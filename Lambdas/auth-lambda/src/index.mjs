@@ -1,7 +1,7 @@
 import { register, login } from './handlers/auth.mjs';
 import { createResponse } from './utils/responses.mjs';
 
-console.log("Testing webhook");
+console.log("Testing webhook again");
 
 export const handler = async (event) => {
     console.log('Event received:', event);
