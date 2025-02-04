@@ -1,26 +1,9 @@
-// match-lambda/src/handlers/match.mjs
 import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 
-const verifyAuth = (event) => {
-    try {
-        const token = event.headers.Authorization?.split(' ')[1];
-        if (!token) return null;
-        return jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-        console.error('Auth error:', error);
-        return null;
-    }
-};
-
 export async function createMatch(event) {
     try {
-        const auth = verifyAuth(event);
-        if (!auth) {
-            return createResponse(401, { message: 'Invalid or missing token' });
-        }
-
         const db = await connectToDatabase();
         const matches = db.collection('matches');
 
@@ -35,7 +18,6 @@ export async function createMatch(event) {
             posterName,
             matchTime: new Date(matchTime),
             matchType,
-            userId: auth.userId,
             createdAt: new Date(),
             status: 'open'
         };
@@ -47,20 +29,12 @@ export async function createMatch(event) {
         });
     } catch (error) {
         console.error('Create match error:', error);
-        return createResponse(500, {
-            message: 'Error creating match',
-            error: error.message
-        });
+        return createResponse(500, { message: 'Error creating match' });
     }
 }
 
 export async function getMatches(event) {
     try {
-        const auth = verifyAuth(event);
-        if (!auth) {
-            return createResponse(401, { message: 'Invalid or missing token' });
-        }
-
         const db = await connectToDatabase();
         const matches = db.collection('matches');
 
@@ -79,9 +53,6 @@ export async function getMatches(event) {
         return createResponse(200, { matches: matchList });
     } catch (error) {
         console.error('Get matches error:', error);
-        return createResponse(500, {
-            message: 'Error retrieving matches',
-            error: error.message
-        });
+        return createResponse(500, { message: 'Error retrieving matches' });
     }
 }
