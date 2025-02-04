@@ -1,9 +1,22 @@
-// match-lambda/src/handlers/match.mjs
+import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 
 export async function createMatch(event) {
     try {
+        const token = event.headers.Authorization?.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Missing Authentication Token' });
+        }
+
+        let userId;
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            userId = decoded.userId;
+        } catch (error) {
+            return createResponse(401, { message: 'Invalid Authentication Token' });
+        }
+
         const db = await connectToDatabase();
         const matches = db.collection('matches');
 
@@ -11,12 +24,10 @@ export async function createMatch(event) {
             courtLocation,
             posterName,
             matchTime,
-            matchType, // 'singles' or 'doubles'
-            userId // from JWT token
+            matchType
         } = JSON.parse(event.body);
 
-        // Validate required fields
-        if (!courtLocation || !posterName || !matchTime || !matchType || !userId) {
+        if (!courtLocation || !posterName || !matchTime || !matchType) {
             return createResponse(400, {
                 message: 'Missing required fields'
             });
@@ -29,7 +40,7 @@ export async function createMatch(event) {
             matchType,
             userId,
             createdAt: new Date(),
-            status: 'open' // open, filled, cancelled, completed
+            status: 'open'
         };
 
         const result = await matches.insertOne(newMatch);
@@ -49,10 +60,20 @@ export async function createMatch(event) {
 
 export async function getMatches(event) {
     try {
+        const token = event.headers.Authorization?.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Missing Authentication Token' });
+        }
+
+        try {
+            jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return createResponse(401, { message: 'Invalid Authentication Token' });
+        }
+
         const db = await connectToDatabase();
         const matches = db.collection('matches');
 
-        // Get query parameters for filtering
         const { courtLocation, matchType, status } = event.queryStringParameters || {};
 
         let query = {};
