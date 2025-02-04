@@ -1,0 +1,12 @@
+{
+  "name": "match-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "build": "powershell -File .\\build.ps1"
+  },
+  "dependencies": {
+    "mongodb": "^5.0.0"
+  }
+}
