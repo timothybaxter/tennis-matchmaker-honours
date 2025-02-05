@@ -39,6 +39,7 @@ export async function register(event) {
             email,
             password: hashedPassword,
             name,
+            playerLevel,
             createdAt: new Date()
         };
 
