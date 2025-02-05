@@ -5,29 +5,17 @@ import { createResponse } from '../utils/responses.mjs';
 
 export async function register(event) {
     try {
-        console.log('Starting registration process');
-        console.log('Event:', JSON.stringify(event));
-
         const body = JSON.parse(event.body);
-        console.log('Parsed body:', body);
+        const { email, password, name, playerLevel } = body;
 
-        const { email, password, name } = body;
-
-        if (!email || !password || !name) {
-            console.log('Validation failed - missing fields');
-            return createResponse(400, { message: 'Email, password, and name are required' });
+        if (!email || !password || !name || !playerLevel) {
+            return createResponse(400, { message: 'All fields are required' });
         }
 
-        console.log('Attempting database connection');
         const db = await connectToDatabase();
-        console.log('Database connection successful');
-
         const users = db.collection('users');
-        console.log('Accessing users collection');
 
         const existingUser = await users.findOne({ email });
-        console.log('Checked for existing user:', !!existingUser);
-
         if (existingUser) {
             return createResponse(409, { message: 'User already exists' });
         }
@@ -44,8 +32,6 @@ export async function register(event) {
         };
 
         await users.insertOne(newUser);
-        console.log('User created successfully');
-
         const token = jwt.sign(
             { userId: newUser._id, email },
             process.env.JWT_SECRET,
@@ -57,19 +43,13 @@ export async function register(event) {
             token,
             user: {
                 email: newUser.email,
-                name: newUser.name
+                name: newUser.name,
+                playerLevel: newUser.playerLevel
             }
         });
     } catch (error) {
-        console.error('Registration error:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
-        return createResponse(500, {
-            message: 'Error creating user',
-            error: error.message
-        });
+        console.error('Registration error:', error);
+        return createResponse(500, { message: 'Error creating user', error: error.message });
     }
 }
 
