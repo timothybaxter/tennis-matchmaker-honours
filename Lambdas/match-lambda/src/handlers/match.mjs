@@ -6,10 +6,9 @@ export async function createMatch(event) {
     try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
+        const { courtLocation, posterName, matchTime, matchType, skillLevel } = JSON.parse(event.body);
 
-        const { courtLocation, posterName, matchTime, matchType } = JSON.parse(event.body);
-
-        if (!courtLocation || !posterName || !matchTime || !matchType) {
+        if (!courtLocation || !posterName || !matchTime || !matchType || !skillLevel) {
             return createResponse(400, { message: 'Missing required fields' });
         }
 
@@ -18,6 +17,7 @@ export async function createMatch(event) {
             posterName,
             matchTime: new Date(matchTime),
             matchType,
+            skillLevel,
             createdAt: new Date(),
             status: 'open'
         };
@@ -37,13 +37,13 @@ export async function getMatches(event) {
     try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
-
-        const { courtLocation, matchType, status } = event.queryStringParameters || {};
+        const { courtLocation, matchType, status, skillLevel } = event.queryStringParameters || {};
 
         const query = {};
         if (courtLocation) query.courtLocation = courtLocation;
         if (matchType) query.matchType = matchType;
         if (status) query.status = status;
+        if (skillLevel) query.skillLevel = skillLevel;
 
         const matchList = await matches.find(query)
             .sort({ matchTime: 1 })
