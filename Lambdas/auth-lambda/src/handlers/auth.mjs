@@ -86,7 +86,8 @@ export async function login(event) {
             token,
             user: {
                 email: user.email,
-                name: user.name
+                name: user.name,
+                playerLevel: user.playerLevel
             }
         });
     } catch (error) {
