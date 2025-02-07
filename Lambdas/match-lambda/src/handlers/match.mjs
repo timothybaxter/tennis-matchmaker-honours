@@ -8,7 +8,8 @@ export async function createMatch(event) {
         const matches = db.collection('matches');
         const { courtLocation, posterName, matchTime, matchType, skillLevel } = JSON.parse(event.body);
 
-        if (!courtLocation || !posterName || !matchTime || !matchType || !skillLevel) {
+        // Remove skillLevel from required check
+        if (!courtLocation || !posterName || !matchTime || !matchType) {
             return createResponse(400, { message: 'Missing required fields' });
         }
 
@@ -17,7 +18,7 @@ export async function createMatch(event) {
             posterName,
             matchTime: new Date(matchTime),
             matchType,
-            skillLevel,
+            skillLevel: skillLevel || 'Not Specified', // Default value if not provided
             createdAt: new Date(),
             status: 'open'
         };
