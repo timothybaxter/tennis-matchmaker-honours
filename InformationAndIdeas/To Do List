@@ -1,0 +1,4 @@
+Need to add the player level to the bottom right of the card //
+Need to make the cards expandable with further information and figure out a way to request the match, then have the user accept the match, will need social hub for this 
+Need to have it so the user can view their match postings, social hub will contain match requests, if the user accepts the match then the match posting will be taken down from the list of available matches
+Any match that has been accepted will be added to users matches with a marking on it that it is arranged

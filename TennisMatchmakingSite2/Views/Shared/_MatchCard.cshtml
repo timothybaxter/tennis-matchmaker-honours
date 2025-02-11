@@ -1,0 +1,67 @@
+@model TennisMatchmakingSite2.Models.MatchData
+@{
+    var isPersonal = ViewBag.IsPersonal ?? false;
+}
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div class="p-4 cursor-pointer" onclick="toggleCard('@Model.Id')">
+        <div class="flex justify-between items-start">
+            <div>
+                <h3 class="text-lg font-semibold">@Model.CourtLocation</h3>
+                <div class="mt-2 space-y-1 text-gray-600">
+                    <p><span class="font-medium">Type:</span> @Model.MatchType?.ToUpper()</p>
+                    <p><span class="font-medium">Time:</span> @Model.MatchTime.ToString("dd MMMM yyyy HH:mm")</p>
+                    <div class="flex justify-between items-center w-full">
+                        <span class="text-sm text-gray-700 font-medium bg-gray-100 px-2 py-0.5 rounded-full"> Skill Level: 
+                            @(string.IsNullOrEmpty(Model.SkillLevel) ? "Unknown" : Model.SkillLevel)
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(Model.Status?.ToLower() == "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")">
+                    @Model.Status?.ToUpper()
+                </span>
+            </div>
+        </div>
+        <div class="flex justify-center mt-2">
+            <i id="icon-@Model.Id" class="fas fa-chevron-down text-gray-500"></i>
+        </div>
+    </div>
+
+    <div id="content-@Model.Id" class="hidden px-4 pb-4 border-t border-gray-100">
+        @if (isPersonal)
+        {
+        <div class="flex gap-2 justify-end pt-4">
+            <button onclick="deleteMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100">
+                <i class="fas fa-trash-alt mr-2"></i>Delete Match
+            </button>
+            <button onclick="editMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                <i class="fas fa-edit mr-2"></i>Edit Match
+            </button>
+        </div>
+        }
+        else
+        {
+    <div class="pt-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <p class="text-gray-700">
+                <span class="font-medium">Posted by:</span> @Model.PosterName
+            </p>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <button onclick="viewProfile('@Model.PosterName'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100">
+                    <i class="fas fa-user mr-2"></i>View Profile
+                </button>
+                <button onclick="messageUser('@Model.PosterName'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                    <i class="fas fa-comment mr-2"></i>Message User
+                </button>
+                <button onclick="requestMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100">
+                    <i class="fas fa-calendar-plus mr-2"></i>Request Match
+                </button>
+            </div>
+        </div>
+    </div>
+        }
+    </div>
+</div>
