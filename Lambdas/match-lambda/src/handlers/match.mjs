@@ -77,17 +77,45 @@ export async function getMatches(event) {
     }
 }
 
+// Add this new function to get a single match
+export async function getMatch(event) {
+    try {
+        const db = await connectToDatabase();
+        const matches = db.collection('matches');
+        const matchId = event.pathParameters?.id;
+
+        if (!matchId) {
+            return createResponse(400, { message: 'Match ID is required' });
+        }
+
+        const match = await matches.findOne({ _id: new ObjectId(matchId) });
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found' });
+        }
+
+        return createResponse(200, match);
+    } catch (error) {
+        console.error('Get match error:', error);
+        return createResponse(500, { message: 'Error retrieving match' });
+    }
+}
+
+// Update the deleteMatch function to use path parameters
 export async function deleteMatch(event) {
     try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
+        const matchId = event.pathParameters?.id;
 
-        const { matchId } = JSON.parse(event.body);
+        if (!matchId) {
+            return createResponse(400, { message: 'Match ID is required' });
+        }
+
         const token = event.headers.Authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
 
-        // Check if match exists and user is the creator
         const match = await matches.findOne({
             _id: new ObjectId(matchId),
             creatorId: userId
@@ -105,17 +133,22 @@ export async function deleteMatch(event) {
     }
 }
 
+// Update the updateMatch function to use path parameters
 export async function updateMatch(event) {
     try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
+        const matchId = event.pathParameters?.id;
 
-        const { matchId, ...updateData } = JSON.parse(event.body);
+        if (!matchId) {
+            return createResponse(400, { message: 'Match ID is required' });
+        }
+
+        const updateData = JSON.parse(event.body);
         const token = event.headers.Authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
 
-        // Check if match exists and user is the creator
         const match = await matches.findOne({
             _id: new ObjectId(matchId),
             creatorId: userId
@@ -123,6 +156,10 @@ export async function updateMatch(event) {
 
         if (!match) {
             return createResponse(404, { message: 'Match not found or unauthorized' });
+        }
+
+        if (updateData.matchTime) {
+            updateData.matchTime = new Date(updateData.matchTime);
         }
 
         const result = await matches.updateOne(
