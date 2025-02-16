@@ -1,178 +1,117 @@
 import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '../utils/database.mjs';
-import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
+import { connectToDatabase } from '../utils/database.mjs';
 
-export async function createMatch(event) {
-    try {
-        const db = await connectToDatabase();
-        const matches = db.collection('matches');
+// Update your createResponse utility to include CORS headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': 'http://localhost:5000',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+};
 
-        const { courtLocation, posterName, matchTime, matchType, skillLevel } = JSON.parse(event.body);
+const createResponse = (statusCode, body) => ({
+    statusCode,
+    headers: corsHeaders,
+    body: JSON.stringify(body)
+});
 
-        // Get user ID from JWT token
-        const token = event.headers.Authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
-
-        if (!courtLocation || !posterName || !matchTime || !matchType) {
-            return createResponse(400, { message: 'Missing required fields' });
-        }
-
-        const newMatch = {
-            courtLocation,
-            posterName,
-            matchTime: new Date(matchTime),
-            matchType,
-            skillLevel: skillLevel || 'Not Specified',
-            createdAt: new Date(),
-            status: 'open',
-            creatorId: userId,
-            participants: [userId], // Array to store all participant IDs
-            requestedBy: [] // Array to store IDs of users who requested to join
-        };
-
-        const result = await matches.insertOne(newMatch);
-        return createResponse(201, {
-            message: 'Match created successfully',
-            matchId: result.insertedId
-        });
-    } catch (error) {
-        console.error('Create match error:', error);
-        return createResponse(500, { message: 'Error creating match' });
-    }
+// Add an OPTIONS handler
+export async function handleOptions() {
+    return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({})
+    };
 }
 
-export async function getMatches(event) {
+// Update the deleteMatch function with proper error handling
+export async function deleteMatch(event) {
+    console.log('Delete match event:', JSON.stringify(event));
+
     try {
-        const db = await connectToDatabase();
-        const matches = db.collection('matches');
-        const { courtLocation, matchType, status, skillLevel, personal } = event.queryStringParameters || {};
-
-        // Get user ID from JWT token
-        const token = event.headers.Authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
-
-        const query = {};
-        if (courtLocation) query.courtLocation = courtLocation;
-        if (matchType) query.matchType = matchType;
-        if (status) query.status = status;
-        if (skillLevel) query.skillLevel = skillLevel;
-
-        // If personal flag is true, only return matches created by the user
-        if (personal === 'true') {
-            query.creatorId = userId;
+        // Handle OPTIONS request
+        if (event.httpMethod === 'OPTIONS') {
+            return handleOptions();
         }
 
-        const matchList = await matches.find(query)
-            .sort({ matchTime: 1 })
-            .limit(100)
-            .toArray();
-
-        return createResponse(200, { matches: matchList });
-    } catch (error) {
-        console.error('Get matches error:', error);
-        return createResponse(500, { message: 'Error retrieving matches' });
-    }
-}
-
-// Add this new function to get a single match
-export async function getMatch(event) {
-    try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
         const matchId = event.pathParameters?.id;
+
+        console.log('Attempting to delete match:', matchId);
 
         if (!matchId) {
             return createResponse(400, { message: 'Match ID is required' });
         }
 
-        const match = await matches.findOne({ _id: new ObjectId(matchId) });
+        // Verify token and get user ID
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization header' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        console.log('Token received:', token);
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+        console.log('User ID from token:', userId);
+
+        // Find the match and verify ownership
+        const match = await matches.findOne({
+            _id: new ObjectId(matchId)
+        });
 
         if (!match) {
             return createResponse(404, { message: 'Match not found' });
         }
 
-        return createResponse(200, match);
-    } catch (error) {
-        console.error('Get match error:', error);
-        return createResponse(500, { message: 'Error retrieving match' });
-    }
-}
-
-// Update the deleteMatch function to use path parameters
-export async function deleteMatch(event) {
-    try {
-        const db = await connectToDatabase();
-        const matches = db.collection('matches');
-        const matchId = event.pathParameters?.id;
-
-        if (!matchId) {
-            return createResponse(400, { message: 'Match ID is required' });
+        if (match.creatorId !== userId) {
+            return createResponse(403, { message: 'Not authorized to delete this match' });
         }
 
-        const token = event.headers.Authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
+        // Delete the match
+        const result = await matches.deleteOne({ _id: new ObjectId(matchId) });
+        console.log('Delete result:', result);
 
-        const match = await matches.findOne({
-            _id: new ObjectId(matchId),
-            creatorId: userId
-        });
-
-        if (!match) {
-            return createResponse(404, { message: 'Match not found or unauthorized' });
+        if (result.deletedCount === 0) {
+            return createResponse(404, { message: 'Match not found' });
         }
 
-        await matches.deleteOne({ _id: new ObjectId(matchId) });
         return createResponse(200, { message: 'Match deleted successfully' });
     } catch (error) {
         console.error('Delete match error:', error);
-        return createResponse(500, { message: 'Error deleting match' });
+        if (error.name === 'JsonWebTokenError') {
+            return createResponse(401, { message: 'Invalid token' });
+        }
+        return createResponse(500, { message: 'Error deleting match', error: error.message });
     }
 }
 
-// Update the updateMatch function to use path parameters
-export async function updateMatch(event) {
+// Update index.mjs handler
+export const handler = async (event) => {
+    console.log('Event received:', JSON.stringify(event));
+
+    // Handle OPTIONS requests
+    if (event.httpMethod === 'OPTIONS') {
+        return handleOptions();
+    }
+
+    // Route the request based on method and path
+    const route = `${event.httpMethod} ${event.resource}`;
+    console.log('Route:', route);
+
     try {
-        const db = await connectToDatabase();
-        const matches = db.collection('matches');
-        const matchId = event.pathParameters?.id;
-
-        if (!matchId) {
-            return createResponse(400, { message: 'Match ID is required' });
+        switch (route) {
+            case 'DELETE /matches/{id}':
+                return await deleteMatch(event);
+            // Add other routes here
+            default:
+                return createResponse(404, { message: 'Route not found' });
         }
-
-        const updateData = JSON.parse(event.body);
-        const token = event.headers.Authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
-
-        const match = await matches.findOne({
-            _id: new ObjectId(matchId),
-            creatorId: userId
-        });
-
-        if (!match) {
-            return createResponse(404, { message: 'Match not found or unauthorized' });
-        }
-
-        if (updateData.matchTime) {
-            updateData.matchTime = new Date(updateData.matchTime);
-        }
-
-        const result = await matches.updateOne(
-            { _id: new ObjectId(matchId) },
-            { $set: updateData }
-        );
-
-        return createResponse(200, {
-            message: 'Match updated successfully',
-            matchId: matchId
-        });
     } catch (error) {
-        console.error('Update match error:', error);
-        return createResponse(500, { message: 'Error updating match' });
+        console.error('Handler error:', error);
+        return createResponse(500, { message: 'Internal server error' });
     }
-}
+};
