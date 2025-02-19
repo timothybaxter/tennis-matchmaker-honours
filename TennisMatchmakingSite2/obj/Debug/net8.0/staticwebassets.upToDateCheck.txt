@@ -1,11 +1,15 @@
 wwwroot\css\site.css
 wwwroot\favicon.ico
+wwwroot\images\court_background_blue.png
+wwwroot\images\court_background_clay.png
 wwwroot\images\court_background_green.png
+wwwroot\images\court_background_hard.png
 wwwroot\images\logo.png
 wwwroot\images\logo2.png
 wwwroot\js\match.js
 wwwroot\js\match-functions.js
 wwwroot\js\site.js
+wwwroot\js\theme-handler.js
 wwwroot\lib\bootstrap\css\bootstrap.css
 wwwroot\lib\bootstrap\css\bootstrap.css.map
 wwwroot\lib\bootstrap\css\bootstrap.min.css

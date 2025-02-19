@@ -6,6 +6,9 @@ namespace TennisMatchmakingSite2.Models
     public class UpdateMatchViewModel
     {
         [Required]
+        public string MatchId { get; set; }  
+
+        [Required]
         public string CourtLocation { get; set; }
 
         [Required]
@@ -14,7 +17,6 @@ namespace TennisMatchmakingSite2.Models
         [Required]
         public string MatchType { get; set; }
 
-        // Optional fields that might be updated
         public string Status { get; set; }
         public string PlayerLevel { get; set; }
     }

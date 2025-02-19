@@ -1,61 +1,118 @@
-// Match card expansion
-function toggleMatchExpand(element) {
-    const card = element.closest('.match-card');
-    const actions = card.querySelector('.match-actions');
-    const icon = card.querySelector('.expand-icon');
 
-    if (actions && icon) {
-        actions.classList.toggle('hidden');
-        if (actions.classList.contains('hidden')) {
-            icon.classList.remove('fa-chevron-up');
-            icon.classList.add('fa-chevron-down');
+
+async function deleteMatch(matchId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!confirm('Are you sure you want to delete this match?')) {
+        return;
+    }
+
+    try {
+        const token = sessionStorage.getItem('jwtToken');
+        const response = await fetch(`${window.API_BASE_URL}/matches/${matchId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const card = document.querySelector(`[data-match-id="${matchId}"]`);
+            if (card) {
+                card.remove();
+            }
         } else {
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-up');
+            throw new Error('Failed to delete match');
         }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to delete match. Please try again.');
+    }
+}
+// Delete functionality
+async function deleteMatchFromApi(matchId) {
+    if (!confirm('Are you sure you want to delete this match?')) {
+        return;
+    }
+
+    try {
+        const token = sessionStorage.getItem('jwtToken');
+        const response = await fetch(`${window.API_BASE_URL}/matches/${matchId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const card = document.querySelector(`[data-match-id="${matchId}"]`);
+            if (card) {
+                card.remove();
+            }
+        } else {
+            throw new Error('Failed to delete match');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to delete match. Please try again.');
     }
 }
 
-// Create match modal
+function showFilterPanel() {
+    const panel = document.getElementById('filterPanel');
+    const backdrop = document.getElementById('filterBackdrop');
+
+    if (!panel || !backdrop) {
+        console.error('Filter panel elements not found');
+        return;
+    }
+
+    backdrop.classList.remove('hidden');
+    // Force a reflow
+    panel.offsetHeight;
+    requestAnimationFrame(() => {
+        panel.classList.remove('translate-x-full');
+    });
+
+    document.body.style.overflow = 'hidden';
+}
+
+function hideFilterPanel() {
+    const panel = document.getElementById('filterPanel');
+    const backdrop = document.getElementById('filterBackdrop');
+
+    if (!panel || !backdrop) {
+        console.error('Filter panel elements not found');
+        return;
+    }
+
+    panel.classList.add('translate-x-full');
+
+    setTimeout(() => {
+        backdrop.classList.add('hidden');
+        document.body.style.overflow = '';
+    }, 300);
+}
+
+// Create match modal functionality
 function showCreateMatchModal() {
     const modal = document.getElementById('createMatchModal');
+    if (!modal) return;
+
     modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
 function hideCreateMatchModal() {
     const modal = document.getElementById('createMatchModal');
+    if (!modal) return;
+
     modal.classList.add('hidden');
+    document.body.style.overflow = '';
 }
 
-// Mobile filter panel
-function showFilterPanel() {
-    const filterPanel = document.getElementById('filterPanel');
-    filterPanel.classList.remove('hidden');
-}
-
-function hideFilterPanel() {
-    const filterPanel = document.getElementById('filterPanel');
-    filterPanel.classList.add('hidden');
-}
-
-// Match actions
-function deleteMatch(matchId) {
-    if (confirm('Are you sure you want to delete this match?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/Match/Delete';
-
-        const matchIdInput = document.createElement('input');
-        matchIdInput.type = 'hidden';
-        matchIdInput.name = 'matchId';
-        matchIdInput.value = matchId;
-
-        form.appendChild(matchIdInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
+// Placeholder functions
 function messageUser(userName) {
     alert('Messaging functionality coming soon');
 }
@@ -64,26 +121,24 @@ function requestMatch(matchId) {
     alert('Match request functionality coming soon');
 }
 
-// Initialize event listeners when the document loads
+function viewProfile(userName) {
+    alert('Profile view functionality coming soon');
+}
+
+// Event Listeners when document loads
 document.addEventListener('DOMContentLoaded', function () {
-    // Filter panel buttons
-    const openFilterBtn = document.getElementById('openFilterPanel');
-    const closeFilterBtn = document.getElementById('closeFilterPanel');
+    const modal = document.getElementById('createMatchModal');
+    const backdrop = document.getElementById('filterBackdrop');
 
-    if (openFilterBtn) {
-        openFilterBtn.addEventListener('click', showFilterPanel);
-    }
-    if (closeFilterBtn) {
-        closeFilterBtn.addEventListener('click', hideFilterPanel);
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) {
+                hideCreateMatchModal();
+            }
+        });
     }
 
-    // Add click listeners to match cards
-    document.querySelectorAll('.match-card').forEach(card => {
-        const clickableArea = card.querySelector('.clickable-area');
-        if (clickableArea) {
-            clickableArea.addEventListener('click', function () {
-                toggleMatchExpand(this);
-            });
-        }
-    });
+    if (backdrop) {
+        backdrop.addEventListener('click', hideFilterPanel);
+    }
 });

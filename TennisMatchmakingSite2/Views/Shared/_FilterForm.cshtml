@@ -1,36 +1,38 @@
-@using (Html.BeginForm("Filter", "Match", FormMethod.Post))
+@using (Html.BeginForm("Index", "Match", FormMethod.Get))
 {
 <div class="space-y-4">
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-        <input type="text" name="CourtLocation" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <input type="text" name="courtLocation" value="@ViewBag.CurrentCourtLocation"
+               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
     </div>
 
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
-        <select name="MatchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <select name="matchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
             <option value="">All Types</option>
-            <option value="singles">SINGLES</option>
-            <option value="doubles">DOUBLES</option>
-            <option value="mixed">MIXED</option>
+            <option value="singles" selected="@(ViewBag.CurrentMatchType == "singles")">SINGLES</option>
+            <option value="doubles" selected="@(ViewBag.CurrentMatchType == "doubles")">DOUBLES</option>
+            <option value="mixed" selected="@(ViewBag.CurrentMatchType == "mixed")">MIXED</option>
         </select>
     </div>
 
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
-        <select name="SkillLevel" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <select name="skillLevel" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
             <option value="">All Levels</option>
-            <option value="beginner">Beginner</option>
-            <option value="casual">Casual</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="competitive">Competitive</option>
-            <option value="advanced">Advanced</option>
+            <option value="beginner" selected="@(ViewBag.CurrentSkillLevel == "beginner")">Beginner</option>
+            <option value="casual" selected="@(ViewBag.CurrentSkillLevel == "casual")">Casual</option>
+            <option value="intermediate" selected="@(ViewBag.CurrentSkillLevel == "intermediate")">Intermediate</option>
+            <option value="competitive" selected="@(ViewBag.CurrentSkillLevel == "competitive")">Competitive</option>
+            <option value="advanced" selected="@(ViewBag.CurrentSkillLevel == "advanced")">Advanced</option>
         </select>
     </div>
 
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-        <input type="date" name="MatchDate" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <input type="date" name="matchDate" value="@(ViewBag.CurrentMatchDate?.ToString("yyyy-MM-dd"))"
+               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
     </div>
 
     <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">

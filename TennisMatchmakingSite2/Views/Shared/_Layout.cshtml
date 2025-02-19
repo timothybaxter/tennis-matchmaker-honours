@@ -13,30 +13,28 @@
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
     <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style type="text/css">
+    <script src="~/js/theme-handler.js"></script>
+    <style>
         html, body {
             height: 100%;
             margin: 0;
-            overflow: auto; /* Changed from hidden to auto for main pages */
+            overflow: auto;
         }
 
-        /* Background div with opacity and proper z-index */
         .bg-tennis {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-image: url('/images/court_background_green.png');
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
-            opacity: 0.4;
             z-index: -1;
             pointer-events: none;
+            opacity: 0.6;
         }
 
-        /* Header with solid color */
         .header {
             position: fixed;
             top: 0;
@@ -62,55 +60,57 @@
                 object-fit: contain;
             }
 
-        .content-area {
-            position: relative;
-            z-index: 1;
-            background: transparent;
-            padding-top: 120px;
-            pointer-events: auto;
-        }
-
-        /* Added bottom navbar styling */
         .bottom-nav {
-            background-color: #64408a !important;
+            background-color: #64408a;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-            /* Style the navigation links to be more visible on purple background */
-            .bottom-nav a {
-                color: rgba(255, 255, 255, 0.7);
-            }
-
-                .bottom-nav a:hover {
-                    color: rgba(255, 255, 255, 0.9);
-                }
-
-                .bottom-nav a.active {
-                    color: white;
-                }
-
-        @@media (orientation: portrait) {
-            .bg-tennis {
-                background-size: auto 100vh;
-                background-position: center;
-            }
+        .bottom-nav a {
+            color: rgba(255, 255, 255, 0.7);
         }
 
-        @@media (orientation: landscape) {
-            .bg-tennis {
-                background-size: 100vw auto;
-                background-position: center;
-            }
+        .bottom-nav a:hover {
+            color: rgba(255, 255, 255, 0.9);
         }
+
+        .bottom-nav a.active {
+            color: white;
+        }
+
+       @@media (orientation: portrait) {
+            .bg-tennis {
+        background-size: auto 100vh;
+        background-position: center;
+    }
+}
+
+    @@media (orientation: landscape) {
+    .bg-tennis {
+        background-size: 100vw auto;
+        background-position: center;
+    }
+}
     </style>
 </head>
 <body>
+    @inject IConfiguration Configuration
+    <script>
+        window.API_BASE_URL = '@Configuration["ApiBaseUrl"]';
+    </script>
+
+    @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+    @{
+        var token = Xsrf.GetAndStoreTokens(Context).RequestToken;
+        <input type="hidden" name="__RequestVerificationToken" value="@token" />
+    }
+
     <div class="bg-tennis"></div>
     <div class="header">
         <div class="logo-container">
             <img src="@Url.Content("~/images/logo.png")" alt="Logo" asp-append-version="true" />
         </div>
     </div>
+
     <div class="container">
         <main role="main" class="pb-20 mt-28">
             @RenderBody()
@@ -129,9 +129,9 @@
                 <i data-lucide="users" class="w-6 h-6"></i>
                 <span class="text-xs mt-1">Social</span>
             </a>
-            <a asp-controller="Courts" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Courts" ? "active" : "")">
-                <i data-lucide="map-pin" class="w-6 h-6"></i>
-                <span class="text-xs mt-1">Courts</span>
+            <a asp-controller="Map" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Map" ? "active" : "")">
+                <i data-lucide="map" class="w-6 h-6"></i>
+                <span class="text-xs mt-1">Map</span>
             </a>
             <a asp-controller="Tournament" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tournament" ? "active" : "")">
                 <i data-lucide="trophy" class="w-6 h-6"></i>
@@ -142,12 +142,18 @@
                 <span class="text-xs mt-1">Settings</span>
             </a>
         </div>
-    
     </nav>
     }
+
     @await RenderSectionAsync("Scripts", required: false)
+
     <script>
         lucide.createIcons();
+        // Initialize theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentTheme = '@(Context.Session.GetString("Theme") ?? "Wimbledon")';
+            window.applyTheme(currentTheme);
+        });
     </script>
     <script src="~/js/match-functions.js"></script>
 </body>

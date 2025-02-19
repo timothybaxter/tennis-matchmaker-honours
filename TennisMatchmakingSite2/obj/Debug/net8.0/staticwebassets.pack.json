@@ -13,8 +13,20 @@
       "PackagePath": "staticwebassets\\favicon.ico"
     },
     {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\images\\court_background_blue.png",
+      "PackagePath": "staticwebassets\\images\\court_background_blue.png"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\images\\court_background_clay.png",
+      "PackagePath": "staticwebassets\\images\\court_background_clay.png"
+    },
+    {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\images\\court_background_green.png",
       "PackagePath": "staticwebassets\\images\\court_background_green.png"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\images\\court_background_hard.png",
+      "PackagePath": "staticwebassets\\images\\court_background_hard.png"
     },
     {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\images\\logo.png",
@@ -35,6 +47,10 @@
     {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\site.js",
       "PackagePath": "staticwebassets\\js\\site.js"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\theme-handler.js",
+      "PackagePath": "staticwebassets\\js\\theme-handler.js"
     },
     {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\lib\\bootstrap\\LICENSE",

@@ -36,8 +36,16 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxQcml2YWN5LmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Map/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWFwXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Match/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWF0Y2hcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Settings/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2V0dGluZ3NcSW5kZXguY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/Error.cshtml]
@@ -46,6 +54,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_AuthLayout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9BdXRoTGF5b3V0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_EditMatch.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9FZGl0TWF0Y2guY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_FilterForm.cshtml]
@@ -58,10 +70,6 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Test/TestingImages.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVGVzdFxUZXN0aW5nSW1hZ2VzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/_ViewImports.cshtml]

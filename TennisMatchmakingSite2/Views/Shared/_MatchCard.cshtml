@@ -4,7 +4,8 @@
 }
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-    <div class="p-4 cursor-pointer" onclick="toggleCard('@Model.Id')">
+    <!-- Header Section -->
+    <div class="p-4" onclick="toggleCard('@Model.Id')">
         <div class="flex justify-between items-start">
             <div>
                 <h3 class="text-lg font-semibold">@Model.CourtLocation</h3>
@@ -12,11 +13,10 @@
                     <p><span class="font-medium">Type:</span> @Model.MatchType?.ToUpper()</p>
                     <p><span class="font-medium">Time:</span> @Model.MatchTime.ToString("dd MMMM yyyy HH:mm")</p>
                     <div class="flex justify-between items-center w-full">
-                        <span class="text-sm text-gray-700 font-medium bg-gray-100 px-2 py-0.5 rounded-full"> Skill Level: 
-                            @(string.IsNullOrEmpty(Model.SkillLevel) ? "Unknown" : Model.SkillLevel)
+                        <span class="text-sm text-gray-700 font-medium bg-gray-100 px-2 py-0.5 rounded-full">
+                            Skill Level: @(string.IsNullOrEmpty(Model.SkillLevel) ? "Unknown" : Model.SkillLevel)
                         </span>
                     </div>
-
                 </div>
             </div>
             <div class="flex flex-col items-end gap-2">
@@ -30,38 +30,83 @@
         </div>
     </div>
 
-    <div id="content-@Model.Id" class="hidden px-4 pb-4 border-t border-gray-100">
-        @if (isPersonal)
-        {
-        <div class="flex gap-2 justify-end pt-4">
-            <button onclick="deleteMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100">
-                <i class="fas fa-trash-alt mr-2"></i>Delete Match
-            </button>
-            <button onclick="editMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
-                <i class="fas fa-edit mr-2"></i>Edit Match
-            </button>
-        </div>
-        }
-        else
-        {
-    <div class="pt-4">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <p class="text-gray-700">
-                <span class="font-medium">Posted by:</span> @Model.PosterName
-            </p>
-            <div class="flex flex-col sm:flex-row gap-2">
-                <button onclick="viewProfile('@Model.PosterName'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100">
-                    <i class="fas fa-user mr-2"></i>View Profile
-                </button>
-                <button onclick="messageUser('@Model.PosterName'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
-                    <i class="fas fa-comment mr-2"></i>Message User
-                </button>
-                <button onclick="requestMatch('@Model.Id'); event.stopPropagation();" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100">
-                    <i class="fas fa-calendar-plus mr-2"></i>Request Match
-                </button>
+    <!-- Expandable Content Section -->
+    <div id="content-@Model.Id" class="hidden">
+        <div class="border-t border-gray-100" id="content-inner-@Model.Id">
+            @if (isPersonal)
+            {
+            <div class="p-4">
+                <div class="flex gap-2 justify-end">
+                    <form asp-controller="Match" asp-action="Delete" method="post" class="inline" onsubmit="return confirm('Are you sure you want to delete this match?')">
+                        <input type="hidden" name="matchId" value="@Model.Id" />
+                        <button type="submit" onclick="event.stopPropagation();"
+                                class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100">
+                            <i class="fas fa-trash-alt mr-2"></i>Delete Match
+                        </button>
+                    </form>
+                    <button onclick="editMatch('@Model.Id'); event.stopPropagation();"
+                            class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                        <i class="fas fa-edit mr-2"></i>Edit Match
+                    </button>
+                </div>
             </div>
+            }
+            else
+            {
+            <div class="p-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <p class="text-gray-700">
+                        <span class="font-medium">Posted by:</span> @Model.PosterName
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button onclick="viewProfile('@Model.PosterName'); event.stopPropagation();"
+                                class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100">
+                            <i class="fas fa-user mr-2"></i>View Profile
+                        </button>
+                        <button onclick="messageUser('@Model.PosterName'); event.stopPropagation();"
+                                class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                            <i class="fas fa-comment mr-2"></i>Message User
+                        </button>
+                        <button onclick="requestMatch('@Model.Id'); event.stopPropagation();"
+                                class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100">
+                            <i class="fas fa-calendar-plus mr-2"></i>Request Match
+                        </button>
+                    </div>
+                </div>
+            </div>
+            }
         </div>
-    </div>
-        }
     </div>
 </div>
+<script>
+    async function deleteMatchFromApi(matchId) {
+        if (!confirm('Are you sure you want to delete this match?')) {
+            return;
+        }
+
+        try {
+            // Get token from the button's data attribute
+            const button = event.target.closest('button');
+            const token = button.dataset.token;
+
+            const response = await fetch(`${window.API_BASE_URL}/matches/${matchId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const card = document.querySelector(`[data-match-id="${matchId}"]`);
+                if (card) {
+                    card.remove();
+                }
+            } else {
+                throw new Error('Failed to delete match');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to delete match. Please try again.');
+        }
+    }
+</script>

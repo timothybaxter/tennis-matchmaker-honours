@@ -257,3 +257,67 @@ body {
         padding-bottom: 5rem;
     }
 }
+
+/* Your existing CSS content first */
+[Previous CSS content remains the same until bottom of file]
+/* Theme-related styles */
+.bg-tennis {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.4;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100px;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease;
+}
+
+.logo-container {
+    width: 600px;
+    height: auto;
+}
+
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+.bottom-nav {
+    transition: background-color 0.3s ease;
+}
+
+    .bottom-nav a {
+        transition: color 0.3s ease;
+    }
+
+@media (orientation: portrait) {
+    .bg-tennis {
+        background-size: auto 100vh;
+        background-position: center;
+    }
+}
+
+@media (orientation: landscape) {
+    .bg-tennis {
+        background-size: 100vw auto;
+        background-position: center;
+    }
+}
