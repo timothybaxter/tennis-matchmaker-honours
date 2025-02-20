@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Tennis Matchmaker</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+    <style type="text/css">
+    html, body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    .bg-tennis {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url('/images/court_background_green.png');
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        opacity: 0.6;
+        z-index: 0;
+    }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background-color: #64408a;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+    .logo-container {
+        width: 600px;
+        height: auto;
+    }
+
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .content-area {
+        position: relative;
+        z-index: 1;
+        background: transparent;
+        padding-top: 120px;
+    }
+
+    /* Media query for portrait orientation - note the double  */
+    @@media(orientation: portrait) {
+        .bg-tennis {
+            background-size: auto 100vh;
+            background-position: center;
+        }
+    }
+
+    /* Media query for landscape orientation - note the double  */
+    @@media(orientation: landscape) {
+        .bg-tennis {
+            background-size: 100vw auto;
+            background-position: center;
+        }
+    }
+    </style>
+</head>
+<body>
+    <!-- Background -->
+    <div class="bg-tennis"></div>
+
+    <!-- White header -->
+    <div class="header">
+        <div class="logo-container">
+            <img src="@Url.Content("~/images/logo.png")" alt="Logo" asp-append-version="true" />
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-area">
+        @RenderBody()
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

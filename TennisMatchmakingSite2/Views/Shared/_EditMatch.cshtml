@@ -1,0 +1,63 @@
+@model TennisMatchmakingSite2.Models.UpdateMatchViewModel
+
+<div class="px-4 py-3">
+    <form asp-controller="Match" asp-action="Update" method="post">
+        <input type="hidden" name="MatchId" value="@Model.MatchId" />
+
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Court Location</label>
+            <input type="text" name="CourtLocation" value="@Model.CourtLocation"
+                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Match Time</label>
+            <input type="datetime-local" name="MatchTime"
+                   value="@Model.MatchTime.ToString("yyyy-MM-ddTHH:mm")"
+                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+            <select name="MatchType"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                @if (Model.MatchType?.ToLower() == "singles")
+            {
+                <option value="singles" selected>Singles</option>
+            }
+            else
+            {
+                <option value="singles">Singles</option>
+            }
+                @if (Model.MatchType?.ToLower() == "doubles")
+            {
+                <option value="doubles" selected>Doubles</option>
+            }
+            else
+            {
+                <option value="doubles">Doubles</option>
+            }
+                @if (Model.MatchType?.ToLower() == "mixed")
+            {
+                <option value="mixed" selected>Mixed</option>
+            }
+            else
+            {
+                <option value="mixed">Mixed</option>
+            }
+            </select>
+        </div>
+
+        <div class="flex justify-end gap-2">
+            <button type="button"
+                    onclick="toggleCard('@Model.MatchId')"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button type="submit"
+                    class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                Update Match
+            </button>
+        </div>
+    </form>
+</div>
