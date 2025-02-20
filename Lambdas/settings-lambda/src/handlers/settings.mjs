@@ -4,6 +4,7 @@ import { createResponse } from '../utils/responses.mjs';
 
 export async function createSettings(event) {
     try {
+        console.log("testing webhook");
         const body = JSON.parse(event.body);
         const { userId, name, email, playerLevel } = body;
 
