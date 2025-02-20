@@ -11,6 +11,7 @@ namespace TennisMatchmakingSite2.Models
         public string Name { get; set; }
         public string Email { get; set; }
         public string PlayerLevel { get; set; }
+        public string Theme { get; set; }  
     }
 
     public class ErrorResponse
