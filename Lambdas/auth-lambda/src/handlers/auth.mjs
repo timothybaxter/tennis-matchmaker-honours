@@ -137,12 +137,14 @@ export async function updateUser(event) {
         // Get updated user to return in response
         const updatedUser = await users.findOne({ _id: decoded.userId });
 
-        return createResponse(200, {
-            message: 'User updated successfully',
+        return createResponse(201, {
+            message: 'User created successfully',
+            token,
             user: {
-                email: updatedUser.email,
-                name: updatedUser.name,
-                playerLevel: updatedUser.playerLevel
+                id: newUser._id.toString(), // Add this
+                email: newUser.email,
+                name: newUser.name,
+                playerLevel: newUser.playerLevel
             }
         });
     } catch (error) {
