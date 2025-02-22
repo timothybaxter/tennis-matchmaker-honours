@@ -1,4 +1,5 @@
-import { createUserSettings, getUserSettings, updateUserSettings } from './handlers/settings.mjs';
+// index.mjs
+import { createSettings, getSettings, updateSettings } from './handlers/settings.mjs';
 import { createResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -13,11 +14,11 @@ export const handler = async (event) => {
         // Route requests
         switch (`${event.httpMethod} ${event.resource}`) {
             case 'POST /settings':
-                return createUserSettings(event);
+                return createSettings(event);  // Changed from createUserSettings to createSettings
             case 'GET /settings':
-                return getUserSettings(event);
+                return getSettings(event);
             case 'PUT /settings':
-                return updateUserSettings(event);
+                return updateSettings(event);
             default:
                 return createResponse(404, { message: 'Route not found' });
         }

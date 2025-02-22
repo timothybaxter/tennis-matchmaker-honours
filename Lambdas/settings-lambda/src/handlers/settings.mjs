@@ -4,7 +4,6 @@ import { createResponse } from '../utils/responses.mjs';
 
 export async function createSettings(event) {
     try {
-        console.log("testing webhook");
         const body = JSON.parse(event.body);
         const { userId, name, email, playerLevel } = body;
 
@@ -25,7 +24,7 @@ export async function createSettings(event) {
             name,
             email,
             playerLevel,
-            theme: 'Wimbledon', // Default theme
+            theme: 'Wimbledon',
             hometown: '',
             createdAt: new Date(),
             updatedAt: new Date()
@@ -35,23 +34,16 @@ export async function createSettings(event) {
 
         return createResponse(201, {
             message: 'Settings created successfully',
-            settings: {
-                name: newSettings.name,
-                email: newSettings.email,
-                playerLevel: newSettings.playerLevel,
-                theme: newSettings.theme,
-                hometown: newSettings.hometown
-            }
+            settings: newSettings
         });
     } catch (error) {
         console.error('Create settings error:', error);
-        return createResponse(500, { message: 'Error creating settings', error: error.message });
+        return createResponse(500, { message: 'Error creating settings' });
     }
 }
 
 export async function getSettings(event) {
     try {
-        // Extract userId from token
         const { authorization } = event.headers;
         if (!authorization) {
             return createResponse(401, { message: 'No authorization token provided' });
@@ -79,13 +71,15 @@ export async function getSettings(event) {
         });
     } catch (error) {
         console.error('Get settings error:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return createResponse(401, { message: 'Invalid token' });
+        }
         return createResponse(500, { message: 'Error retrieving settings' });
     }
 }
 
 export async function updateSettings(event) {
     try {
-        // Extract userId from token
         const { authorization } = event.headers;
         if (!authorization) {
             return createResponse(401, { message: 'No authorization token provided' });
@@ -139,6 +133,9 @@ export async function updateSettings(event) {
         });
     } catch (error) {
         console.error('Update settings error:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return createResponse(401, { message: 'Invalid token' });
+        }
         return createResponse(500, { message: 'Error updating settings' });
     }
 }
