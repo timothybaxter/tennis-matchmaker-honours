@@ -2,7 +2,7 @@ import { register, login, updateUser, updatePassword } from './handlers/auth.mjs
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
-    console.log('Event received:', event);
+    console.log('Event:', JSON.stringify(event));
 
     if (event.httpMethod === 'OPTIONS') {
         return createCorsResponse();
