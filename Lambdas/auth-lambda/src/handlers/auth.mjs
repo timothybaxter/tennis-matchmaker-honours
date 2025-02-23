@@ -101,7 +101,10 @@ export async function updateUser(event) {
         const db = await connectToDatabase();
         const users = db.collection('users');
 
-        // Extract userId from token
+        // Extract userId from path parameters
+        const { id } = event.pathParameters;
+
+        // Extract userId from token and verify they match
         const { authorization } = event.headers;
         if (!authorization) {
             return createResponse(401, { message: 'No authorization token provided' });
@@ -109,6 +112,11 @@ export async function updateUser(event) {
 
         const token = authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Verify the token userId matches the path parameter
+        if (decoded.userId !== id && id !== 'me') {
+            return createResponse(403, { message: 'Not authorized to update this user' });
+        }
 
         const updates = JSON.parse(event.body);
         const allowedUpdates = ['name', 'email', 'playerLevel'];

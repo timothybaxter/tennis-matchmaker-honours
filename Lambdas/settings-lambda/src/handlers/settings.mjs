@@ -80,6 +80,8 @@ export async function getSettings(event) {
 
 export async function updateSettings(event) {
     try {
+        const { id } = event.pathParameters;
+
         const { authorization } = event.headers;
         if (!authorization) {
             return createResponse(401, { message: 'No authorization token provided' });
@@ -88,10 +90,15 @@ export async function updateSettings(event) {
         const token = authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+        // Verify the token userId matches the path parameter
+        if (decoded.userId !== id && id !== 'me') {
+            return createResponse(403, { message: 'Not authorized to update these settings' });
+        }
+
         const updates = JSON.parse(event.body);
         const allowedUpdates = ['name', 'email', 'playerLevel', 'theme', 'hometown'];
 
-        // Filter out any fields that aren't in allowedUpdates
+        // Filter updates to only allow certain fields
         const filteredUpdates = Object.keys(updates)
             .filter(key => allowedUpdates.includes(key))
             .reduce((obj, key) => {
@@ -103,11 +110,11 @@ export async function updateSettings(event) {
             return createResponse(400, { message: 'No valid update fields provided' });
         }
 
-        // Add updatedAt timestamp
-        filteredUpdates.updatedAt = new Date();
-
         const db = await connectToDatabase();
         const settings = db.collection('user-settings');
+
+        // Add updatedAt timestamp
+        filteredUpdates.updatedAt = new Date();
 
         const result = await settings.updateOne(
             { userId: decoded.userId },
