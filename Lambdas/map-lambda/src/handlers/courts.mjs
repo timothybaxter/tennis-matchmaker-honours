@@ -8,7 +8,7 @@ export async function getCourts(event) {
         const courts = db.collection('courts');
 
         // Get search parameters if they exist
-        const { query, lat, lng, radius } = event.queryStringParameters || {};
+        const { query } = event.queryStringParameters || {};
         let findQuery = {};
 
         if (query) {
@@ -18,21 +18,16 @@ export async function getCourts(event) {
                     { location: { $regex: query, $options: 'i' } }
                 ]
             };
-        } else if (lat && lng) {
-            // If coordinates are provided, find courts within radius (default 10km)
-            const searchRadius = radius ? parseFloat(radius) : 10;
-            findQuery = {
-                coordinates: {
-                    $geoWithin: {
-                        $centerSphere: [[parseFloat(lng), parseFloat(lat)], searchRadius / 6371] // radius in radians
-                    }
-                }
-            };
         }
+
+        console.log('Executing query:', JSON.stringify(findQuery));
 
         const courtList = await courts.find(findQuery)
             .sort({ name: 1 })
             .toArray();
+
+        console.log('Query results count:', courtList.length);
+        console.log('First few results:', JSON.stringify(courtList.slice(0, 2)));
 
         return createResponse(200, { courts: courtList });
     } catch (error) {
