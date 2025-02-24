@@ -10,30 +10,31 @@ export async function getCourts(event) {
         // Get search parameters if they exist
         const { query } = event.queryStringParameters || {};
         let findQuery = {};
-
+        
         if (query) {
-            // Create a query that matches court names starting with the query (case insensitive)
             findQuery = {
-                name: { $regex: `^${query}`, $options: 'i' }
+                $or: [
+                    { name: { $regex: query, $options: 'i' } },
+                    { location: { $regex: query, $options: 'i' } }
+                ]
             };
-
-            console.log('Executing search query:', JSON.stringify(findQuery));
         }
 
+        console.log('Executing query:', JSON.stringify(findQuery));
+        
         const courtList = await courts.find(findQuery)
             .sort({ name: 1 })
-            .limit(10)  // Limit results for performance
             .toArray();
-
-        console.log(`Query results: Found ${courtList.length} courts`);
-
+            
+        console.log('Query results count:', courtList.length);
+        console.log('First few results:', JSON.stringify(courtList.slice(0, 2)));
+        
         return createResponse(200, { courts: courtList });
     } catch (error) {
         console.error('Get courts error:', error);
         return createResponse(500, { message: 'Error retrieving courts' });
     }
 }
-
 export async function searchNearby(event) {
     try {
         const db = await connectToDatabase();
