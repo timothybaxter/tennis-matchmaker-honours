@@ -192,27 +192,56 @@ export async function updateUser(event) {
 
 export async function updatePassword(event) {
     try {
-        const db = await connectToDatabase();
-        const users = db.collection('users');
+        console.log('UpdatePassword event:', JSON.stringify(event));
 
-        // Extract userId from token
-        const { authorization } = event.headers;
-        if (!authorization) {
+        // Extract authorization token - checking all possible header formats
+        const authHeader = event.headers.Authorization ||
+            event.headers.authorization ||
+            event.headers['Authorization'] ||
+            event.headers['authorization'];
+
+        console.log('Auth header detected:', authHeader);
+
+        if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
-        const token = authorization.split(' ')[1];
+        const token = authHeader.split(' ')[1];
+        console.log('Token extracted:', token?.substring(0, 20) + '...');
+
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded token:', JSON.stringify(decoded));
 
         const { currentPassword, newPassword } = JSON.parse(event.body);
+        console.log('Password update request with current password provided:', !!currentPassword);
 
         if (!currentPassword || !newPassword) {
             return createResponse(400, { message: 'Current password and new password are required' });
         }
 
-        // Get user and verify current password
-        const user = await users.findOne({ _id: decoded.userId });
+        const db = await connectToDatabase();
+        const users = db.collection('users');
+
+        // Try to find user with either string ID or ObjectId
+        let user = await users.findOne({ _id: decoded.userId });
+        if (!user) {
+            try {
+                const ObjectId = require('mongodb').ObjectId;
+                user = await users.findOne({ _id: new ObjectId(decoded.userId) });
+            } catch (error) {
+                console.error('Error converting to ObjectId:', error);
+            }
+        }
+
+        console.log('User found:', !!user);
+
+        if (!user) {
+            return createResponse(404, { message: 'User not found' });
+        }
+
+        // Verify current password
         const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        console.log('Current password valid:', isValidPassword);
 
         if (!isValidPassword) {
             return createResponse(401, { message: 'Current password is incorrect' });
@@ -223,12 +252,14 @@ export async function updatePassword(event) {
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
         const result = await users.updateOne(
-            { _id: decoded.userId },
+            { _id: user._id },
             { $set: { password: hashedPassword } }
         );
 
+        console.log('Update result:', JSON.stringify(result));
+
         if (result.matchedCount === 0) {
-            return createResponse(404, { message: 'User not found' });
+            return createResponse(404, { message: 'Update failed' });
         }
 
         return createResponse(200, { message: 'Password updated successfully' });
@@ -237,6 +268,6 @@ export async function updatePassword(event) {
         if (error.name === 'JsonWebTokenError') {
             return createResponse(401, { message: 'Invalid token' });
         }
-        return createResponse(500, { message: 'Error updating password' });
+        return createResponse(500, { message: 'Error updating password', error: error.message });
     }
 }
