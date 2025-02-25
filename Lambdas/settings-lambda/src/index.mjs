@@ -15,8 +15,8 @@ export const handler = async (event) => {
             return await getSettings(event);
         case 'PUT /settings/{id}':
             return await updateSettings(event);
-        case 'POST /update-settings':
-            return await updateSettings(event);
+        case 'POST /settings/update-settings':
+            return await partialUpdateSettings(event);
         default:
             return createResponse(404, { message: 'Route not found' });
     }

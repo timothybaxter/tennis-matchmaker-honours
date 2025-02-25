@@ -168,3 +168,97 @@ export async function updateSettings(event) {
         return createResponse(500, { message: 'Error updating settings', error: error.message });
     }
 }
+export async function partialUpdateSettings(event) {
+    try {
+        console.log('Partial update settings event:', JSON.stringify(event));
+
+        // Extract authorization token
+        const authHeader = event.headers.Authorization ||
+            event.headers.authorization ||
+            event.headers['Authorization'] ||
+            event.headers['authorization'];
+
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+        console.log('User ID from token:', userId);
+
+        const updates = JSON.parse(event.body);
+        console.log('Update request body:', JSON.stringify(updates));
+
+        const allowedUpdates = ['name', 'email', 'playerLevel', 'theme', 'hometown'];
+
+        // Filter updates to only allow certain fields
+        const filteredUpdates = Object.keys(updates)
+            .filter(key => allowedUpdates.includes(key))
+            .reduce((obj, key) => {
+                obj[key] = updates[key];
+                return obj;
+            }, {});
+
+        console.log('Filtered updates:', JSON.stringify(filteredUpdates));
+
+        if (Object.keys(filteredUpdates).length === 0) {
+            return createResponse(400, { message: 'No valid update fields provided' });
+        }
+
+        const db = await connectToDatabase();
+        const settings = db.collection('user-settings');
+
+        // Add updatedAt timestamp
+        filteredUpdates.updatedAt = new Date();
+
+        const result = await settings.updateOne(
+            { userId: userId },
+            { $set: filteredUpdates }
+        );
+
+        console.log('Update result:', JSON.stringify(result));
+
+        if (result.matchedCount === 0) {
+            // If no document exists, create one with default values plus the update
+            const defaultSettings = {
+                userId,
+                name: "",
+                email: "",
+                playerLevel: "Beginner",
+                theme: "Wimbledon",
+                hometown: "",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...filteredUpdates
+            };
+
+            await settings.insertOne(defaultSettings);
+
+            return createResponse(200, {
+                message: 'Settings created successfully',
+                settings: defaultSettings
+            });
+        }
+
+        // Get updated settings to return
+        const updatedSettings = await settings.findOne({ userId });
+
+        return createResponse(200, {
+            message: 'Settings updated successfully',
+            settings: {
+                name: updatedSettings.name,
+                email: updatedSettings.email,
+                playerLevel: updatedSettings.playerLevel,
+                theme: updatedSettings.theme,
+                hometown: updatedSettings.hometown
+            }
+        });
+    } catch (error) {
+        console.error('Partial update settings error:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return createResponse(401, { message: 'Invalid token' });
+        }
+        return createResponse(500, { message: 'Error updating settings', error: error.message });
+    }
+}

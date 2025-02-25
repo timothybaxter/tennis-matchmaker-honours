@@ -222,10 +222,11 @@ export async function updatePassword(event) {
         const db = await connectToDatabase();
         const users = db.collection('users');
 
-        // Try to find user with either string ID or ObjectId
+        // Get the userId from the token
         const userId = decoded.userId;
         console.log('Looking for user with ID:', userId);
 
+        // Try to find user with either string ID or ObjectId
         let user = await users.findOne({ _id: userId });
         if (!user) {
             try {
