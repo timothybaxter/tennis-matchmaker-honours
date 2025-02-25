@@ -78,26 +78,25 @@ export async function getSettings(event) {
     }
 }
 
+// Add this to your settings.mjs file
 export async function updateSettings(event) {
     try {
-        const { authorization } = event.headers;
-        if (!authorization) {
+        console.log('Update settings event:', JSON.stringify(event));
+
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
-        const token = authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const token = authHeader.split(' ')[1];
+        console.log('Token extracted:', token.substring(0, 20) + '...');
 
-        // For PUT requests with path parameters
-        if (event.pathParameters && event.pathParameters.id) {
-            const { id } = event.pathParameters;
-            // Verify the token userId matches the path parameter
-            if (decoded.userId !== id && id !== 'me') {
-                return createResponse(403, { message: 'Not authorized to update these settings' });
-            }
-        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded token:', JSON.stringify(decoded));
 
         const updates = JSON.parse(event.body);
+        console.log('Update request body:', JSON.stringify(updates));
+
         const allowedUpdates = ['name', 'email', 'playerLevel', 'theme', 'hometown'];
 
         // Filter updates to only allow certain fields
@@ -107,6 +106,8 @@ export async function updateSettings(event) {
                 obj[key] = updates[key];
                 return obj;
             }, {});
+
+        console.log('Filtered updates:', JSON.stringify(filteredUpdates));
 
         if (Object.keys(filteredUpdates).length === 0) {
             return createResponse(400, { message: 'No valid update fields provided' });
@@ -118,13 +119,32 @@ export async function updateSettings(event) {
         // Add updatedAt timestamp
         filteredUpdates.updatedAt = new Date();
 
+        console.log('Updating settings for userId:', decoded.userId);
+
         const result = await settings.updateOne(
             { userId: decoded.userId },
             { $set: filteredUpdates }
         );
 
+        console.log('Update result:', JSON.stringify(result));
+
         if (result.matchedCount === 0) {
-            return createResponse(404, { message: 'Settings not found' });
+            console.log('No matching document found. Creating new settings document.');
+
+            // If no settings document exists, create one
+            const newSettings = {
+                userId: decoded.userId,
+                ...filteredUpdates,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            await settings.insertOne(newSettings);
+
+            return createResponse(200, {
+                message: 'Settings created successfully',
+                settings: newSettings
+            });
         }
 
         // Get updated settings to return
@@ -145,6 +165,6 @@ export async function updateSettings(event) {
         if (error.name === 'JsonWebTokenError') {
             return createResponse(401, { message: 'Invalid token' });
         }
-        return createResponse(500, { message: 'Error updating settings' });
+        return createResponse(500, { message: 'Error updating settings', error: error.message });
     }
 }

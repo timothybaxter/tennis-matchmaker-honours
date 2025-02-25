@@ -96,31 +96,49 @@ export async function login(event) {
     }
 }
 
+import { ObjectId } from 'mongodb';
+
 export async function updateUser(event) {
     try {
         console.log('UpdateUser event:', JSON.stringify(event));
-        console.log('Headers:', JSON.stringify(event.headers));
 
         const db = await connectToDatabase();
         const users = db.collection('users');
 
         // Extract authorization token
         const authHeader = event.headers.Authorization || event.headers.authorization;
-        console.log('Auth header:', authHeader);
 
         if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
         const token = authHeader.split(' ')[1];
-        console.log('Extracted token:', token);
-
-        if (!token) {
-            return createResponse(401, { message: 'Invalid authorization token format' });
-        }
-
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         console.log('Decoded token:', JSON.stringify(decoded));
+
+        // Get the userId from the token
+        const userId = decoded.userId;
+        console.log('User ID from token:', userId);
+
+        // Check the user in the database
+        // Try both as string and ObjectId to be safe
+        let user = await users.findOne({ _id: userId });
+
+        if (!user) {
+            // Try with ObjectId
+            try {
+                user = await users.findOne({ _id: new ObjectId(userId) });
+            } catch (error) {
+                console.error('Error converting to ObjectId:', error);
+            }
+        }
+
+        if (!user) {
+            console.log('User not found with ID:', userId);
+            return createResponse(404, { message: 'User not found' });
+        }
+
+        console.log('User found:', user);
 
         const updates = JSON.parse(event.body);
         const allowedUpdates = ['name', 'email', 'playerLevel'];
@@ -139,24 +157,25 @@ export async function updateUser(event) {
             return createResponse(400, { message: 'No valid update fields provided' });
         }
 
+        // Use whatever ID format worked for finding the user
         const result = await users.updateOne(
-            { _id: decoded.userId },
+            { _id: user._id },
             { $set: filteredUpdates }
         );
 
         console.log('DB update result:', JSON.stringify(result));
 
         if (result.matchedCount === 0) {
-            return createResponse(404, { message: 'User not found' });
+            return createResponse(404, { message: 'Update failed' });
         }
 
         // Get updated user to return in response
-        const updatedUser = await users.findOne({ _id: decoded.userId });
+        const updatedUser = await users.findOne({ _id: user._id });
 
         return createResponse(200, {
             message: 'User updated successfully',
             user: {
-                id: updatedUser._id,
+                id: updatedUser._id.toString(),
                 email: updatedUser.email,
                 name: updatedUser.name,
                 playerLevel: updatedUser.playerLevel
@@ -171,7 +190,6 @@ export async function updateUser(event) {
     }
 }
 
-// Similarly update the updatePassword function to work with POST
 export async function updatePassword(event) {
     try {
         const db = await connectToDatabase();

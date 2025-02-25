@@ -2,7 +2,7 @@ import { createSettings, getSettings, updateSettings } from './handlers/settings
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
-    console.log('Event received:', event);
+    console.log('Event received:', JSON.stringify(event));
 
     if (event.httpMethod === 'OPTIONS') {
         return createCorsResponse();
@@ -11,7 +11,7 @@ export const handler = async (event) => {
     switch (`${event.httpMethod} ${event.resource}`) {
         case 'POST /settings':
             return await createSettings(event);
-        case 'GET /settings/{id}':
+        case 'GET /settings':
             return await getSettings(event);
         case 'PUT /settings/{id}':
             return await updateSettings(event);
