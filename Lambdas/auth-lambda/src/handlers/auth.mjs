@@ -223,11 +223,16 @@ export async function updatePassword(event) {
         const users = db.collection('users');
 
         // Try to find user with either string ID or ObjectId
-        let user = await users.findOne({ _id: decoded.userId });
+        const userId = decoded.userId;
+        console.log('Looking for user with ID:', userId);
+
+        let user = await users.findOne({ _id: userId });
         if (!user) {
             try {
-                const ObjectId = require('mongodb').ObjectId;
-                user = await users.findOne({ _id: new ObjectId(decoded.userId) });
+                // Try with ObjectId
+                const { ObjectId } = require('mongodb');
+                user = await users.findOne({ _id: new ObjectId(userId) });
+                console.log('Found user using ObjectId conversion');
             } catch (error) {
                 console.error('Error converting to ObjectId:', error);
             }
