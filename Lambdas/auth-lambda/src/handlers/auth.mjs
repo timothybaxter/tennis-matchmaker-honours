@@ -96,32 +96,31 @@ export async function login(event) {
     }
 }
 
-// Add this modified version of updateUser that works with POST requests
 export async function updateUser(event) {
     try {
+        console.log('UpdateUser event:', JSON.stringify(event));
+        console.log('Headers:', JSON.stringify(event.headers));
+
         const db = await connectToDatabase();
         const users = db.collection('users');
 
-        // Extract userId from token
-        const { authorization } = event.headers;
-        if (!authorization) {
+        // Extract authorization token
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        console.log('Auth header:', authHeader);
+
+        if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
-        const token = authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const token = authHeader.split(' ')[1];
+        console.log('Extracted token:', token);
 
-        // Get userId from path parameters or body depending on the request type
-        let userId = decoded.userId;
-
-        // For PUT requests with path parameters
-        if (event.pathParameters && event.pathParameters.id) {
-            const { id } = event.pathParameters;
-            // Verify the token userId matches the path parameter
-            if (decoded.userId !== id && id !== 'me') {
-                return createResponse(403, { message: 'Not authorized to update this user' });
-            }
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization token format' });
         }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded token:', JSON.stringify(decoded));
 
         const updates = JSON.parse(event.body);
         const allowedUpdates = ['name', 'email', 'playerLevel'];
@@ -134,6 +133,8 @@ export async function updateUser(event) {
                 return obj;
             }, {});
 
+        console.log('Filtered updates:', JSON.stringify(filteredUpdates));
+
         if (Object.keys(filteredUpdates).length === 0) {
             return createResponse(400, { message: 'No valid update fields provided' });
         }
@@ -142,6 +143,8 @@ export async function updateUser(event) {
             { _id: decoded.userId },
             { $set: filteredUpdates }
         );
+
+        console.log('DB update result:', JSON.stringify(result));
 
         if (result.matchedCount === 0) {
             return createResponse(404, { message: 'User not found' });
@@ -153,7 +156,7 @@ export async function updateUser(event) {
         return createResponse(200, {
             message: 'User updated successfully',
             user: {
-                id: updatedUser._id.toString(),
+                id: updatedUser._id,
                 email: updatedUser.email,
                 name: updatedUser.name,
                 playerLevel: updatedUser.playerLevel
@@ -164,7 +167,7 @@ export async function updateUser(event) {
         if (error.name === 'JsonWebTokenError') {
             return createResponse(401, { message: 'Invalid token' });
         }
-        return createResponse(500, { message: 'Error updating user' });
+        return createResponse(500, { message: 'Error updating user', error: error.message });
     }
 }
 
