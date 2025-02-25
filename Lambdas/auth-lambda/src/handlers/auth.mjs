@@ -190,53 +190,60 @@ export async function updateUser(event) {
     }
 }
 
-export async function updatePassword(event) {
+[HttpPost]
+public async Task < IActionResult > UpdatePassword(SettingsViewModel model)
+{
     try {
-        const db = await connectToDatabase();
-        const users = db.collection('users');
-
-        // Extract userId from token
-        const { authorization } = event.headers;
-        if (!authorization) {
-            return createResponse(401, { message: 'No authorization token provided' });
+        var token = HttpContext.Session.GetString("JWTToken");
+        if (string.IsNullOrEmpty(token)) {
+            return RedirectToAction("Login", "Account");
         }
 
-        const token = authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        const { currentPassword, newPassword } = JSON.parse(event.body);
-
-        if (!currentPassword || !newPassword) {
-            return createResponse(400, { message: 'Current password and new password are required' });
+        if (string.IsNullOrEmpty(model.CurrentPassword) ||
+            string.IsNullOrEmpty(model.NewPassword) ||
+            string.IsNullOrEmpty(model.ConfirmNewPassword)) {
+            ModelState.AddModelError("", "All password fields are required");
+            return RedirectToAction(nameof(Index));
         }
 
-        // Get user and verify current password
-        const user = await users.findOne({ _id: decoded.userId });
-        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
-
-        if (!isValidPassword) {
-            return createResponse(401, { message: 'Current password is incorrect' });
+        if (model.NewPassword != model.ConfirmNewPassword) {
+            ModelState.AddModelError("", "New passwords do not match");
+            return RedirectToAction(nameof(Index));
         }
 
-        // Hash new password and update
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        // Updated path to match API Gateway structure
+        var request = new HttpRequestMessage(HttpMethod.Post, "auth/update-password");
+        request.Headers.Add("Authorization", $"Bearer {token}");
 
-        const result = await users.updateOne(
-            { _id: decoded.userId },
-            { $set: { password: hashedPassword } }
-        );
+        var requestBody = new
+            {
+                currentPassword = model.CurrentPassword,
+                newPassword = model.NewPassword
+            };
 
-        if (result.matchedCount === 0) {
-            return createResponse(404, { message: 'User not found' });
+        request.Content = JsonContent.Create(requestBody);
+
+        _logger.LogInformation("Sending password update request");
+        _logger.LogInformation($"Authorization header: {request.Headers.GetValues("Authorization").FirstOrDefault()}");
+        _logger.LogInformation($"Request body: {await request.Content.ReadAsStringAsync()}");
+
+        var response = await _httpClient.SendAsync(request);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation($"Password update response status: {response.StatusCode}");
+        _logger.LogInformation($"Password update response content: {responseContent}");
+
+        if (response.IsSuccessStatusCode) {
+            TempData["SuccessMessage"] = "Password updated successfully";
         }
-
-        return createResponse(200, { message: 'Password updated successfully' });
-    } catch (error) {
-        console.error('Update password error:', error);
-        if (error.name === 'JsonWebTokenError') {
-            return createResponse(401, { message: 'Invalid token' });
+        else {
+            var error = await response.Content.ReadFromJsonAsync < ErrorResponse > ();
+            ModelState.AddModelError("", error?.Message ?? "Failed to update password");
         }
-        return createResponse(500, { message: 'Error updating password' });
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error updating password");
+        ModelState.AddModelError("", "An error occurred while updating password");
+    }
+    return RedirectToAction(nameof(Index));
 }
