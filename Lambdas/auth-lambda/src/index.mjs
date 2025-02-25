@@ -15,7 +15,11 @@ export const handler = async (event) => {
             return await login(event);
         case 'PUT /auth/user/{id}':
             return await updateUser(event);
+        case 'POST /auth/update-user':
+            return await updateUser(event);
         case 'PUT /auth/password/{id}':
+            return await updatePassword(event);
+        case 'POST /auth/update-password':
             return await updatePassword(event);
         default:
             return createResponse(404, { message: 'Route not found' });

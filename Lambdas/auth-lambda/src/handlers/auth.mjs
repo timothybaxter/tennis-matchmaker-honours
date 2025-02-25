@@ -1,110 +1,10 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '../utils/database.mjs';
-import { createResponse } from '../utils/responses.mjs';
-
-export async function register(event) {
-    try {
-        const body = JSON.parse(event.body);
-        const { email, password, name, playerLevel } = body;
-
-        if (!email || !password || !name || !playerLevel) {
-            return createResponse(400, { message: 'All fields are required' });
-        }
-
-        const db = await connectToDatabase();
-        const users = db.collection('users');
-
-        const existingUser = await users.findOne({ email });
-        if (existingUser) {
-            return createResponse(409, { message: 'User already exists' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = {
-            email,
-            password: hashedPassword,
-            name,
-            playerLevel,
-            createdAt: new Date()
-        };
-
-        await users.insertOne(newUser);
-        const token = jwt.sign(
-            { userId: newUser._id, email },
-            process.env.JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-
-        return createResponse(201, {
-            message: 'User created successfully',
-            token,
-            user: {
-                email: newUser.email,
-                name: newUser.name,
-                playerLevel: newUser.playerLevel
-            }
-        });
-    } catch (error) {
-        console.error('Registration error:', error);
-        return createResponse(500, { message: 'Error creating user', error: error.message });
-    }
-}
-
-export async function login(event) {
-    try {
-        console.log('Starting login process');
-        const { email, password } = JSON.parse(event.body);
-
-        if (!email || !password) {
-            return createResponse(400, { message: 'Email and password are required' });
-        }
-
-        const db = await connectToDatabase();
-        const users = db.collection('users');
-
-        const user = await users.findOne({ email });
-        if (!user) {
-            return createResponse(401, { message: 'Invalid credentials' });
-        }
-
-        const isValidPassword = await bcrypt.compare(password, user.password);
-        if (!isValidPassword) {
-            return createResponse(401, { message: 'Invalid credentials' });
-        }
-
-        const token = jwt.sign(
-            { userId: user._id, email: user.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-
-        return createResponse(200, {
-            message: 'Login successful',
-            token,
-            user: {
-                email: user.email,
-                name: user.name,
-                playerLevel: user.playerLevel
-            }
-        });
-    } catch (error) {
-        console.error('Login error:', error);
-        return createResponse(500, { message: 'Error during login' });
-    }
-}
-
+// Add this modified version of updateUser that works with POST requests
 export async function updateUser(event) {
     try {
         const db = await connectToDatabase();
         const users = db.collection('users');
 
-        // Extract userId from path parameters
-        const { id } = event.pathParameters;
-
-        // Extract userId from token and verify they match
+        // Extract userId from token
         const { authorization } = event.headers;
         if (!authorization) {
             return createResponse(401, { message: 'No authorization token provided' });
@@ -113,9 +13,16 @@ export async function updateUser(event) {
         const token = authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Verify the token userId matches the path parameter
-        if (decoded.userId !== id && id !== 'me') {
-            return createResponse(403, { message: 'Not authorized to update this user' });
+        // Get userId from path parameters or body depending on the request type
+        let userId = decoded.userId;
+
+        // For PUT requests with path parameters
+        if (event.pathParameters && event.pathParameters.id) {
+            const { id } = event.pathParameters;
+            // Verify the token userId matches the path parameter
+            if (decoded.userId !== id && id !== 'me') {
+                return createResponse(403, { message: 'Not authorized to update this user' });
+            }
         }
 
         const updates = JSON.parse(event.body);
@@ -163,6 +70,7 @@ export async function updateUser(event) {
     }
 }
 
+// Similarly update the updatePassword function to work with POST
 export async function updatePassword(event) {
     try {
         const db = await connectToDatabase();
