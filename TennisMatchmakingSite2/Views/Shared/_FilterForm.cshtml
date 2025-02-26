@@ -1,10 +1,14 @@
-@using (Html.BeginForm("Index", "Match", FormMethod.Get))
+﻿@using (Html.BeginForm("Index", "Match", FormMethod.Get))
 {
 <div class="space-y-4">
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-        <input type="text" name="courtLocation" value="@ViewBag.CurrentCourtLocation"
-               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <div class="relative" id="filterLocationContainer">
+            <input type="text" name="courtLocation" id="filterLocation" value="@ViewBag.CurrentCourtLocation"
+                   autocomplete="off"
+                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <!-- Dropdown will be created by JavaScript -->
+        </div>
     </div>
 
     <div>
@@ -40,3 +44,148 @@
     </button>
 </div>
 }
+
+<!-- Pure copy of working code -->
+<script>
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            // This is a direct copy of the code that works for the match creation form
+            setupFilterAutocomplete();
+        });
+
+        function setupFilterAutocomplete() {
+            const input = document.getElementById('filterLocation');
+            if (!input) {
+                console.error('Filter location input not found');
+                return;
+            }
+
+            console.log('Setting up filter autocomplete');
+
+            // Create dropdown element
+            const dropdown = document.createElement('div');
+            dropdown.style.position = 'absolute';
+            dropdown.style.backgroundColor = 'white';
+            dropdown.style.border = '1px solid #ccc';
+            dropdown.style.borderRadius = '4px';
+            dropdown.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            dropdown.style.zIndex = '9999';
+            dropdown.style.maxHeight = '200px';
+            dropdown.style.overflowY = 'auto';
+            dropdown.style.display = 'none';
+            dropdown.style.width = input.offsetWidth + 'px';
+
+            // Add to document body
+            document.body.appendChild(dropdown);
+
+            // Position the dropdown
+            function positionDropdown() {
+                const rect = input.getBoundingClientRect();
+                dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+                dropdown.style.left = (rect.left + window.scrollX) + 'px';
+                dropdown.style.width = rect.width + 'px';
+            }
+
+            // Function to fetch courts from the API
+            async function fetchCourts(query) {
+                try {
+                    console.log('Fetching courts for filter with query:', query);
+                    const response = await fetch(`/Map/Search?query=${encodeURIComponent(query)}`);
+
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('API returned courts for filter:', data);
+                    return data || [];
+                } catch (error) {
+                    console.error('Error fetching courts for filter:', error);
+                    // Return hardcoded data as fallback
+                    return [
+                        { name: 'Dundee University Tennis Courts' },
+                        { name: 'Dundee Indoor Tennis Club' },
+                        { name: 'St Andrews Tennis Club' },
+                        { name: 'Perth Tennis Club' },
+                        { name: 'David Lloyd Tennis Centre' },
+                        { name: 'Broughty Ferry Tennis Courts' }
+                    ];
+                }
+            }
+
+            // Function to show the dropdown with results
+            function showDropdown(courts) {
+                dropdown.innerHTML = '';
+
+                if (!courts || courts.length === 0) {
+                    const noResults = document.createElement('div');
+                    noResults.textContent = 'No courts found';
+                    noResults.style.padding = '8px 12px';
+                    noResults.style.color = '#666';
+                    dropdown.appendChild(noResults);
+                } else {
+                    courts.forEach(court => {
+                        const option = document.createElement('div');
+                        option.textContent = court.name;
+                        option.style.padding = '8px 12px';
+                        option.style.cursor = 'pointer';
+                        option.style.borderBottom = '1px solid #eee';
+
+                        option.addEventListener('mouseover', () => {
+                            option.style.backgroundColor = '#f0f0f0';
+                        });
+
+                        option.addEventListener('mouseout', () => {
+                            option.style.backgroundColor = 'white';
+                        });
+
+                        option.addEventListener('click', () => {
+                            input.value = court.name;
+                            dropdown.style.display = 'none';
+
+                            // Trigger change event
+                            const event = new Event('change', { bubbles: true });
+                            input.dispatchEvent(event);
+                        });
+
+                        dropdown.appendChild(option);
+                    });
+                }
+
+                positionDropdown();
+                dropdown.style.display = 'block';
+            }
+
+            // Setup debounce function
+            let debounceTimer;
+
+            // Input handler with debounce
+            input.addEventListener('input', function () {
+                const query = this.value.trim();
+
+                clearTimeout(debounceTimer);
+
+                if (query.length >= 2) {
+                    debounceTimer = setTimeout(async () => {
+                        const courts = await fetchCourts(query);
+                        showDropdown(courts);
+                    }, 300);
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            // Handle clicks outside
+            document.addEventListener('click', function (e) {
+                if (e.target !== input && e.target !== dropdown && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            // Update position on window resize
+            window.addEventListener('resize', positionDropdown);
+
+            console.log('Filter autocomplete setup complete');
+        }
+    })();
+</script>

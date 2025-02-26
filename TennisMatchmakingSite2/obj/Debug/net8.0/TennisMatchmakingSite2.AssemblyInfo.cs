@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ad4b3b029137bbbe0a24f7a8827ceba3b1936ca1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+31405089e69b3538c221e022d6553abbba05a8db")]
 [assembly: System.Reflection.AssemblyProductAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

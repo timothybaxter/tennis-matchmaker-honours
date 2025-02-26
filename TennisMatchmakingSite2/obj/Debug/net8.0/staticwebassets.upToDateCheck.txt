@@ -6,6 +6,7 @@ wwwroot\images\court_background_green.png
 wwwroot\images\court_background_hard.png
 wwwroot\images\logo.png
 wwwroot\images\logo2.png
+wwwroot\js\court-autocomplete.js
 wwwroot\js\match.js
 wwwroot\js\match-functions.js
 wwwroot\js\site.js

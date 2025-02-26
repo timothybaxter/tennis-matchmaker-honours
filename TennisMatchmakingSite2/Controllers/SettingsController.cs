@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using TennisMatchmakingSite2.Models;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using System;
 
 namespace TennisMatchmakingSite2.Controllers
 {
@@ -67,44 +70,6 @@ namespace TennisMatchmakingSite2.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateTheme(SettingsViewModel model)
-        {
-            try
-            {
-                var token = HttpContext.Session.GetString("JWTToken");
-                if (string.IsNullOrEmpty(token))
-                {
-                    return RedirectToAction("Login", "Account");
-                }
-
-                var request = new HttpRequestMessage(HttpMethod.Put, "user/settings");
-                request.Headers.Add("Authorization", $"Bearer {token}");
-
-                var requestBody = new { theme = model.Theme.ToString() };
-                request.Content = JsonContent.Create(requestBody);
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    HttpContext.Session.SetString("Theme", model.Theme.ToString());
-                    TempData["SuccessMessage"] = "Theme updated successfully";
-                }
-                else
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-                    ModelState.AddModelError("", error?.Message ?? "Failed to update theme");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating theme");
-                ModelState.AddModelError("", "An error occurred while updating theme");
-            }
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
         public async Task<IActionResult> UpdateName(SettingsViewModel model)
         {
             try
@@ -115,27 +80,35 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Update auth service
-                var authRequest = new HttpRequestMessage(HttpMethod.Put, "auth/user");
+                // Update auth database
+                var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
                 authRequest.Headers.Add("Authorization", $"Bearer {token}");
                 var authBody = new { name = model.Name };
                 authRequest.Content = JsonContent.Create(authBody);
 
+                _logger.LogInformation($"Sending auth request to update name: {model.Name}");
                 var authResponse = await _httpClient.SendAsync(authRequest);
+                var authResponseContent = await authResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Auth response status: {authResponse.StatusCode}");
+                _logger.LogInformation($"Auth response content: {authResponseContent}");
 
                 if (!authResponse.IsSuccessStatusCode)
                 {
                     var error = await authResponse.Content.ReadFromJsonAsync<ErrorResponse>();
-                    ModelState.AddModelError("", error?.Message ?? "Failed to update name");
+                    ModelState.AddModelError("", error?.Message ?? "Failed to update name in auth database");
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Update settings service
-                var settingsRequest = new HttpRequestMessage(HttpMethod.Put, "user/settings");
+                // Update settings database
+                var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
                 settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
-                settingsRequest.Content = JsonContent.Create(authBody);
+                settingsRequest.Content = JsonContent.Create(new { name = model.Name });
 
+                _logger.LogInformation($"Sending settings request to update name");
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
+                var settingsResponseContent = await settingsResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Settings response status: {settingsResponse.StatusCode}");
+                _logger.LogInformation($"Settings response content: {settingsResponseContent}");
 
                 if (settingsResponse.IsSuccessStatusCode)
                 {
@@ -164,30 +137,44 @@ namespace TennisMatchmakingSite2.Controllers
                 var token = HttpContext.Session.GetString("JWTToken");
                 if (string.IsNullOrEmpty(token))
                 {
+                    _logger.LogWarning("No JWT token found in session");
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Update auth service
-                var authRequest = new HttpRequestMessage(HttpMethod.Put, "auth/user");
+                // Update auth database
+                var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
                 authRequest.Headers.Add("Authorization", $"Bearer {token}");
                 var authBody = new { email = model.Email };
                 authRequest.Content = JsonContent.Create(authBody);
 
+                _logger.LogInformation($"Base URL: {_httpClient.BaseAddress}");
+                _logger.LogInformation($"Endpoint: auth/update-user");
+                _logger.LogInformation($"Full request URL: {authRequest.RequestUri}");
+                _logger.LogInformation($"Authorization: {authRequest.Headers.GetValues("Authorization").FirstOrDefault()}");
+                var bodyContent = await authRequest.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Request body: {bodyContent}");
+
                 var authResponse = await _httpClient.SendAsync(authRequest);
+                var authResponseContent = await authResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Auth response status: {authResponse.StatusCode}");
+                _logger.LogInformation($"Auth response content: {authResponseContent}");
 
                 if (!authResponse.IsSuccessStatusCode)
                 {
                     var error = await authResponse.Content.ReadFromJsonAsync<ErrorResponse>();
-                    ModelState.AddModelError("", error?.Message ?? "Failed to update email");
+                    ModelState.AddModelError("", error?.Message ?? "Failed to update email in auth database");
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Update settings service
-                var settingsRequest = new HttpRequestMessage(HttpMethod.Put, "user/settings");
+                // Update settings database
+                var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
                 settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
-                settingsRequest.Content = JsonContent.Create(authBody);
+                settingsRequest.Content = JsonContent.Create(new { email = model.Email });
 
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
+                var settingsResponseContent = await settingsResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Settings response status: {settingsResponse.StatusCode}");
+                _logger.LogInformation($"Settings response content: {settingsResponseContent}");
 
                 if (settingsResponse.IsSuccessStatusCode)
                 {
@@ -219,8 +206,8 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                if (string.IsNullOrEmpty(model.CurrentPassword) || 
-                    string.IsNullOrEmpty(model.NewPassword) || 
+                if (string.IsNullOrEmpty(model.CurrentPassword) ||
+                    string.IsNullOrEmpty(model.NewPassword) ||
                     string.IsNullOrEmpty(model.ConfirmNewPassword))
                 {
                     ModelState.AddModelError("", "All password fields are required");
@@ -233,9 +220,10 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                var request = new HttpRequestMessage(HttpMethod.Put, "auth/password");
+                // Updated path to match API Gateway structure
+                var request = new HttpRequestMessage(HttpMethod.Post, "auth/update-password");
                 request.Headers.Add("Authorization", $"Bearer {token}");
-                
+
                 var requestBody = new
                 {
                     currentPassword = model.CurrentPassword,
@@ -243,7 +231,15 @@ namespace TennisMatchmakingSite2.Controllers
                 };
 
                 request.Content = JsonContent.Create(requestBody);
+
+                _logger.LogInformation("Sending password update request");
+                _logger.LogInformation($"Authorization header: {request.Headers.GetValues("Authorization").FirstOrDefault()}");
+                _logger.LogInformation($"Request body: {await request.Content.ReadAsStringAsync()}");
+
                 var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Password update response status: {response.StatusCode}");
+                _logger.LogInformation($"Password update response content: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -274,27 +270,34 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Update auth service
-                var authRequest = new HttpRequestMessage(HttpMethod.Put, "auth/user");
+                // Update auth database
+                var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
                 authRequest.Headers.Add("Authorization", $"Bearer {token}");
                 var authBody = new { playerLevel = model.PlayerLevel.ToString() };
                 authRequest.Content = JsonContent.Create(authBody);
 
+                _logger.LogInformation($"Sending player level update request: {model.PlayerLevel}");
                 var authResponse = await _httpClient.SendAsync(authRequest);
+                var authResponseContent = await authResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Auth response status: {authResponse.StatusCode}");
+                _logger.LogInformation($"Auth response content: {authResponseContent}");
 
                 if (!authResponse.IsSuccessStatusCode)
                 {
                     var error = await authResponse.Content.ReadFromJsonAsync<ErrorResponse>();
-                    ModelState.AddModelError("", error?.Message ?? "Failed to update player level");
+                    ModelState.AddModelError("", error?.Message ?? "Failed to update player level in auth database");
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Update settings service
-                var settingsRequest = new HttpRequestMessage(HttpMethod.Put, "user/settings");
+                // Update settings database
+                var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
                 settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
-                settingsRequest.Content = JsonContent.Create(authBody);
+                settingsRequest.Content = JsonContent.Create(new { playerLevel = model.PlayerLevel.ToString() });
 
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
+                var settingsResponseContent = await settingsResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Settings response status: {settingsResponse.StatusCode}");
+                _logger.LogInformation($"Settings response content: {settingsResponseContent}");
 
                 if (settingsResponse.IsSuccessStatusCode)
                 {
@@ -326,13 +329,18 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                var request = new HttpRequestMessage(HttpMethod.Put, "user/settings");
+                // Only update settings database for hometown
+                var request = new HttpRequestMessage(HttpMethod.Post, "settings");
                 request.Headers.Add("Authorization", $"Bearer {token}");
 
                 var requestBody = new { hometown = model.Hometown };
                 request.Content = JsonContent.Create(requestBody);
 
+                _logger.LogInformation($"Sending hometown update request: {model.Hometown}");
                 var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Hometown update response status: {response.StatusCode}");
+                _logger.LogInformation($"Hometown update response content: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -349,6 +357,47 @@ namespace TennisMatchmakingSite2.Controllers
             {
                 _logger.LogError(ex, "Error updating hometown");
                 ModelState.AddModelError("", "An error occurred while updating hometown");
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateTheme(SettingsViewModel model)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWTToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return RedirectToAction("Login", "Account");
+                }
+
+                // Update settings database only for theme
+                var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
+                settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
+                settingsRequest.Content = JsonContent.Create(new { theme = model.Theme.ToString() });
+
+                _logger.LogInformation($"Sending theme update request: {model.Theme}");
+                var settingsResponse = await _httpClient.SendAsync(settingsRequest);
+                var settingsResponseContent = await settingsResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Theme update response status: {settingsResponse.StatusCode}");
+                _logger.LogInformation($"Theme update response content: {settingsResponseContent}");
+
+                if (settingsResponse.IsSuccessStatusCode)
+                {
+                    HttpContext.Session.SetString("Theme", model.Theme.ToString());
+                    TempData["SuccessMessage"] = "Theme updated successfully";
+                }
+                else
+                {
+                    var error = await settingsResponse.Content.ReadFromJsonAsync<ErrorResponse>();
+                    ModelState.AddModelError("", error?.Message ?? "Failed to update theme");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating theme");
+                ModelState.AddModelError("", "An error occurred while updating theme");
             }
             return RedirectToAction(nameof(Index));
         }

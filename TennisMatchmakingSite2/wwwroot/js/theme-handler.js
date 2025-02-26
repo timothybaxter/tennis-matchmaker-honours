@@ -1,7 +1,5 @@
 // wwwroot/js/theme-handler.js
 
-// wwwroot/js/theme-handler.js
-
 const themes = {
     Wimbledon: {
         navbarColor: '#64408a',

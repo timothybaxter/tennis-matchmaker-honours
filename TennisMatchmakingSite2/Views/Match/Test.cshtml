@@ -1,0 +1,104 @@
+@{
+    ViewData["Title"] = "Test Court Autocomplete";
+}
+
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Test Court Autocomplete</h1>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-lg font-medium mb-4">Court Search</h2>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Court Location</label>
+                <div class="relative">
+                    <input type="text" id="courtLocation"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Type at least 2 characters...">
+                </div>
+                <div class="mt-2 text-sm text-gray-500">Type 'dun' to see Dundee courts, 'st' for St Andrews, etc.</div>
+            </div>
+
+            <div class="mt-4">
+                <button type="button" id="testButton"
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                    Test Dropdown Manually
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-medium mb-4">Debug Information</h2>
+
+            <div class="text-sm font-mono bg-gray-100 p-3 rounded-md h-40 overflow-y-auto" id="debugOutput">
+                Waiting for actions...
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/court-autocomplete.js"></script>
+    <script>
+        // Helper to log messages to the debug panel
+        function logDebug(message) {
+            const debugOutput = document.getElementById('debugOutput');
+            if (debugOutput) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = 'mb-1';
+                logEntry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${message}`;
+                debugOutput.appendChild(logEntry);
+                debugOutput.scrollTop = debugOutput.scrollHeight;
+
+                // Also log to console
+                console.log(message);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            logDebug('Page loaded, initializing court autocomplete...');
+
+            // Initialize the autocomplete
+            const courtInput = document.getElementById('courtLocation');
+            if (courtInput) {
+                // Override console.log for the autocomplete
+                const originalConsoleLog = console.log;
+                console.log = function() {
+                    const args = Array.from(arguments);
+                    logDebug(args.join(' '));
+                    originalConsoleLog.apply(console, arguments);
+                };
+
+                const autocomplete = initCourtAutocomplete('#courtLocation', 2);
+                logDebug('Autocomplete initialized with ID: ' + autocomplete.getDropdownId());
+
+                // Set up the test button
+                const testButton = document.getElementById('testButton');
+                if (testButton) {
+                    testButton.addEventListener('click', function() {
+                        logDebug('Test button clicked, showing test dropdown');
+                        autocomplete.testDropdown();
+                    });
+                }
+
+                // Listen for input events
+                courtInput.addEventListener('input', function() {
+                    logDebug(`Input value changed: "${this.value}"`);
+                });
+
+                // Double-click test
+                courtInput.addEventListener('dblclick', function() {
+                    logDebug('Input double-clicked');
+                });
+
+                // Restore console.log
+                setTimeout(() => {
+                    console.log = originalConsoleLog;
+                }, 500);
+            } else {
+                logDebug('ERROR: Could not find court input element');
+            }
+        });
+    </script>
+}

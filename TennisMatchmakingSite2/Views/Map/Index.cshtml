@@ -1,112 +1,105 @@
-@{
+@model List<TennisMatchmakingSite2.Controllers.CourtData>
+    @{
     ViewData["Title"] = "Tennis Court Map";
-}
+    }
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tennis Court Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
     <style>
-        .map-container {
-            position: absolute;
-            top: 80px; /* Adjust based on your header height */
-            bottom: 60px; /* Adjust based on your footer height */
-            left: 0;
-            right: 0;
-            width: 100%;
+    .map-container {
+        position: absolute;
+        top: 80px;
+        bottom: 60px;
+        left: 0;
+        right: 0;
+        width: 100%;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
+
+    .search-container {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        background: white;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-width: 400px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #search-input {
+        padding: 8px;
+        flex: 1;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        outline: none;
+        background-color: white;
+    }
+
+    #search-button {
+        padding: 8px 12px;
+        margin-left: 8px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    #search-button:hover {
+        background-color: #218838;
+    }
+
+    .court-popup {
+        text-align: center;
+    }
+
+    .court-popup .popup-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+        justify-content: center;
+    }
+
+    .court-popup button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        color: white;
+    }
+
+    .court-popup .view-matches {
+        background-color: #007bff;
+    }
+
+    .court-popup .post-match {
+        background-color: #28a745;
+    }
+
+    .court-popup button:hover {
+        opacity: 0.9;
+    }
+
+    @@media (max-width: 768px) {
+        .leaflet-control-zoom {
+            display: none;
         }
-
-        #map {
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-
-
-        .search-container {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 400px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #search-input {
-            padding: 8px;
-            flex: 1;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            outline: none;
-            background-color: white;
-        }
-
-        #search-button {
-            padding: 8px 12px;
-            margin-left: 8px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-            #search-button:hover {
-                background-color: #218838;
-            }
-
-        .court-popup {
-            text-align: center;
-        }
-
-            .court-popup .popup-buttons {
-                display: flex;
-                gap: 10px;
-                margin-top: 10px;
-                justify-content: center;
-            }
-
-            .court-popup button {
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                color: white;
-            }
-
-            .court-popup .view-matches {
-                background-color: #007bff;
-            }
-
-            .court-popup .post-match {
-                background-color: #28a745;
-            }
-
-            .court-popup button:hover {
-                opacity: 0.9;
-            }
-
-            @@media (max-width: 768px) {
-            .leaflet-control-zoom {
-                display: none;
-            }
-        }
+    }
     </style>
-</head>
-<body>
+
     <div class="map-container">
         <div class="search-container">
             <input type="text" id="search-input" placeholder="Enter a location..." autocomplete="off">
@@ -116,101 +109,101 @@
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            // Initialize the map
-            var map = L.map('map').setView([56.457645, -2.983281], 13); // Default to Dundee University Courts
+    document.addEventListener("DOMContentLoaded", function () {
+        // Initialize the map centered on Dundee
+        var map = L.map('map').setView([56.457645, -2.983281], 13);
 
-            // Add OpenStreetMap tile layer
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(map);
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
 
-            // Create a custom red icon
-            var redIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-            });
+        // Create a custom red icon
+        var redIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
 
-            // Add the Dundee University Courts marker with red icon
-            var courtMarker = L.marker([56.457645, -2.983281], { icon: redIcon }).addTo(map);
+        // Add markers for all courts
+        @foreach (var court in Model)
+        {
+            <text>
+            var courtMarker = L.marker([@court.Coordinates[1], @court.Coordinates[0]], { icon: redIcon }).addTo(map);
 
-            // Custom popup content for the court
             var popupContent = document.createElement('div');
             popupContent.className = 'court-popup';
             popupContent.innerHTML = `
-                            <h3>Dundee University Courts</h3>
-                            <p>University tennis courts available for matches</p>
-                            <div class="popup-buttons">
-                                <button class="view-matches" onclick="viewMatchesAtCourt('Dundee University Courts')">View Matches</button>
-                                <button class="post-match" onclick="postMatchAtCourt('Dundee University Courts')">Post Match</button>
-                            </div>
-                        `;
+                <h3>@court.Name</h3>
+                <p>@court.Location</p>
+                <div class="popup-buttons">
+                    <button class="view-matches" onclick="viewMatchesAtCourt('@court.Name')">View Matches</button>
+                    <button class="post-match" onclick="postMatchAtCourt('@court.Name')">Post Match</button>
+                </div>
+            `;
 
             courtMarker.bindPopup(popupContent);
+            </text>
+        }
 
-            // Geolocation - Show user's location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function (position) {
-                    var userLatLng = [position.coords.latitude, position.coords.longitude];
-                    L.marker(userLatLng).addTo(map)
-                        .bindPopup("You are here!")
-                        .openPopup();
-                    map.setView(userLatLng, 14);
-                });
-            }
-
-            // Function to search for a location
-            async function searchLocation() {
-                var query = document.getElementById("search-input").value.trim();
-                if (!query) {
-                    alert("Please enter a location.");
-                    return;
-                }
-
-                try {
-                    let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-                    let data = await response.json();
-
-                    if (data.length > 0) {
-                        var result = data[0];
-                        var latLng = [parseFloat(result.lat), parseFloat(result.lon)];
-                        map.setView(latLng, 14);
-                    } else {
-                        alert("Location not found. Try another search.");
-                    }
-                } catch (error) {
-                    console.error("Error searching location:", error);
-                    alert("An error occurred while searching.");
-                }
-            }
-
-            // Attach event listeners
-            document.getElementById("search-button").addEventListener("click", searchLocation);
-            document.getElementById("search-input").addEventListener("keypress", function (event) {
-                if (event.key === "Enter") {
-                    event.preventDefault();
-                    searchLocation();
-                }
+        // Geolocation - Show user's location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                var userLatLng = [position.coords.latitude, position.coords.longitude];
+                L.marker(userLatLng).addTo(map)
+                    .bindPopup("You are here!")
+                    .openPopup();
+                map.setView(userLatLng, 14);
             });
+        }
+
+        // Search functionality
+        async function searchLocation() {
+            var query = document.getElementById("search-input").value.trim();
+            if (!query) {
+                alert("Please enter a location.");
+                return;
+            }
+
+            try {
+                let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                let data = await response.json();
+
+                if (data.length > 0) {
+                    var result = data[0];
+                    var latLng = [parseFloat(result.lat), parseFloat(result.lon)];
+                    map.setView(latLng, 14);
+                } else {
+                    alert("Location not found. Try another search.");
+                }
+            } catch (error) {
+                console.error("Error searching location:", error);
+                alert("An error occurred while searching.");
+            }
+        }
+
+        // Attach event listeners
+        document.getElementById("search-button").addEventListener("click", searchLocation);
+        document.getElementById("search-input").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                searchLocation();
+            }
         });
+    });
 
-        // Function to handle viewing matches at a specific court
-        function viewMatchesAtCourt(courtName) {
-            // Navigate directly to matches page with court location filter
-            window.location.href = `/Match/Index?courtLocation=${encodeURIComponent(courtName)}`;
-        }
+    // Functions to handle court interactions
+    function viewMatchesAtCourt(courtName) {
+        window.location.href = `/Match/Index?courtLocation=${encodeURIComponent(courtName)}`;
+    }
 
-        // Function to handle posting a match at a specific court
-        function postMatchAtCourt(courtName) {
-            console.log('Setting court location:', courtName); // Add logging
-            sessionStorage.setItem('selectedCourtLocation', courtName);
-            sessionStorage.setItem('shouldOpenCreateForm', 'true');
-            window.location.href = '/Match/Index';
-        }
+    function postMatchAtCourt(courtName) {
+        console.log('Setting court location:', courtName);
+        sessionStorage.setItem('selectedCourtLocation', courtName);
+        sessionStorage.setItem('shouldOpenCreateForm', 'true');
+        window.location.href = '/Match/Index';
+    }
     </script>
-</body>
-</html>

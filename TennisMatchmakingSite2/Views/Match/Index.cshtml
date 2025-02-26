@@ -3,389 +3,618 @@
     var isPersonal = ViewBag.IsPersonal ?? false;
     }
 
-               <div class="container mx-auto px-4 pb-20">
-                   @if (TempData["SuccessMessage"] != null)
+    <div class="container mx-auto px-4 pb-20">
+        @if (TempData["SuccessMessage"] != null)
     {
-                   <div class="bg-green-50 text-green-800 p-4 rounded-md mb-4">
-                       @TempData["SuccessMessage"]
-                   </div>
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-4">
+            @TempData["SuccessMessage"]
+        </div>
     }
 
-                   @if (TempData["ErrorMessage"] != null)
+        @if (TempData["ErrorMessage"] != null)
     {
-                   <div class="bg-red-50 text-red-800 p-4 rounded-md mb-4">
-                       @TempData["ErrorMessage"]
-                   </div>
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-4">
+            @TempData["ErrorMessage"]
+        </div>
     }
 
-                   <div class="mt-4">
-                       <!-- Mobile View -->
-                       <div class="sm:hidden mt-16 mb-6">
-                           <h1 class="text-2xl font-bold text-center mb-4">@(isPersonal ? "My Matches" : "Available Matches")</h1>
-                           <div class="flex justify-between gap-2 px-2">
-                               <a href="@(isPersonal ? @Url.Action("Index", "Match") : @Url.Action("Index", "Match", new { personal = true }))"
-                                  class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors flex-1 justify-center
-                     @(isPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
-                                   <i class="fas @(isPersonal ? "fa-globe" : "fa-user") mr-2"></i>
-                                   @(isPersonal ? "View All" : "My Matches")
-                               </a>
-                               <button onclick="showCreateMatchModal()"
-                                       class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors flex-1 justify-center">
-                                   <i class="fas fa-plus mr-2"></i>
-                                   Create Match
-                               </button>
-                           </div>
-                       </div>
+        <div class="mt-4">
+            <!-- Mobile View -->
+            <div class="sm:hidden mt-16 mb-6">
+                <h1 class="text-2xl font-bold text-center mb-4">@(isPersonal ? "My Matches" : "Available Matches")</h1>
+                <div class="flex justify-between gap-2 px-2">
+                    <a href="@(isPersonal ? @Url.Action("Index", "Match") : @Url.Action("Index", "Match", new { personal = true }))"
+                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors flex-1 justify-center
+                    @(isPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
+                        <i class="fas @(isPersonal ? "fa-globe" : "fa-user") mr-2"></i>
+                        @(isPersonal ? "View All" : "My Matches")
+                    </a>
+                    <button onclick="showCreateMatchModal()"
+                            class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors flex-1 justify-center">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create Match
+                    </button>
+                </div>
+            </div>
 
-                       <!-- Desktop View -->
-                       <div class="hidden sm:flex justify-between items-center mb-6">
-                           <h1 class="text-2xl font-bold">@(isPersonal ? "My Matches" : "Available Matches")</h1>
-                           <div class="flex gap-4">
-                               <a href="@(isPersonal ? @Url.Action("Index", "Match") : @Url.Action("Index", "Match", new { personal = true }))"
-                                  class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
-                     @(isPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
-                                   <i class="fas @(isPersonal ? "fa-globe" : "fa-user") mr-2"></i>
-                                   @(isPersonal ? "View All Matches" : "My Matches")
-                               </a>
-                               <button onclick="showCreateMatchModal()"
-                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-                                   <i class="fas fa-plus mr-2"></i>
-                                   Create Match
-                               </button>
-                           </div>
-                       </div>
+            <!-- Desktop View -->
+            <div class="hidden sm:flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">@(isPersonal ? "My Matches" : "Available Matches")</h1>
+                <div class="flex gap-4">
+                    <a href="@(isPersonal ? @Url.Action("Index", "Match") : @Url.Action("Index", "Match", new { personal = true }))"
+                       class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
+                    @(isPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
+                        <i class="fas @(isPersonal ? "fa-globe" : "fa-user") mr-2"></i>
+                        @(isPersonal ? "View All Matches" : "My Matches")
+                    </a>
+                    <button onclick="showCreateMatchModal()"
+                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Create Match
+                    </button>
+                </div>
+            </div>
 
-                       <!-- Mobile Filter Button and Form -->
-                       <div class="md:hidden mb-8">
-                           <button onclick="toggleMobileFilter()" type="button"
-                                   class="w-full bg-white text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center border border-gray-200">
-                               <i class="fas fa-filter mr-2"></i>
-                               Filter Matches
-                           </button>
-                           <div id="mobileFilterForm" class="hidden mt-2 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                               @await Html.PartialAsync("_FilterForm")
-                           </div>
-                       </div>
-
-
-
-                       <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                           <!-- Desktop Filter Section -->
-                           <div class="hidden md:block md:col-span-1">
-                               <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                                   <h2 class="font-semibold mb-4">Filter Matches</h2>
-                                   @await Html.PartialAsync("_FilterForm")
-                               </div>
-                           </div>
-
-                           <!-- Matches Section -->
-                           <div class="md:col-span-3">
-                               @if (!Model.Any())
-                 {
-                               <div class="bg-blue-50 text-blue-700 p-4 rounded-md">
-                                   @(isPersonal ? "You haven't created any matches yet." : "No matches available.")
-                               </div>
-                 }
-                    else
-                 {
-                               <div class="space-y-4">
-                                   @foreach (var match in Model)
+            <!-- Mobile Filter Button and Form -->
+            <div class="md:hidden mb-8">
+                <button onclick="toggleMobileFilter()" type="button"
+                        class="w-full bg-white text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center border border-gray-200">
+                    <i class="fas fa-filter mr-2"></i>
+                    Filter Matches
+                </button>
+                <div id="mobileFilterForm" class="hidden mt-2 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <!-- Embedded Filter Form for Mobile -->
+                    @using (Html.BeginForm("Index", "Match", FormMethod.Get))
                 {
-                                   @await Html.PartialAsync("_MatchCard", match)
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                            <div class="relative">
+                                <input type="text" name="courtLocation" id="mobileFilterLocation" value="@ViewBag.CurrentCourtLocation"
+                                       autocomplete="off"
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                            <select name="matchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">All Types</option>
+                                <option value="singles" selected="@(ViewBag.CurrentMatchType == "singles")">SINGLES</option>
+                                <option value="doubles" selected="@(ViewBag.CurrentMatchType == "doubles")">DOUBLES</option>
+                                <option value="mixed" selected="@(ViewBag.CurrentMatchType == "mixed")">MIXED</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
+                            <select name="skillLevel" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">All Levels</option>
+                                <option value="beginner" selected="@(ViewBag.CurrentSkillLevel == "beginner")">Beginner</option>
+                                <option value="casual" selected="@(ViewBag.CurrentSkillLevel == "casual")">Casual</option>
+                                <option value="intermediate" selected="@(ViewBag.CurrentSkillLevel == "intermediate")">Intermediate</option>
+                                <option value="competitive" selected="@(ViewBag.CurrentSkillLevel == "competitive")">Competitive</option>
+                                <option value="advanced" selected="@(ViewBag.CurrentSkillLevel == "advanced")">Advanced</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <input type="date" name="matchDate" value="@(ViewBag.CurrentMatchDate?.ToString("yyyy-MM-dd"))"
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                            Apply Filters
+                        </button>
+                    </div>
                 }
-                               </div>
-        }
-                           </div>
-                       </div>
+                </div>
+            </div>
 
-                       <!-- Mobile Filter Panel -->
-                       <div id="filterBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-[1000] hidden"></div>
-                       <div id="filterPanel" class="fixed inset-y-0 right-0 w-80 bg-white shadow-lg z-[1001] transform translate-x-full transition-transform duration-300">
-                           <div class="p-4 h-full overflow-y-auto">
-                               <div class="flex justify-between items-center mb-4">
-                                   <h3 class="text-lg font-semibold">Filter Matches</h3>
-                                   <button onclick="hideFilterPanel()" class="text-gray-500 hover:text-gray-700">
-                                       <i class="fas fa-times"></i>
-                                   </button>
-                               </div>
-                               @await Html.PartialAsync("_FilterForm")
-                           </div>
-                       </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Desktop Filter Section -->
+                <div class="hidden md:block md:col-span-1">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <h2 class="font-semibold mb-4">Filter Matches</h2>
+                        <!-- Embedded Filter Form for Desktop -->
+                        @using (Html.BeginForm("Index", "Match", FormMethod.Get))
+                    {
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                <div class="relative">
+                                    <input type="text" name="courtLocation" id="desktopFilterLocation" value="@ViewBag.CurrentCourtLocation"
+                                           autocomplete="off"
+                                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
 
-                       <!-- Create Match Modal -->
-                       <div id="createMatchModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                           <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                               <div class="flex justify-between items-center mb-4">
-                                   <h3 class="text-lg font-semibold">Create New Match</h3>
-                                   <button onclick="hideCreateMatchModal()" class="text-gray-500 hover:text-gray-700">
-                                       <i class="fas fa-times"></i>
-                                   </button>
-                               </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                                <select name="matchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">All Types</option>
+                                    <option value="singles" selected="@(ViewBag.CurrentMatchType == "singles")">SINGLES</option>
+                                    <option value="doubles" selected="@(ViewBag.CurrentMatchType == "doubles")">DOUBLES</option>
+                                    <option value="mixed" selected="@(ViewBag.CurrentMatchType == "mixed")">MIXED</option>
+                                </select>
+                            </div>
 
-                               <form asp-controller="Match" asp-action="Create" method="post">
-                                   <div class="space-y-4">
-                                       <div>
-                                           <label class="block text-sm font-medium text-gray-700 mb-1">Court Location</label>
-                                           <input type="text" name="CourtLocation" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                                       </div>
-                                       <div>
-                                           <label class="block text-sm font-medium text-gray-700 mb-1">Match Time</label>
-                                           <input type="datetime-local" name="MatchTime" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                                       </div>
-                                       <div>
-                                           <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
-                                           <select name="MatchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                                               <option value="singles" selected>Singles</option>
-                                               <option value="doubles">Doubles</option>
-                                               <option value="mixed">Mixed</option>
-                                           </select>
-                                       </div>
-                                       <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors">
-                                           Create Match
-                                       </button>
-                                   </div>
-                               </form>
-                           </div>
-                       </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
+                                <select name="skillLevel" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">All Levels</option>
+                                    <option value="beginner" selected="@(ViewBag.CurrentSkillLevel == "beginner")">Beginner</option>
+                                    <option value="casual" selected="@(ViewBag.CurrentSkillLevel == "casual")">Casual</option>
+                                    <option value="intermediate" selected="@(ViewBag.CurrentSkillLevel == "intermediate")">Intermediate</option>
+                                    <option value="competitive" selected="@(ViewBag.CurrentSkillLevel == "competitive")">Competitive</option>
+                                    <option value="advanced" selected="@(ViewBag.CurrentSkillLevel == "advanced")">Advanced</option>
+                                </select>
+                            </div>
 
-                       <script>
-                           document.addEventListener('DOMContentLoaded', function () {
-                               // Debug logging for create form
-                               console.log('Checking session storage...');
-                               console.log('shouldOpenCreateForm:', sessionStorage.getItem('shouldOpenCreateForm'));
-                               console.log('selectedCourtLocation:', sessionStorage.getItem('selectedCourtLocation'));
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                <input type="date" name="matchDate" value="@(ViewBag.CurrentMatchDate?.ToString("yyyy-MM-dd"))"
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
 
-                               const shouldOpenForm = sessionStorage.getItem('shouldOpenCreateForm');
-                               const courtLocation = sessionStorage.getItem('selectedCourtLocation');
+                            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                                Apply Filters
+                            </button>
+                        </div>
+                    }
+                    </div>
+                </div>
 
-                               if (shouldOpenForm === 'true' && courtLocation) {
-                                   console.log('Should open form with location:', courtLocation);
-                                   showCreateMatchModal();
+                <!-- Matches Section -->
+                <div class="md:col-span-3">
+                    @if (!Model.Any())
+                {
+                    <div class="bg-blue-50 text-blue-700 p-4 rounded-md">
+                        @(isPersonal ? "You haven't created any matches yet." : "No matches available.")
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-4">
+                        @foreach (var match in Model)
+                    {
+                        @await Html.PartialAsync("_MatchCard", match)
+                    }
+                    </div>
+                }
+                </div>
+            </div>
 
-                                   // Try both selectors to see which one works
-                                   let courtLocationInput = document.querySelector('input[name="CourtLocation"]');
-                                   if (!courtLocationInput) {
-                                       courtLocationInput = document.querySelector('#createMatchModal input[name="CourtLocation"]');
-                                   }
+            <!-- Mobile Filter Panel -->
+            <div id="filterBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-[1000] hidden"></div>
+            <div id="filterPanel" class="fixed inset-y-0 right-0 w-80 bg-white shadow-lg z-[1001] transform translate-x-full transition-transform duration-300">
+                <div class="p-4 h-full overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Filter Matches</h3>
+                        <button onclick="hideFilterPanel()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <!-- We'll use the mobile filter form for this panel -->
+                </div>
+            </div>
 
-                                   if (courtLocationInput) {
-                                       console.log('Found input field, setting value');
-                                       courtLocationInput.value = courtLocation;
-                                   } else {
-                                       console.error('Could not find court location input');
-                                   }
+            <!-- Create Match Modal -->
+            <div id="createMatchModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Create New Match</h3>
+                        <button onclick="hideCreateMatchModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
 
-                                   sessionStorage.removeItem('shouldOpenCreateForm');
-                                   sessionStorage.removeItem('selectedCourtLocation');
-                               }
+                    <form asp-controller="Match" asp-action="Create" method="post">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Court Location</label>
+                                <input type="text" name="CourtLocation" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Match Time</label>
+                                <input type="datetime-local" name="MatchTime" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                                <select name="MatchType" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                    <option value="singles" selected>Singles</option>
+                                    <option value="doubles">Doubles</option>
+                                    <option value="mixed">Mixed</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors">
+                                Create Match
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                               // Handle URL parameters for filtering
-                               const urlParams = new URLSearchParams(window.location.search);
-                               const courtLocationParam = urlParams.get('courtLocation');
+    @section Scripts {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Debug logging for create form
+                console.log('Checking session storage...');
+                console.log('shouldOpenCreateForm:', sessionStorage.getItem('shouldOpenCreateForm'));
+                console.log('selectedCourtLocation:', sessionStorage.getItem('selectedCourtLocation'));
 
-                               if (courtLocationParam) {
-                                   // Set the court location in the filter form
-                                   const filterInput = document.querySelector('input[name="courtLocation"]');
-                                   if (filterInput) {
-                                       filterInput.value = courtLocationParam;
-                                   }
-                               }
+                const shouldOpenForm = sessionStorage.getItem('shouldOpenCreateForm');
+                const courtLocation = sessionStorage.getItem('selectedCourtLocation');
 
-                               // Existing modal handlers
-                               const createMatchModal = document.getElementById('createMatchModal');
-                               if (createMatchModal) {
-                                   createMatchModal.addEventListener('click', function (e) {
-                                       if (e.target === createMatchModal) {
-                                           hideCreateMatchModal();
-                                       }
-                                   });
-                               }
+                if (shouldOpenForm === 'true' && courtLocation) {
+                    console.log('Should open form with location:', courtLocation);
+                    showCreateMatchModal();
 
-                               // Add event listeners for the filter backdrop
-                               const filterBackdrop = document.getElementById('filterBackdrop');
-                               if (filterBackdrop) {
-                                   filterBackdrop.addEventListener('click', hideFilterPanel);
-                               }
-                           });
+                    // Try both selectors to see which one works
+                    let courtLocationInput = document.querySelector('input[name="CourtLocation"]');
+                    if (!courtLocationInput) {
+                        courtLocationInput = document.querySelector('#createMatchModal input[name="CourtLocation"]');
+                    }
 
-                           function editMatch(matchId) {
-                               // Prevent the card toggle
-                               event.stopPropagation();
+                    if (courtLocationInput) {
+                        console.log('Found input field, setting value');
+                        courtLocationInput.value = courtLocation;
+                    } else {
+                        console.error('Could not find court location input');
+                    }
 
-                               // Get both the outer and inner content divs
-                               const contentDiv = document.getElementById(`content-${matchId}`);
-                               const contentInnerDiv = document.getElementById(`content-inner-${matchId}`);
+                    sessionStorage.removeItem('shouldOpenCreateForm');
+                    sessionStorage.removeItem('selectedCourtLocation');
+                }
 
-                               // Ensure the card is expanded
-                               if (contentDiv) {
-                                   contentDiv.classList.remove('hidden');
-                                   // Update the chevron
-                                   const icon = document.getElementById(`icon-${matchId}`);
-                                   if (icon) {
-                                       icon.classList.remove('fa-chevron-down');
-                                       icon.classList.add('fa-chevron-up');
-                                   }
-                               }
+                // Handle URL parameters for filtering
+                const urlParams = new URLSearchParams(window.location.search);
+                const courtLocationParam = urlParams.get('courtLocation');
 
-                               // Show loading state in the inner div
-                               if (contentInnerDiv) {
-                                   contentInnerDiv.innerHTML = '<div class="p-4 text-center">Loading...</div>';
-                               }
+                if (courtLocationParam) {
+                    // Set the court location in the filter form
+                    const filterInputs = document.querySelectorAll('input[name="courtLocation"]');
+                    filterInputs.forEach(input => {
+                        input.value = courtLocationParam;
+                    });
+                }
 
-                               // Fetch the edit form
-                               fetch(`/Match/Edit/${matchId}`)
-                                   .then(response => {
-                                       if (!response.ok) {
-                                           throw new Error('Network response was not ok');
-                                       }
-                                       return response.text();
-                                   })
-                                   .then(html => {
-                                       if (contentInnerDiv) {
-                                           contentInnerDiv.innerHTML = html;
-                                       }
-                                   })
-                                   .catch(error => {
-                                       console.error('Error:', error);
-                                       if (contentInnerDiv) {
-                                           contentInnerDiv.innerHTML = '<div class="p-4 text-center text-red-600">Error loading edit form</div>';
-                                       }
-                                   });
-                           }
+                // Existing modal handlers
+                const createMatchModal = document.getElementById('createMatchModal');
+                if (createMatchModal) {
+                    createMatchModal.addEventListener('click', function (e) {
+                        if (e.target === createMatchModal) {
+                            hideCreateMatchModal();
+                        }
+                    });
+                }
 
-                           function closeEditForm() {
-                               const editForms = document.querySelectorAll('[id^="content-"]');
-                               editForms.forEach(form => {
-                                   form.classList.add('hidden');
-                               });
-                           }
+                // Add event listeners for the filter backdrop
+                const filterBackdrop = document.getElementById('filterBackdrop');
+                if (filterBackdrop) {
+                    filterBackdrop.addEventListener('click', hideFilterPanel);
+                }
 
-                           // Modal Functions
-                           function showCreateMatchModal() {
-                               const modal = document.getElementById('createMatchModal');
-                               if (modal) {
-                                   modal.classList.remove('hidden');
-                                   document.body.style.overflow = 'hidden';
-                               }
-                           }
+                // Setup autocomplete for create match form and all filter location inputs
+                setupRealCourtAutocomplete('input[name="CourtLocation"]');
+                setupRealCourtAutocomplete('#desktopFilterLocation');
+                setupRealCourtAutocomplete('#mobileFilterLocation');
+            });
 
-                           function hideCreateMatchModal() {
-                               const modal = document.getElementById('createMatchModal');
-                               if (modal) {
-                                   modal.classList.add('hidden');
-                                   document.body.style.overflow = '';
-                               }
-                           }
+            // Function to setup autocomplete using real court data
+            function setupRealCourtAutocomplete(inputSelector) {
+                const input = document.querySelector(inputSelector);
+                if (!input) {
+                    console.error('Input not found:', inputSelector);
+                    return;
+                }
 
-                           // Delete Function
-                           function deleteMatch(matchId) {
-                               if (!matchId) {
-                                   console.error('No match ID provided');
-                                   return;
-                               }
+                console.log('Setting up real data autocomplete for:', inputSelector);
 
-                               if (confirm('Are you sure you want to delete this match?')) {
-                                   const form = document.createElement('form');
-                                   form.method = 'POST';
-                                   form.action = '/Match/Delete';
+                // Create dropdown element
+                const dropdown = document.createElement('div');
+                dropdown.className = 'court-autocomplete-dropdown';
+                dropdown.style.position = 'absolute';
+                dropdown.style.backgroundColor = 'white';
+                dropdown.style.border = '1px solid #ccc';
+                dropdown.style.borderRadius = '4px';
+                dropdown.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                dropdown.style.zIndex = '9999';
+                dropdown.style.maxHeight = '200px';
+                dropdown.style.overflowY = 'auto';
+                dropdown.style.display = 'none';
+                dropdown.style.width = input.offsetWidth + 'px';
 
-                                   // Add anti-forgery token if it exists
-                                   const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]');
-                                   if (antiForgeryToken) {
-                                       const tokenInput = antiForgeryToken.cloneNode(true);
-                                       form.appendChild(tokenInput);
-                                   }
+                // Add to document body
+                document.body.appendChild(dropdown);
 
-                                   // Add match ID
-                                   const matchIdInput = document.createElement('input');
-                                   matchIdInput.type = 'hidden';
-                                   matchIdInput.name = 'matchId';
-                                   matchIdInput.value = matchId;
-                                   form.appendChild(matchIdInput);
+                // Position the dropdown
+                function positionDropdown() {
+                    const rect = input.getBoundingClientRect();
+                    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+                    dropdown.style.left = (rect.left + window.scrollX) + 'px';
+                    dropdown.style.width = rect.width + 'px';
+                }
 
-                                   // Add the form to the document and submit
-                                   document.body.appendChild(form);
-                                   form.submit();
-                               }
-                           }
+                // Function to fetch courts from the API
+                async function fetchCourts(query) {
+                    try {
+                        console.log('Fetching courts with query:', query);
+                        const response = await fetch(`/Map/Search?query=${encodeURIComponent(query)}`);
 
-                           // Toggle Functions
-                           function toggleMobileFilter() {
-                               const filterForm = document.getElementById('mobileFilterForm');
-                               if (filterForm) {
-                                   filterForm.classList.toggle('hidden');
-                               }
-                           }
+                        if (!response.ok) {
+                            throw new Error(`API error: ${response.status}`);
+                        }
 
-                           function toggleCard(id) {
-                               const content = document.getElementById('content-' + id);
-                               const icon = document.getElementById('icon-' + id);
+                        const data = await response.json();
+                        console.log('API returned courts:', data);
+                        return data || [];
+                    } catch (error) {
+                        console.error('Error fetching courts:', error);
+                        return [];
+                    }
+                }
 
-                               if (content && icon) {
-                                   content.classList.toggle('hidden');
+                // Function to show the dropdown with results
+                function showDropdown(courts) {
+                    dropdown.innerHTML = '';
 
-                                   // Update icon
-                                   if (content.classList.contains('hidden')) {
-                                       icon.classList.remove('fa-chevron-up');
-                                       icon.classList.add('fa-chevron-down');
-                                   } else {
-                                       icon.classList.remove('fa-chevron-down');
-                                       icon.classList.add('fa-chevron-up');
-                                   }
-                               }
-                           }
+                    if (!courts || courts.length === 0) {
+                        const noResults = document.createElement('div');
+                        noResults.textContent = 'No courts found';
+                        noResults.style.padding = '8px 12px';
+                        noResults.style.color = '#666';
+                        dropdown.appendChild(noResults);
+                    } else {
+                        courts.forEach(court => {
+                            const option = document.createElement('div');
+                            option.textContent = court.name;
+                            option.style.padding = '8px 12px';
+                            option.style.cursor = 'pointer';
+                            option.style.borderBottom = '1px solid #eee';
 
-                           // Filter Panel Functions
-                           function showFilterPanel() {
-                               const panel = document.getElementById('filterPanel');
-                               const backdrop = document.getElementById('filterBackdrop');
+                            option.addEventListener('mouseover', () => {
+                                option.style.backgroundColor = '#f0f0f0';
+                            });
 
-                               if (!panel || !backdrop) {
-                                   console.error('Filter panel elements not found');
-                                   return;
-                               }
+                            option.addEventListener('mouseout', () => {
+                                option.style.backgroundColor = 'white';
+                            });
 
-                               backdrop.classList.remove('hidden');
-                               // Force a reflow
-                               panel.offsetHeight;
-                               requestAnimationFrame(() => {
-                                   panel.classList.remove('translate-x-full');
-                               });
+                            option.addEventListener('click', () => {
+                                input.value = court.name;
+                                dropdown.style.display = 'none';
 
-                               document.body.style.overflow = 'hidden';
-                           }
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                input.dispatchEvent(event);
+                            });
 
-                           function hideFilterPanel() {
-                               const panel = document.getElementById('filterPanel');
-                               const backdrop = document.getElementById('filterBackdrop');
+                            dropdown.appendChild(option);
+                        });
+                    }
 
-                               if (!panel || !backdrop) {
-                                   console.error('Filter panel elements not found');
-                                   return;
-                               }
+                    positionDropdown();
+                    dropdown.style.display = 'block';
+                }
 
-                               panel.classList.add('translate-x-full');
+                // Setup debounce function
+                let debounceTimer;
 
-                               setTimeout(() => {
-                                   backdrop.classList.add('hidden');
-                                   document.body.style.overflow = '';
-                               }, 300);
-                           }
+                // Input handler with debounce
+                input.addEventListener('input', function () {
+                    const query = this.value.trim();
 
-                           // Error handling helper
-                           function showError(message) {
-                               const errorDiv = document.createElement('div');
-                               errorDiv.className = 'bg-red-50 text-red-800 p-4 rounded-md mb-4';
-                               errorDiv.textContent = message;
+                    clearTimeout(debounceTimer);
 
-                               const container = document.querySelector('.container');
-                               if (container) {
-                                   container.insertBefore(errorDiv, container.firstChild);
+                    if (query.length >= 2) {
+                        debounceTimer = setTimeout(async () => {
+                            const courts = await fetchCourts(query);
+                            showDropdown(courts);
+                        }, 300);
+                    } else {
+                        dropdown.style.display = 'none';
+                    }
+                });
 
-                                   // Remove after 5 seconds
-                                   setTimeout(() => {
-                                       errorDiv.remove();
-                                   }, 5000);
-                               }
-                           }
-                       </script>
+                // Handle clicks outside
+                document.addEventListener('click', function (e) {
+                    if (e.target !== input && e.target !== dropdown && !dropdown.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                    }
+                });
+
+                // Update position on window resize
+                window.addEventListener('resize', positionDropdown);
+
+                // Add autocomplete=off to prevent browser autocomplete
+                input.setAttribute('autocomplete', 'off');
+
+                console.log('Real data autocomplete setup complete for:', inputSelector);
+            }
+
+            // Modal Functions
+            function showCreateMatchModal() {
+                const modal = document.getElementById('createMatchModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            function hideCreateMatchModal() {
+                const modal = document.getElementById('createMatchModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+
+            // Delete Function
+            function deleteMatch(matchId) {
+                if (!matchId) {
+                    console.error('No match ID provided');
+                    return;
+                }
+
+                if (confirm('Are you sure you want to delete this match?')) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/Match/Delete';
+
+                    // Add anti-forgery token if it exists
+                    const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]');
+                    if (antiForgeryToken) {
+                        const tokenInput = antiForgeryToken.cloneNode(true);
+                        form.appendChild(tokenInput);
+                    }
+
+                    // Add match ID
+                    const matchIdInput = document.createElement('input');
+                    matchIdInput.type = 'hidden';
+                    matchIdInput.name = 'matchId';
+                    matchIdInput.value = matchId;
+                    form.appendChild(matchIdInput);
+
+                    // Add the form to the document and submit
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            }
+
+            // Toggle Functions
+            function toggleMobileFilter() {
+                const filterForm = document.getElementById('mobileFilterForm');
+                if (filterForm) {
+                    filterForm.classList.toggle('hidden');
+                }
+            }
+
+            function toggleCard(id) {
+                const content = document.getElementById('content-' + id);
+                const icon = document.getElementById('icon-' + id);
+
+                if (content && icon) {
+                    content.classList.toggle('hidden');
+
+                    // Update icon
+                    if (content.classList.contains('hidden')) {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    } else {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                }
+            }
+
+            // Filter Panel Functions
+            function showFilterPanel() {
+                const panel = document.getElementById('filterPanel');
+                const backdrop = document.getElementById('filterBackdrop');
+
+                if (!panel || !backdrop) {
+                    console.error('Filter panel elements not found');
+                    return;
+                }
+
+                backdrop.classList.remove('hidden');
+                // Force a reflow
+                panel.offsetHeight;
+                requestAnimationFrame(() => {
+                    panel.classList.remove('translate-x-full');
+                });
+
+                document.body.style.overflow = 'hidden';
+            }
+
+            function hideFilterPanel() {
+                const panel = document.getElementById('filterPanel');
+                const backdrop = document.getElementById('filterBackdrop');
+
+                if (!panel || !backdrop) {
+                    console.error('Filter panel elements not found');
+                    return;
+                }
+
+                panel.classList.add('translate-x-full');
+
+                setTimeout(() => {
+                    backdrop.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }, 300);
+            }
+
+            function editMatch(matchId) {
+                // Prevent the card toggle
+                event.stopPropagation();
+
+                // Get both the outer and inner content divs
+                const contentDiv = document.getElementById(`content-${matchId}`);
+                const contentInnerDiv = document.getElementById(`content-inner-${matchId}`);
+
+                // Ensure the card is expanded
+                if (contentDiv) {
+                    contentDiv.classList.remove('hidden');
+                    // Update the chevron
+                    const icon = document.getElementById(`icon-${matchId}`);
+                    if (icon) {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                }
+
+                // Show loading state in the inner div
+                if (contentInnerDiv) {
+                    contentInnerDiv.innerHTML = '<div class="p-4 text-center">Loading...</div>';
+                }
+
+                // Fetch the edit form
+                fetch(`/Match/Edit/${matchId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        if (contentInnerDiv) {
+                            contentInnerDiv.innerHTML = html;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        if (contentInnerDiv) {
+                            contentInnerDiv.innerHTML = '<div class="p-4 text-center text-red-600">Error loading edit form</div>';
+                        }
+                    });
+            }
+
+            function closeEditForm() {
+                const editForms = document.querySelectorAll('[id^="content-"]');
+                editForms.forEach(form => {
+                    form.classList.add('hidden');
+                });
+            }
+
+            // Error handling helper
+            function showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-50 text-red-800 p-4 rounded-md mb-4';
+                errorDiv.textContent = message;
+
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.insertBefore(errorDiv, container.firstChild);
+
+                    // Remove after 5 seconds
+                    setTimeout(() => {
+                        errorDiv.remove();
+                    }, 5000);
+                }
+            }
+        </script>
+    }

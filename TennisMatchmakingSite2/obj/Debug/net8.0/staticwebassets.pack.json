@@ -37,6 +37,10 @@
       "PackagePath": "staticwebassets\\images\\logo2.png"
     },
     {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\court-autocomplete.js",
+      "PackagePath": "staticwebassets\\js\\court-autocomplete.js"
+    },
+    {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\match-functions.js",
       "PackagePath": "staticwebassets\\js\\match-functions.js"
     },

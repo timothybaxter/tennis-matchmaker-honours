@@ -67,23 +67,32 @@ namespace TennisMatchmakingSite2.Controllers
                 {
                     var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
 
+                    // Extract userId from token
+                    var tokenParts = result.Token.Split('.');
+                    var payload = tokenParts[1];
+                    var paddedPayload = payload.PadRight(4 * ((payload.Length + 3) / 4), '=');
+                    var decodedBytes = Convert.FromBase64String(paddedPayload);
+                    var decodedText = System.Text.Encoding.UTF8.GetString(decodedBytes);
+                    var tokenData = JsonSerializer.Deserialize<TokenPayload>(decodedText);
+
                     // Store initial settings
-                    var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "user/settings");
+                    var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings");
                     var settingsBody = new
                     {
-                        userId = result.User.Id,
+                        userId = tokenData.userId,  // Use userId from token
                         name = model.Name,
                         email = model.Email,
-                        playerLevel = model.PlayerLevel.ToString(),
-                        theme = "Wimbledon" // Default theme
+                        playerLevel = model.PlayerLevel.ToString()
                     };
 
+                    _logger.LogInformation($"Settings request body: {JsonSerializer.Serialize(settingsBody)}");
                     settingsRequest.Content = JsonContent.Create(settingsBody);
                     var settingsResponse = await _httpClient.SendAsync(settingsRequest);
 
                     if (!settingsResponse.IsSuccessStatusCode)
                     {
-                        _logger.LogError($"Failed to create settings: {await settingsResponse.Content.ReadAsStringAsync()}");
+                        var errorContent = await settingsResponse.Content.ReadAsStringAsync();
+                        _logger.LogError($"Failed to create settings. Status: {settingsResponse.StatusCode}, Error: {errorContent}");
                     }
 
                     return RedirectToAction("Login");
@@ -125,7 +134,16 @@ namespace TennisMatchmakingSite2.Controllers
                 {
                     var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
 
-                    // Store session data
+                    // Extract userId from token
+                    var tokenParts = result.Token.Split('.');
+                    var payload = tokenParts[1];
+                    var paddedPayload = payload.PadRight(4 * ((payload.Length + 3) / 4), '=');
+                    var decodedBytes = Convert.FromBase64String(paddedPayload);
+                    var decodedText = System.Text.Encoding.UTF8.GetString(decodedBytes);
+                    var tokenData = JsonSerializer.Deserialize<TokenPayload>(decodedText);
+
+                    // Store session data including userId
+                    HttpContext.Session.SetString("UserId", tokenData.userId);
                     HttpContext.Session.SetString("JWTToken", result.Token);
                     HttpContext.Session.SetString("UserName", result.User.Name);
                     HttpContext.Session.SetString("UserEmail", result.User.Email);
@@ -133,7 +151,7 @@ namespace TennisMatchmakingSite2.Controllers
                     HttpContext.Session.SetString("Theme", "Wimbledon"); // Set default theme
 
                     // Get user settings
-                    var settingsRequest = new HttpRequestMessage(HttpMethod.Get, "user/settings");
+                    var settingsRequest = new HttpRequestMessage(HttpMethod.Get, "settings");
                     settingsRequest.Headers.Add("Authorization", $"Bearer {result.Token}");
                     var settingsResponse = await _httpClient.SendAsync(settingsRequest);
 
@@ -156,6 +174,12 @@ namespace TennisMatchmakingSite2.Controllers
                 ModelState.AddModelError("", "An error occurred during login");
             }
             return View(model);
+        }
+
+        public IActionResult Logout()
+        {
+            HttpContext.Session.Clear();
+            return RedirectToAction("Login");
         }
     }
 }
