@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
+import { ObjectId } from 'mongodb';
 
 export async function register(event) {
     try {
@@ -66,6 +67,7 @@ export async function login(event) {
         const users = db.collection('users');
 
         const user = await users.findOne({ email });
+        console.log('User data from DB:', JSON.stringify(user, null, 2));
         if (!user) {
             return createResponse(401, { message: 'Invalid credentials' });
         }
@@ -85,9 +87,9 @@ export async function login(event) {
             message: 'Login successful',
             token,
             user: {
-                email: user.email,
-                name: user.name,
-                playerLevel: user.playerLevel
+                email: user.email || "",
+                name: user.name || "",
+                playerLevel: user.playerLevel || "Beginner"
             }
         });
     } catch (error) {
