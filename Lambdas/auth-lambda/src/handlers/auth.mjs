@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 
