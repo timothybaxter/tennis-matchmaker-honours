@@ -44,13 +44,30 @@ export async function createSettings(event) {
 
 export async function getSettings(event) {
     try {
-        const { authorization } = event.headers;
-        if (!authorization) {
+        // Extract authorization token - checking all possible header formats
+        const authHeader = event.headers.Authorization ||
+            event.headers.authorization ||
+            event.headers['Authorization'] ||
+            event.headers['authorization'];
+
+        if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
-        const token = authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Extract token
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            console.error('Token verification error:', error);
+            return createResponse(401, { message: 'Invalid token' });
+        }
 
         const db = await connectToDatabase();
         const settings = db.collection('user-settings');
@@ -78,112 +95,39 @@ export async function getSettings(event) {
     }
 }
 
-// Add this to your settings.mjs file
-export async function updateSettings(event) {
-    try {
-        console.log('Update settings event:', JSON.stringify(event));
-
-        const authHeader = event.headers.Authorization || event.headers.authorization;
-        if (!authHeader) {
-            return createResponse(401, { message: 'No authorization token provided' });
-        }
-
-        const token = authHeader.split(' ')[1];
-        console.log('Token extracted:', token.substring(0, 20) + '...');
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Decoded token:', JSON.stringify(decoded));
-
-        const updates = JSON.parse(event.body);
-        console.log('Update request body:', JSON.stringify(updates));
-
-        const allowedUpdates = ['name', 'email', 'playerLevel', 'theme', 'hometown'];
-
-        // Filter updates to only allow certain fields
-        const filteredUpdates = Object.keys(updates)
-            .filter(key => allowedUpdates.includes(key))
-            .reduce((obj, key) => {
-                obj[key] = updates[key];
-                return obj;
-            }, {});
-
-        console.log('Filtered updates:', JSON.stringify(filteredUpdates));
-
-        if (Object.keys(filteredUpdates).length === 0) {
-            return createResponse(400, { message: 'No valid update fields provided' });
-        }
-
-        const db = await connectToDatabase();
-        const settings = db.collection('user-settings');
-
-        // Add updatedAt timestamp
-        filteredUpdates.updatedAt = new Date();
-
-        console.log('Updating settings for userId:', decoded.userId);
-
-        const result = await settings.updateOne(
-            { userId: decoded.userId },
-            { $set: filteredUpdates }
-        );
-
-        console.log('Update result:', JSON.stringify(result));
-
-        if (result.matchedCount === 0) {
-            console.log('No matching document found. Creating new settings document.');
-
-            // If no settings document exists, create one
-            const newSettings = {
-                userId: decoded.userId,
-                ...filteredUpdates,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-
-            await settings.insertOne(newSettings);
-
-            return createResponse(200, {
-                message: 'Settings created successfully',
-                settings: newSettings
-            });
-        }
-
-        // Get updated settings to return
-        const updatedSettings = await settings.findOne({ userId: decoded.userId });
-
-        return createResponse(200, {
-            message: 'Settings updated successfully',
-            settings: {
-                name: updatedSettings.name,
-                email: updatedSettings.email,
-                playerLevel: updatedSettings.playerLevel,
-                theme: updatedSettings.theme,
-                hometown: updatedSettings.hometown
-            }
-        });
-    } catch (error) {
-        console.error('Update settings error:', error);
-        if (error.name === 'JsonWebTokenError') {
-            return createResponse(401, { message: 'Invalid token' });
-        }
-        return createResponse(500, { message: 'Error updating settings', error: error.message });
-    }
-}
 export async function partialUpdateSettings(event) {
     try {
         console.log('Partial update settings event:', JSON.stringify(event));
 
-        // Extract authorization token
+        // Extract authorization token - checking all possible header formats
         const authHeader = event.headers.Authorization ||
             event.headers.authorization ||
             event.headers['Authorization'] ||
             event.headers['authorization'];
 
+        console.log('Auth header detected:', authHeader);
+
         if (!authHeader) {
             return createResponse(401, { message: 'No authorization token provided' });
         }
 
+        // Extract token
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        console.log('Token extracted:', token.substring(0, 20) + '...');
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            console.error('Token verification error:', error);
+            return createResponse(401, { message: 'Invalid token' });
+        }
+
         const userId = decoded.userId;
         console.log('User ID from token:', userId);
 
@@ -212,15 +156,12 @@ export async function partialUpdateSettings(event) {
         // Add updatedAt timestamp
         filteredUpdates.updatedAt = new Date();
 
-        const result = await settings.updateOne(
-            { userId: userId },
-            { $set: filteredUpdates }
-        );
+        // Check if settings exist for this user
+        const existingSettings = await settings.findOne({ userId });
+        console.log('Existing settings found:', !!existingSettings);
 
-        console.log('Update result:', JSON.stringify(result));
-
-        if (result.matchedCount === 0) {
-            // If no document exists, create one with default values plus the update
+        if (!existingSettings) {
+            // Create new settings document with default values plus updates
             const defaultSettings = {
                 userId,
                 name: "",
@@ -233,12 +174,32 @@ export async function partialUpdateSettings(event) {
                 ...filteredUpdates
             };
 
+            console.log('Creating new settings document:', JSON.stringify(defaultSettings));
             await settings.insertOne(defaultSettings);
 
             return createResponse(200, {
                 message: 'Settings created successfully',
-                settings: defaultSettings
+                settings: {
+                    name: defaultSettings.name,
+                    email: defaultSettings.email,
+                    playerLevel: defaultSettings.playerLevel,
+                    theme: defaultSettings.theme,
+                    hometown: defaultSettings.hometown
+                }
             });
+        }
+
+        // Update existing settings
+        console.log('Updating settings for userId:', userId);
+        const result = await settings.updateOne(
+            { userId },
+            { $set: filteredUpdates }
+        );
+
+        console.log('Update result:', JSON.stringify(result));
+
+        if (result.matchedCount === 0) {
+            return createResponse(404, { message: 'Update failed - no document matched' });
         }
 
         // Get updated settings to return

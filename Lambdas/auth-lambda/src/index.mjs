@@ -1,4 +1,4 @@
-import { register, login, updateUser, updatePassword } from './handlers/auth.mjs';
+import { register, login, updateUser } from './handlers/auth.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -13,15 +13,9 @@ export const handler = async (event) => {
             return await register(event);
         case 'POST /auth/login':
             return await login(event);
-        case 'PUT /auth/user/{id}':
-            return await updateUser(event);
         case 'POST /auth/update-user':
             return await updateUser(event);
-        case 'PUT /auth/password/{id}':
-            return await updatePassword(event);
-        case 'POST /auth/update-password':
-            return await updatePassword(event);
         default:
-            return createResponse(404, { message: 'Route not found' });
+            return createResponse(404, { message: 'Route not found', route: `${event.httpMethod} ${event.resource}` });
     }
 };
