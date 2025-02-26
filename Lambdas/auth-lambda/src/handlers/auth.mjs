@@ -29,6 +29,7 @@ export async function register(event) {
             password: hashedPassword,
             name,
             playerLevel,
+            theme: "Wimbledon",  // Default theme
             createdAt: new Date()
         };
 
@@ -45,7 +46,8 @@ export async function register(event) {
             user: {
                 email: newUser.email,
                 name: newUser.name,
-                playerLevel: newUser.playerLevel
+                playerLevel: newUser.playerLevel,
+                theme: newUser.theme
             }
         });
     } catch (error) {
@@ -89,7 +91,8 @@ export async function login(event) {
             user: {
                 email: user.email || "",
                 name: user.name || "",
-                playerLevel: user.playerLevel || "Beginner"
+                playerLevel: user.playerLevel || "Beginner",
+                theme: user.theme || "Wimbledon" 
             }
         });
     } catch (error) {
@@ -194,8 +197,7 @@ export async function updateUser(event) {
         }
 
         // Handle regular profile updates
-        const allowedUpdates = ['name', 'email', 'playerLevel'];
-
+        const allowedUpdates = ['name', 'email', 'playerLevel', 'theme'];
         // Filter updates to only allow certain fields
         const filteredUpdates = Object.keys(updates)
             .filter(key => allowedUpdates.includes(key))
