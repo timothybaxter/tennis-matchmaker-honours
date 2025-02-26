@@ -9,7 +9,7 @@ export const handler = async (event) => {
     }
 
     switch (`${event.httpMethod} ${event.resource}`) {
-        case 'POST /settings/create':
+        case 'POST /settings':
             return await createSettings(event);
         case 'GET /settings':
             return await getSettings(event);
