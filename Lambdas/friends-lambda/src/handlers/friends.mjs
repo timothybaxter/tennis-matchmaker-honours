@@ -91,9 +91,10 @@ export async function getFriendRequests(event) {
     }
 }
 
-// Send a friend request
 export async function sendFriendRequest(event) {
     try {
+        console.log('Processing friend request with body:', event.body);
+
         // Extract and verify token
         const token = extractAndVerifyToken(event);
         if (!token.isValid) {
@@ -103,8 +104,14 @@ export async function sendFriendRequest(event) {
         const senderId = token.decoded.userId;
         const { recipientId } = JSON.parse(event.body);
 
-        if (!recipientId) {
-            return createResponse(400, { message: 'recipientId is required' });
+        console.log('Friend request details:', {
+            senderId,
+            recipientId,
+            tokenInfo: token.decoded
+        });
+
+        if (!recipientId || recipientId === "undefined") {
+            return createResponse(400, { message: 'Valid recipientId is required' });
         }
 
         if (senderId === recipientId) {
@@ -115,8 +122,22 @@ export async function sendFriendRequest(event) {
         const friendships = db.collection('friendships');
         const users = db.collection('users');
 
+        // Get sender's info for notification content
+        const senderInfo = await users.findOne({ _id: new ObjectId(senderId) });
+        if (!senderInfo) {
+            return createResponse(404, { message: 'Sender account not found' });
+        }
+
         // Check if recipient exists
-        const recipientExists = await users.findOne({ _id: new ObjectId(recipientId) });
+        let recipientObjectId;
+        try {
+            recipientObjectId = new ObjectId(recipientId);
+        } catch (error) {
+            console.error('Invalid recipient ID format:', error);
+            return createResponse(400, { message: 'Invalid recipient ID format' });
+        }
+
+        const recipientExists = await users.findOne({ _id: recipientObjectId });
         if (!recipientExists) {
             return createResponse(404, { message: 'Recipient not found' });
         }
@@ -141,10 +162,66 @@ export async function sendFriendRequest(event) {
                         { _id: existingFriendship._id },
                         { $set: { status: 'accepted', updatedAt: new Date() } }
                     );
+
+                    // Create a notification for the other user
+                    const notifications = db.collection('notifications');
+                    const newNotification = {
+                        userId: recipientId,
+                        sourceUserId: senderId,
+                        type: 'friend_accepted',
+                        content: `${senderInfo.name} accepted your friend request`,
+                        relatedItemId: existingFriendship._id.toString(),
+                        isRead: false,
+                        createdAt: new Date()
+                    };
+
+                    await notifications.insertOne(newNotification);
+
                     return createResponse(200, { message: 'Friend request accepted' });
                 }
             }
         }
+
+        // Create new friendship request
+        const newFriendship = {
+            userId1: senderId, // Sender
+            userId2: recipientId, // Recipient
+            status: 'pending',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        const result = await friendships.insertOne(newFriendship);
+
+        // Create a notification for the recipient
+        const notifications = db.collection('notifications');
+        const newNotification = {
+            userId: recipientId,
+            sourceUserId: senderId,
+            type: 'friend_request',
+            content: `${senderInfo.name} sent you a friend request`,
+            relatedItemId: result.insertedId.toString(),
+            isRead: false,
+            createdAt: new Date()
+        };
+
+        await notifications.insertOne(newNotification);
+        console.log('Created notification:', newNotification);
+
+        return createResponse(201, {
+            message: 'Friend request sent successfully',
+            friendshipId: result.insertedId,
+            notification: newNotification
+        });
+    } catch (error) {
+        console.error('Send friend request error:', error);
+        console.error('Error stack:', error.stack);
+        return createResponse(500, {
+            message: 'Error sending friend request',
+            error: error.message
+        });
+    }
+}
 
         // Create new friendship request
         const newFriendship = {
