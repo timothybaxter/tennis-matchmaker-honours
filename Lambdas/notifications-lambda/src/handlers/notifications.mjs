@@ -13,6 +13,8 @@ export async function getNotifications(event) {
         }
 
         const userId = token.decoded.userId;
+        console.log('Getting notifications for user:', userId);
+
         const db = await connectToDatabase();
         const notifications = db.collection('notifications');
 
@@ -27,6 +29,8 @@ export async function getNotifications(event) {
             query.isRead = false;
         }
 
+        console.log('Notifications query:', query);
+
         // Get notifications
         const userNotifications = await notifications
             .find(query)
@@ -34,10 +38,13 @@ export async function getNotifications(event) {
             .limit(limit)
             .toArray();
 
+        console.log(`Found ${userNotifications.length} notifications`);
+
         return createResponse(200, { notifications: userNotifications });
     } catch (error) {
         console.error('Get notifications error:', error);
-        return createResponse(500, { message: 'Error retrieving notifications' });
+        console.error('Error stack:', error.stack);
+        return createResponse(500, { message: 'Error retrieving notifications', error: error.message });
     }
 }
 
