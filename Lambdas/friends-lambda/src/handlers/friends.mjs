@@ -3,6 +3,7 @@ import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 
+console.log("webhook test");
 // Get all friends for a user
 export async function getFriends(event) {
     try {
