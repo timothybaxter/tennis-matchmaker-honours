@@ -23,7 +23,7 @@ export async function connectToDatabase() {
 
         console.log('Connected to MongoDB client');
 
-        const db = client.db('users-db');
+        const db = client.db('notification-db');
         console.log('Database selected');
 
         // Test the connection
