@@ -208,6 +208,9 @@ export async function sendMessage(event) {
         const senderId = token.decoded.userId;
         console.log('🔹 Received send message request from:', senderId);
 
+        // ✅ Log the full event for debugging
+        console.log('Full event:', JSON.stringify(event, null, 2));
+
         // ✅ Ensure request body exists
         if (!event.body) {
             console.error('❌ Request body is missing');
@@ -217,19 +220,29 @@ export async function sendMessage(event) {
         let parsedBody;
         try {
             parsedBody = JSON.parse(event.body);
+            console.log('🔹 Parsed request body:', JSON.stringify(parsedBody, null, 2));
         } catch (error) {
-            console.error('❌ Error parsing JSON:', error.message);
-            return createResponse(400, { message: 'Invalid JSON format' });
+            console.error('❌ Error parsing JSON:', error.message, 'Body:', event.body);
+            return createResponse(400, { message: 'Invalid JSON format', details: error.message });
         }
 
         // ✅ Extract fields from the parsed body
         const { conversationId, content, recipientId } = parsedBody;
-        console.log('🔹 Parsed request body:', parsedBody);
 
-        // ✅ Validate required fields
-        if (!conversationId || !content || typeof content !== 'string' || content.trim() === '') {
-            console.error('❌ Invalid conversationId or content:', { conversationId, content });
-            return createResponse(400, { message: 'conversationId and content are required and must be valid' });
+        // ✅ Validate required fields with detailed errors
+        if (!conversationId) {
+            console.error('❌ Missing conversationId');
+            return createResponse(400, { message: 'conversationId is required' });
+        }
+
+        if (!content) {
+            console.error('❌ Missing content');
+            return createResponse(400, { message: 'content is required' });
+        }
+
+        if (typeof content !== 'string' || content.trim() === '') {
+            console.error('❌ Invalid content format:', content);
+            return createResponse(400, { message: 'content must be a non-empty string' });
         }
 
         let actualConversationId = conversationId;
@@ -270,7 +283,7 @@ export async function sendMessage(event) {
                 console.log('✅ Created new conversation:', actualConversationId);
             }
         } else {
-            // ✅ Validate `conversationId` format
+            // ✅ Validate `conversationId` format for existing conversations
             let conversationObjectId;
             try {
                 conversationObjectId = new ObjectId(conversationId);
@@ -295,10 +308,16 @@ export async function sendMessage(event) {
         }
 
         // ✅ Fetch sender details
-        const sender = await users.findOne({ _id: new ObjectId(senderId) });
-        if (!sender) {
-            console.error('❌ Sender not found in database:', senderId);
-            return createResponse(404, { message: 'Sender not found' });
+        let sender;
+        try {
+            sender = await users.findOne({ _id: new ObjectId(senderId) });
+            if (!sender) {
+                console.error('❌ Sender not found in database:', senderId);
+                return createResponse(404, { message: 'Sender not found' });
+            }
+        } catch (error) {
+            console.error('❌ Error finding sender:', error);
+            return createResponse(500, { message: 'Error finding sender', error: error.message });
         }
 
         // ✅ Create the message object
@@ -312,39 +331,48 @@ export async function sendMessage(event) {
         };
 
         // ✅ Insert message into database
-        const messageResult = await messages.insertOne(newMessage);
-        console.log('✅ Message saved:', messageResult.insertedId.toString());
+        try {
+            const messageResult = await messages.insertOne(newMessage);
+            console.log('✅ Message saved:', messageResult.insertedId.toString());
 
-        // ✅ Update conversation's last activity
-        await conversations.updateOne(
-            { _id: new ObjectId(actualConversationId) },
-            { $set: { updatedAt: new Date() } }
-        );
+            // ✅ Update conversation's last activity
+            await conversations.updateOne(
+                { _id: new ObjectId(actualConversationId) },
+                { $set: { updatedAt: new Date() } }
+            );
+        } catch (error) {
+            console.error('❌ Error saving message:', error);
+            return createResponse(500, { message: 'Error saving message', error: error.message });
+        }
 
         // ✅ Send notifications to other participants
-        const conversation = await conversations.findOne({
-            _id: new ObjectId(actualConversationId)
-        });
+        try {
+            const conversation = await conversations.findOne({
+                _id: new ObjectId(actualConversationId)
+            });
 
-        if (conversation) {
-            for (const participantId of conversation.participants) {
-                if (participantId !== senderId) {
-                    await notifications.insertOne({
-                        userId: participantId,
-                        sourceUserId: senderId,
-                        type: 'message',
-                        content: `New message from ${sender.name}`,
-                        relatedItemId: actualConversationId,
-                        isRead: false,
-                        createdAt: new Date()
-                    });
+            if (conversation) {
+                for (const participantId of conversation.participants) {
+                    if (participantId !== senderId) {
+                        await notifications.insertOne({
+                            userId: participantId,
+                            sourceUserId: senderId,
+                            type: 'message',
+                            content: `New message from ${sender.name}`,
+                            relatedItemId: actualConversationId,
+                            isRead: false,
+                            createdAt: new Date()
+                        });
+                    }
                 }
             }
+        } catch (error) {
+            console.error('❌ Error sending notifications:', error);
+            // Continue even if notifications fail
         }
 
         return createResponse(201, {
             message: 'Message sent successfully',
-            messageId: messageResult.insertedId.toString(),
             conversationId: actualConversationId
         });
     } catch (error) {
