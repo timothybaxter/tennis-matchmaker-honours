@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '../utils/database.mjs';
+import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 
 console.log("webhook test");
+
 // Get all friends for a user
 export async function getFriends(event) {
     try {
@@ -16,12 +17,16 @@ export async function getFriends(event) {
         const userId = token.decoded.userId;
         console.log('Getting friends for user:', userId);
 
-        const db = await connectToDatabase();
-        const friends = db.collection('friendships');
-        const users = db.collection('users');
+        // Connect to friends database (primary for this service)
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Connect to users database (cross-service access)
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
 
         // Find all accepted friendships where the user is either user1 or user2
-        const friendships = await friends.find({
+        const friendships = await friendships.find({
             $and: [
                 { $or: [{ userId1: userId }, { userId2: userId }] },
                 { status: 'accepted' }
@@ -78,12 +83,17 @@ export async function getFriendRequests(event) {
         }
 
         const userId = token.decoded.userId;
-        const db = await connectToDatabase();
-        const friends = db.collection('friendships');
-        const users = db.collection('users');
+
+        // Connect to friends database (primary for this service)
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Connect to users database (cross-service access)
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
 
         // Get incoming friend requests
-        const friendRequests = await friends.find({
+        const friendRequests = await friendships.find({
             userId2: userId,
             status: 'pending'
         }).toArray();
@@ -148,9 +158,17 @@ export async function sendFriendRequest(event) {
             return createResponse(400, { message: 'Cannot send friend request to yourself' });
         }
 
-        const db = await connectToDatabase();
-        const friendships = db.collection('friendships');
-        const users = db.collection('users');
+        // Connect to friends database (primary for this service)
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Connect to users database (cross-service access)
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Connect to notifications database (cross-service access)
+        const notificationsDb = await connectToSpecificDatabase('notifications-db');
+        const notifications = notificationsDb.collection('notifications');
 
         // Get sender's info for notification content
         const senderInfo = await users.findOne({ _id: new ObjectId(senderId) });
@@ -194,7 +212,6 @@ export async function sendFriendRequest(event) {
                     );
 
                     // Create a notification for the other user
-                    const notifications = db.collection('notifications');
                     const newNotification = {
                         userId: recipientId,
                         sourceUserId: senderId,
@@ -224,7 +241,6 @@ export async function sendFriendRequest(event) {
         const result = await friendships.insertOne(newFriendship);
 
         // Create a notification for the recipient
-        const notifications = db.collection('notifications');
         const newNotification = {
             userId: recipientId,
             sourceUserId: senderId,
@@ -277,9 +293,17 @@ export async function respondToFriendRequest(event) {
             return createResponse(400, { message: 'friendshipId and accept are required' });
         }
 
-        const db = await connectToDatabase();
-        const friendships = db.collection('friendships');
-        const users = db.collection('users');
+        // Connect to friends database (primary for this service)
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Connect to users database (cross-service access)
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Connect to notifications database (cross-service access)
+        const notificationsDb = await connectToSpecificDatabase('notifications-db');
+        const notifications = notificationsDb.collection('notifications');
 
         // Find the friendship
         let friendship;
@@ -313,7 +337,6 @@ export async function respondToFriendRequest(event) {
             );
 
             // Create notification for the requester
-            const notifications = db.collection('notifications');
             const newNotification = {
                 userId: friendship.userId1,
                 sourceUserId: userId,
@@ -332,7 +355,6 @@ export async function respondToFriendRequest(event) {
             await friendships.deleteOne({ _id: friendship._id });
 
             // Create rejection notification (optional)
-            const notifications = db.collection('notifications');
             const newNotification = {
                 userId: friendship.userId1,
                 sourceUserId: userId,
@@ -371,9 +393,13 @@ export async function searchUsers(event) {
             return createResponse(400, { message: 'Search query must be at least 2 characters' });
         }
 
-        const db = await connectToDatabase();
-        const users = db.collection('users');
-        const friendships = db.collection('friendships');
+        // Connect to friends database (primary for this service)
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Connect to users database (cross-service access)
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
 
         // Get list of existing friendships
         const userFriendships = await friendships.find({

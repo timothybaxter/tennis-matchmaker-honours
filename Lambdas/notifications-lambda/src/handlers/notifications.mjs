@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { connectToDatabase } from '../utils/database.mjs';
+import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 
@@ -15,8 +15,9 @@ export async function getNotifications(event) {
         const userId = token.decoded.userId;
         console.log('Getting notifications for user:', userId);
 
-        const db = await connectToDatabase();
-        const notifications = db.collection('notifications');
+        // Connect to notifications database (primary for this service)
+        const notificationsDb = await connectToDatabase();
+        const notifications = notificationsDb.collection('notifications');
 
         // Get query parameters
         const queryParams = event.queryStringParameters || {};
@@ -40,6 +41,55 @@ export async function getNotifications(event) {
 
         console.log(`Found ${userNotifications.length} notifications`);
 
+        // Enhance notifications with source user details
+        if (userNotifications.length > 0) {
+            try {
+                // Get unique source user IDs
+                const sourceUserIds = [...new Set(
+                    userNotifications
+                        .filter(n => n.sourceUserId)
+                        .map(n => n.sourceUserId)
+                )];
+
+                if (sourceUserIds.length > 0) {
+                    // Connect to users database
+                    const usersDb = await connectToSpecificDatabase('users-db');
+                    const users = usersDb.collection('users');
+
+                    // Get user details
+                    const sourceUserObjectIds = sourceUserIds.map(id => {
+                        try { return new ObjectId(id); }
+                        catch (e) { return null; }
+                    }).filter(id => id !== null);
+
+                    const sourceUserDetails = await users.find({
+                        _id: { $in: sourceUserObjectIds }
+                    }).project({
+                        _id: 1,
+                        name: 1,
+                        email: 1,
+                        playerLevel: 1
+                    }).toArray();
+
+                    // Add source user details to notifications
+                    userNotifications.forEach(notification => {
+                        if (notification.sourceUserId) {
+                            const sourceUser = sourceUserDetails.find(
+                                u => u._id.toString() === notification.sourceUserId
+                            );
+                            if (sourceUser) {
+                                notification.sourceUserName = sourceUser.name;
+                                notification.sourceUserPlayerLevel = sourceUser.playerLevel;
+                            }
+                        }
+                    });
+                }
+            } catch (userError) {
+                console.error('Error fetching source user details:', userError);
+                // Continue without source user details rather than failing the request
+            }
+        }
+
         return createResponse(200, { notifications: userNotifications });
     } catch (error) {
         console.error('Get notifications error:', error);
@@ -57,8 +107,15 @@ export async function createNotification(event) {
             return token.response;
         }
 
-        const db = await connectToDatabase();
-        const notifications = db.collection('notifications');
+        const sourceUserId = token.decoded.userId;
+
+        // Connect to notifications database (primary for this service)
+        const notificationsDb = await connectToDatabase();
+        const notifications = notificationsDb.collection('notifications');
+
+        // Connect to users database for user verification and info
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
 
         const { recipientId, type, content, relatedItemId } = JSON.parse(event.body);
 
@@ -66,25 +123,47 @@ export async function createNotification(event) {
             return createResponse(400, { message: 'recipientId, type, and content are required' });
         }
 
-        const newNotification = {
-            userId: recipientId, // The user who will receive this notification
-            sourceUserId: token.decoded.userId, // The user who generated this notification
-            type,
-            content,
-            relatedItemId: relatedItemId || null,
-            isRead: false,
-            createdAt: new Date()
-        };
+        // Verify both users exist
+        try {
+            // Check source user
+            const sourceUser = await users.findOne({ _id: new ObjectId(sourceUserId) });
+            if (!sourceUser) {
+                return createResponse(404, { message: 'Source user not found' });
+            }
 
-        const result = await notifications.insertOne(newNotification);
+            // Check recipient user
+            const recipientUser = await users.findOne({ _id: new ObjectId(recipientId) });
+            if (!recipientUser) {
+                return createResponse(404, { message: 'Recipient user not found' });
+            }
 
-        return createResponse(201, {
-            message: 'Notification created successfully',
-            notificationId: result.insertedId
-        });
+            // Create the notification
+            const newNotification = {
+                userId: recipientId, // The user who will receive this notification
+                sourceUserId: sourceUserId, // The user who generated this notification
+                sourceUserName: sourceUser.name, // Add source user name for convenience
+                type,
+                content,
+                relatedItemId: relatedItemId || null,
+                isRead: false,
+                createdAt: new Date()
+            };
+
+            const result = await notifications.insertOne(newNotification);
+
+            return createResponse(201, {
+                message: 'Notification created successfully',
+                notificationId: result.insertedId,
+                notification: newNotification
+            });
+        } catch (error) {
+            console.error('Error verifying users:', error);
+            return createResponse(400, { message: 'Invalid user ID format or users not found' });
+        }
     } catch (error) {
         console.error('Create notification error:', error);
-        return createResponse(500, { message: 'Error creating notification' });
+        console.error('Error stack:', error.stack);
+        return createResponse(500, { message: 'Error creating notification', error: error.message });
     }
 }
 
@@ -104,23 +183,32 @@ export async function markNotificationRead(event) {
             return createResponse(400, { message: 'notificationId is required' });
         }
 
-        const db = await connectToDatabase();
-        const notifications = db.collection('notifications');
+        // Connect to notifications database (primary for this service)
+        const notificationsDb = await connectToDatabase();
+        const notifications = notificationsDb.collection('notifications');
 
         // Ensure the user only updates their own notifications
-        const result = await notifications.updateOne(
-            { _id: new ObjectId(notificationId), userId: userId },
-            { $set: { isRead: true } }
-        );
+        try {
+            const notificationObjectId = new ObjectId(notificationId);
 
-        if (result.matchedCount === 0) {
-            return createResponse(404, { message: 'Notification not found or not authorized' });
+            const result = await notifications.updateOne(
+                { _id: notificationObjectId, userId: userId },
+                { $set: { isRead: true } }
+            );
+
+            if (result.matchedCount === 0) {
+                return createResponse(404, { message: 'Notification not found or not authorized' });
+            }
+
+            return createResponse(200, { message: 'Notification marked as read' });
+        } catch (error) {
+            console.error('Error parsing notification ID:', error);
+            return createResponse(400, { message: 'Invalid notification ID format' });
         }
-
-        return createResponse(200, { message: 'Notification marked as read' });
     } catch (error) {
         console.error('Mark notification read error:', error);
-        return createResponse(500, { message: 'Error updating notification' });
+        console.error('Error stack:', error.stack);
+        return createResponse(500, { message: 'Error updating notification', error: error.message });
     }
 }
 

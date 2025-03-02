@@ -1,44 +1,104 @@
 import { MongoClient } from 'mongodb';
 
-let cachedDb = null;
+// Cache for MongoDB client and database connections
+let cachedClient = null;
+let cachedDbs = {};
 
+/**
+ * Connect to the primary database for this service
+ */
 export async function connectToDatabase() {
     try {
-        console.log('Starting database connection...');
+        console.log('Connecting to primary database...');
 
-        if (cachedDb) {
-            console.log('Using cached database connection');
-            return cachedDb;
+        // Determine which is the primary database for this service
+        const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME || '';
+        const dbName = getPrimaryDbName(functionName);
+
+        return await getDatabase(dbName);
+    } catch (error) {
+        console.error('Database connection error:', error);
+        throw new Error(`Database connection failed: ${error.message}`);
+    }
+}
+
+/**
+ * Connect to a specific database by name
+ * @param {string} dbName - The name of the database to connect to
+ */
+export async function connectToSpecificDatabase(dbName) {
+    try {
+        console.log(`Connecting to specific database: ${dbName}`);
+        return await getDatabase(dbName);
+    } catch (error) {
+        console.error(`Error connecting to ${dbName}:`, error);
+        throw new Error(`Connection to ${dbName} failed: ${error.message}`);
+    }
+}
+
+/**
+ * Get or create a database connection
+ * @param {string} dbName - The name of the database
+ */
+async function getDatabase(dbName) {
+    try {
+        // Return cached connection if available
+        if (cachedDbs[dbName]) {
+            console.log(`Using cached connection to ${dbName}`);
+            return cachedDbs[dbName];
         }
 
-        // Log the connection string (remove for production)
-        const uri = process.env.MONGODB_URI;
-        console.log('Connection URI starts with:', uri.substring(0, 20) + '...');
+        // Initialize MongoDB client if needed
+        if (!cachedClient) {
+            const uri = process.env.MONGODB_URI;
+            if (!uri) {
+                throw new Error('MONGODB_URI environment variable not set');
+            }
 
-        const client = await MongoClient.connect(uri, {
-            connectTimeoutMS: 5000,
-            socketTimeoutMS: 5000,
-            serverSelectionTimeoutMS: 5000
-        });
+            console.log('Initializing MongoDB client...');
+            cachedClient = await MongoClient.connect(uri, {
+                connectTimeoutMS: 5000,
+                socketTimeoutMS: 5000,
+                serverSelectionTimeoutMS: 5000
+            });
+        }
 
-        console.log('Connected to MongoDB client');
+        // Get database from client
+        const db = cachedClient.db(dbName);
 
-        const db = client.db('messages-db');
-        console.log('Database selected');
-
-        // Test the connection
+        // Test connection
         await db.command({ ping: 1 });
-        console.log('Database connection verified');
+        console.log(`Successfully connected to ${dbName}`);
 
-        cachedDb = db;
+        // Cache the database connection
+        cachedDbs[dbName] = db;
         return db;
     } catch (error) {
-        console.error('Detailed connection error:', {
-            name: error.name,
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-        });
-        throw new Error(`Database connection failed: ${error.message}`);
+        console.error(`Error getting database ${dbName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Determine the primary database name based on the Lambda function
+ */
+function getPrimaryDbName(functionName) {
+    if (functionName.includes('auth')) {
+        return 'users-db';
+    } else if (functionName.includes('friends')) {
+        return 'friends-db';
+    } else if (functionName.includes('messages')) {
+        return 'messages-db';
+    } else if (functionName.includes('notifications')) {
+        return 'notifications-db';
+    } else if (functionName.includes('match')) {
+        return 'matches-db';
+    } else if (functionName.includes('settings')) {
+        return 'settings-db';
+    } else if (functionName.includes('map')) {
+        return 'maps-db';
+    } else {
+        console.log('Using default database: users-db');
+        return 'users-db';
     }
 }
