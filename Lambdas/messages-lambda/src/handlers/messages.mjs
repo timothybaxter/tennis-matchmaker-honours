@@ -209,131 +209,98 @@ export async function sendMessage(event) {
         const senderId = token.decoded.userId;
         console.log('Received send message request from:', senderId);
 
-        // Log request body
-        console.log('Request body:', event.body);
+        // Ensure request body is present
+        if (!event.body) {
+            return createResponse(400, { message: 'Request body is missing' });
+        }
 
+        let parsedBody;
         try {
-            const { conversationId, content } = JSON.parse(event.body);
-
-            if (!conversationId || !content) {
-                console.error('Missing required field in request body');
-                return createResponse(400, { message: 'conversationId and content are required' });
-            }
-
-            // Connect to messages database (primary for this service)
-            const messagesDb = await connectToDatabase();
-            const conversations = messagesDb.collection('conversations');
-            const messages = messagesDb.collection('messages');
-
-            // Connect to users database for sender info
-            const usersDb = await connectToSpecificDatabase('users-db');
-            const users = usersDb.collection('users');
-
-            // Connect to notifications database for creating notifications
-            const notificationsDb = await connectToSpecificDatabase('notifications-db');
-            const notifications = notificationsDb.collection('notifications');
-
-            // If it's a new conversation, create it first
-            if (conversationId === 'new') {
-                const { recipientId } = JSON.parse(event.body);
-                if (!recipientId) {
-                    return createResponse(400, { message: 'recipientId is required for new conversations' });
-                }
-
-                // Check if a conversation already exists between these users
-                const existingConversation = await conversations.findOne({
-                    participants: { $all: [senderId, recipientId], $size: 2 }
-                });
-
-                if (existingConversation) {
-                    console.log('Found existing conversation:', existingConversation._id);
-                    actualConversationId = existingConversation._id.toString();
-                } else {
-                    // Create new conversation
-                    const result = await conversations.insertOne({
-                        participants: [senderId, recipientId],
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    });
-
-                    actualConversationId = result.insertedId.toString();
-                    console.log('Created new conversation:', actualConversationId);
-                }
-            } else {
-                // Verify the conversation exists and user is a participant
-                const conversation = await conversations.findOne({
-                    _id: new ObjectId(conversationId),
-                    participants: senderId
-                });
-
-                if (!conversation) {
-                    return createResponse(404, { message: 'Conversation not found or you are not a participant' });
-                }
-
-                actualConversationId = conversationId;
-            }
-
-            // Get sender info
-            const sender = await users.findOne({ _id: new ObjectId(senderId) });
-            if (!sender) {
-                return createResponse(404, { message: 'Sender not found' });
-            }
-
-            // Create the message
-            const newMessage = {
-                conversationId: actualConversationId,
-                senderId,
-                senderName: sender.name,
-                content,
-                timestamp: new Date(),
-                read: false
-            };
-
-            const messageResult = await messages.insertOne(newMessage);
-            const messageId = messageResult.insertedId.toString();
-
-            // Update conversation's updatedAt timestamp
-            await conversations.updateOne(
-                { _id: new ObjectId(actualConversationId) },
-                { $set: { updatedAt: new Date() } }
-            );
-
-            // Create notifications for other participants
-            const conversation = await conversations.findOne({
-                _id: new ObjectId(actualConversationId)
-            });
-
-            if (conversation) {
-                for (const participantId of conversation.participants) {
-                    if (participantId !== senderId) {
-                        await notifications.insertOne({
-                            userId: participantId,
-                            sourceUserId: senderId,
-                            type: 'message',
-                            content: `New message from ${sender.name}`,
-                            relatedItemId: actualConversationId,
-                            isRead: false,
-                            createdAt: new Date()
-                        });
-                    }
-                }
-            }
-
-            return createResponse(201, {
-                message: 'Message sent successfully',
-                messageId,
-                conversationId: actualConversationId
-            });
-        } catch (parseError) {
-            console.error('Error parsing message request body:', parseError);
+            parsedBody = JSON.parse(event.body);
+        } catch (error) {
             return createResponse(400, { message: 'Invalid JSON in request body' });
         }
+
+        const { conversationId, content, recipientId } = parsedBody;
+
+        if (!conversationId || !content) {
+            return createResponse(400, { message: 'conversationId and content are required' });
+        }
+
+        let actualConversationId = conversationId;
+
+        // Connect to messages database
+        const messagesDb = await connectToDatabase();
+        const conversations = messagesDb.collection('conversations');
+        const messages = messagesDb.collection('messages');
+
+        // If it's a new conversation, ensure recipientId is provided
+        if (conversationId === 'new') {
+            if (!recipientId) {
+                return createResponse(400, { message: 'recipientId is required for new conversations' });
+            }
+
+            // Check if conversation already exists
+            const existingConversation = await conversations.findOne({
+                participants: { $all: [senderId, recipientId], $size: 2 }
+            });
+
+            if (existingConversation) {
+                actualConversationId = existingConversation._id.toString();
+            } else {
+                // Create new conversation
+                const result = await conversations.insertOne({
+                    participants: [senderId, recipientId],
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+
+                actualConversationId = result.insertedId.toString();
+            }
+        } else {
+            // Validate conversationId format
+            let conversationObjectId;
+            try {
+                conversationObjectId = new ObjectId(conversationId);
+            } catch (error) {
+                return createResponse(400, { message: 'Invalid conversation ID format' });
+            }
+
+            // Check if conversation exists and user is a participant
+            const conversation = await conversations.findOne({
+                _id: conversationObjectId,
+                participants: senderId
+            });
+
+            if (!conversation) {
+                return createResponse(404, { message: 'Conversation not found or you are not a participant' });
+            }
+
+            actualConversationId = conversationId;
+        }
+
+        // Store message in database
+        const newMessage = {
+            conversationId: actualConversationId,
+            senderId,
+            content,
+            timestamp: new Date(),
+            read: false
+        };
+
+        const messageResult = await messages.insertOne(newMessage);
+
+        return createResponse(201, {
+            message: 'Message sent successfully',
+            messageId: messageResult.insertedId.toString(),
+            conversationId: actualConversationId
+        });
     } catch (error) {
         console.error('Send message error:', error);
-        console.error('Error stack:', error.stack);
         return createResponse(500, { message: 'Error sending message', error: error.message });
     }
 }
+
 
 // Create a new conversation
 export async function createConversation(event) {
