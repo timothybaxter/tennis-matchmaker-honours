@@ -3,141 +3,71 @@ import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 
-// Enhanced searchUsers function with users-db access
+// Simple search users function for testing
 export async function searchUsers(event) {
     console.log('searchUsers called with event:', JSON.stringify(event));
 
     try {
-        // Check authentication
-        console.log('Checking authentication...');
+        // Extract and verify token using existing approach
         const authHeader = event.headers.Authorization ||
             event.headers.authorization;
 
         if (!authHeader) {
-            console.log('No auth header found');
-            return createResponse(401, { message: 'Unauthorized' });
+            console.error('No auth header found');
+            return createResponse(401, { message: 'No authorization token provided' });
         }
 
         console.log('Auth header:', authHeader);
-
-        // Extract token
         const token = authHeader.split(' ')[1];
+
         if (!token) {
-            console.log('No token found in auth header');
-            return createResponse(401, { message: 'Token not found' });
+            console.error('No token found in header');
+            return createResponse(401, { message: 'Invalid authorization format' });
         }
 
-        console.log('Verifying token...');
+        console.log('JWT_SECRET available:', !!process.env.JWT_SECRET);
 
-        // Verify token
+        // For debugging, print information about the token
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log('Token verified, decoded:', JSON.stringify(decoded));
+            // First, try to decode without verification to see the payload structure
+            const decoded = jwt.decode(token);
+            console.log('Token decoded (without verification):', JSON.stringify(decoded));
 
-            // Extract user ID and query
-            const userId = decoded.userId;
-            const query = event.queryStringParameters?.query;
+            // Now verify with the secret
+            const verified = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Token verified, userId:', verified.userId);
 
-            console.log(`User ID: ${userId}, Query: ${query}`);
-
-            if (!query || query.length < 2) {
-                console.log('Query too short or missing');
-                return createResponse(400, { message: 'Search query must be at least 2 characters' });
-            }
-
-            // Connect to friends database to get existing friendships
-            console.log('Connecting to friends database...');
-            const friendsDb = await connectToDatabase();
-            console.log('Connected to friends database');
-
-            // Connect to users database to search users
-            console.log('Connecting to users database...');
-            const usersDb = await connectToSpecificDatabase('users-db');
-            console.log('Connected to users database');
-
-            // Get existing friendships
-            console.log('Getting existing friendships...');
-            const friendships = friendsDb.collection('friendships');
-            const existingFriendships = await friendships.find({
-                $or: [
-                    { userId1: userId },
-                    { userId2: userId }
-                ]
-            }).toArray();
-            console.log(`Found ${existingFriendships.length} existing friendships`);
-
-            // Extract friend IDs
-            const connectedUserIds = [];
-            existingFriendships.forEach(friendship => {
-                if (friendship.userId1 === userId) {
-                    connectedUserIds.push(friendship.userId2);
-                } else {
-                    connectedUserIds.push(friendship.userId1);
-                }
-            });
-
-            // Add the current user's ID
-            connectedUserIds.push(userId);
-            console.log('User IDs to exclude:', connectedUserIds);
-
-            // Search for users
-            console.log('Searching for users...');
-            const users = usersDb.collection('users');
-
-            // Convert string IDs to ObjectIds, handling errors gracefully
-            const excludeObjectIds = [];
-            for (const id of connectedUserIds) {
-                try {
-                    excludeObjectIds.push(new ObjectId(id));
-                } catch (err) {
-                    console.warn(`Invalid ObjectId: ${id}, skipping`);
-                }
-            }
-
-            // Build search query
-            const searchQuery = {
-                $and: [
-                    // Exclude current user and existing friends/requests
-                    { _id: { $nin: excludeObjectIds } },
-                    // Match on name or email
+            // For now, return dummy data to check basic connectivity
+            return createResponse(200, {
+                users: [
                     {
-                        $or: [
-                            { name: { $regex: query, $options: 'i' } },
-                            { email: { $regex: query, $options: 'i' } }
-                        ]
+                        _id: "test1",
+                        name: "Test User 1",
+                        email: "test1@example.com",
+                        playerLevel: "Beginner"
+                    },
+                    {
+                        _id: "test2",
+                        name: "Test User 2",
+                        email: "test2@example.com",
+                        playerLevel: "Intermediate"
                     }
                 ]
-            };
-
-            console.log('Search query:', JSON.stringify(searchQuery));
-
-            const searchResults = await users.find(searchQuery)
-                .project({
-                    password: 0, // Exclude passwords
-                    _id: 1,
-                    name: 1,
-                    email: 1,
-                    playerLevel: 1
-                })
-                .limit(10)
-                .toArray();
-
-            console.log(`Found ${searchResults.length} users matching the query`);
-
-            return createResponse(200, { users: searchResults });
+            });
 
         } catch (jwtError) {
-            console.error('JWT verification error:', jwtError);
-            return createResponse(401, { message: 'Invalid token' });
+            // Log detailed information about the JWT error
+            console.error('JWT verification error:', jwtError.message);
+            console.error('JWT error name:', jwtError.name);
+
+            return createResponse(401, {
+                message: 'Invalid token',
+                error: jwtError.message
+            });
         }
     } catch (error) {
         console.error('Error in searchUsers:', error);
-        console.error('Stack trace:', error.stack);
-        return createResponse(500, {
-            message: 'Internal server error',
-            error: error.message,
-            stack: error.stack
-        });
+        return createResponse(500, { message: 'Internal server error' });
     }
 }
 
