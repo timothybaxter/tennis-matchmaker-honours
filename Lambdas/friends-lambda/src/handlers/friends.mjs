@@ -89,7 +89,6 @@ export async function searchUsers(event) {
         // Execute search
         const searchResults = await users.find(searchQuery)
             .project({
-                password: 0, // Exclude passwords
                 _id: 1,
                 name: 1,
                 email: 1,
@@ -97,6 +96,7 @@ export async function searchUsers(event) {
             })
             .limit(10)
             .toArray();
+
 
         console.log(`Found ${searchResults.length} users matching query "${query}"`);
 
