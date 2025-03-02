@@ -167,12 +167,12 @@ export async function getFriends(event) {
         const friendDetails = await users.find({
             _id: { $in: friendObjectIds }
         }).project({
-            password: 0, // Exclude passwords
             _id: 1,
             name: 1,
             email: 1,
             playerLevel: 1
         }).toArray();
+
 
         return createResponse(200, { friends: friendDetails });
     } catch (error) {
