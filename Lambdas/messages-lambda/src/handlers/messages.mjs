@@ -3,7 +3,6 @@ import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 
-// Get all conversations for a user
 export async function getConversations(event) {
     try {
         // Extract and verify token
@@ -15,9 +14,10 @@ export async function getConversations(event) {
         const userId = token.decoded.userId;
         console.log('Getting conversations for user:', userId);
 
-        // Connect to messages database (primary for this service)
+        // Connect to messages database
         const messagesDb = await connectToDatabase();
         const conversations = messagesDb.collection('conversations');
+        const messagesCollection = messagesDb.collection('messages');
 
         // Find all conversations where the user is a participant
         const userConversations = await conversations.find({
@@ -26,56 +26,62 @@ export async function getConversations(event) {
 
         console.log(`Found ${userConversations.length} conversations`);
 
-        // If we need user details, connect to users database
-        if (userConversations.length > 0) {
+        // Format for frontend - this is the key change
+        const formattedConversations = [];
+
+        // Connect to users database
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Process each conversation
+        for (const conv of userConversations) {
             try {
-                // Get unique participant IDs across all conversations
-                const participantIds = new Set();
-                userConversations.forEach(conv => {
-                    conv.participants.forEach(id => {
-                        if (id !== userId) participantIds.add(id);
-                    });
-                });
+                // 1. Find the other participant (not current user)
+                const otherParticipantId = conv.participants.find(id => id !== userId);
+                if (!otherParticipantId) continue;
 
-                if (participantIds.size > 0) {
-                    // Connect to users database
-                    const usersDb = await connectToSpecificDatabase('users-db');
-                    const users = usersDb.collection('users');
-
-                    // Get user details
-                    const participantObjectIds = Array.from(participantIds).map(id => {
-                        try { return new ObjectId(id); }
-                        catch (e) { return null; }
-                    }).filter(id => id !== null);
-
-                    const userDetails = await users.find({
-                        _id: { $in: participantObjectIds }
-                    }).project({
-                        _id: 1,
-                        name: 1,
-                        email: 1,
-                        playerLevel: 1
-                    }).toArray();
-
-                    // Add user details to conversations
-                    userConversations.forEach(conv => {
-                        conv.participantDetails = conv.participants.map(partId => {
-                            if (partId === userId) return { id: userId, isCurrentUser: true };
-                            const userDetail = userDetails.find(u => u._id.toString() === partId);
-                            return userDetail || { id: partId };
-                        });
-                    });
+                // 2. Get other user details
+                let otherUser = null;
+                try {
+                    otherUser = await users.findOne({ _id: new ObjectId(otherParticipantId) });
+                } catch (err) {
+                    console.error(`Error finding user with ID ${otherParticipantId}:`, err);
                 }
-            } catch (userError) {
-                console.error('Error fetching user details:', userError);
-                // Continue without user details rather than failing the request
+
+                // 3. Get last message
+                const lastMessage = await messagesCollection.findOne(
+                    { conversationId: conv._id.toString() },
+                    { sort: { timestamp: -1 } }
+                );
+
+                // 4. Format the conversation for frontend
+                formattedConversations.push({
+                    conversationId: conv._id.toString(),
+                    otherUser: otherUser ? {
+                        id: otherParticipantId,
+                        name: otherUser.name || 'Unknown User',
+                        playerLevel: otherUser.playerLevel || 'Beginner'
+                    } : {
+                        id: otherParticipantId,
+                        name: 'Unknown User',
+                        playerLevel: 'Beginner'
+                    },
+                    lastMessageAt: lastMessage?.timestamp || conv.updatedAt || conv.createdAt,
+                    unreadCount: await messagesCollection.countDocuments({
+                        conversationId: conv._id.toString(),
+                        senderId: { $ne: userId },
+                        read: false
+                    })
+                });
+            } catch (err) {
+                console.error('Error processing conversation:', err);
             }
         }
 
-        return createResponse(200, { conversations: userConversations });
+        console.log('Returning formatted conversations:', JSON.stringify(formattedConversations));
+        return createResponse(200, { conversations: formattedConversations });
     } catch (error) {
         console.error('Get conversations error:', error);
-        console.error('Error stack:', error.stack);
         return createResponse(500, { message: 'Error retrieving conversations', error: error.message });
     }
 }
