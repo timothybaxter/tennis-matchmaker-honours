@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
+import fetch from 'node-fetch';
 
 // Full implementation of searchUsers function
 export async function searchUsers(event) {
@@ -307,6 +308,33 @@ export async function sendFriendRequest(event) {
 
         await notifications.insertOne(newNotification);
 
+        // Send real-time notification
+        try {
+            // Create notification request
+            const notificationRequest = {
+                recipientId: recipientId,
+                senderId: senderId,
+                senderName: sender.name,
+                friendshipId: result.insertedId.toString()
+            };
+
+            // Make request to API Gateway endpoint
+            const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/friend-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`  // Use the JWT token instead of API key
+                },
+                body: JSON.stringify(notificationRequest)
+            });
+
+            const responseText = await notificationResponse.text();
+            console.log('Real-time friend request notification sent:', responseText);
+        } catch (notificationError) {
+            // Log but don't fail if notification fails
+            console.error('Error sending real-time notification:', notificationError);
+        }
+
         return createResponse(201, {
             message: 'Friend request sent successfully',
             friendshipId: result.insertedId,
@@ -482,6 +510,34 @@ export async function respondToFriendRequest(event) {
 
             await notifications.insertOne(newNotification);
 
+            // Send real-time notification
+            try {
+                // Create notification request for acceptance
+                const notificationRequest = {
+                    userId: friendship.userId1,
+                    recipientId: friendship.userId1,
+                    senderId: userId,
+                    senderName: currentUser.name,
+                    content: `${currentUser.name} accepted your friend request`
+                };
+
+                // Make request to refresh notifications
+                const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/api/notificationsapi/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': process.env.NOTIFICATION_API_KEY
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+
+                const responseText = await notificationResponse.text();
+                console.log('Real-time friend request acceptance notification sent:', responseText);
+            } catch (notificationError) {
+                // Log but don't fail if notification fails
+                console.error('Error sending real-time notification for acceptance:', notificationError);
+            }
+
             return createResponse(200, { message: 'Friend request accepted' });
         } else {
             // Reject by deleting the request
@@ -509,5 +565,119 @@ export async function respondToFriendRequest(event) {
         }
 
         return createResponse(500, { message: 'Error responding to friend request' });
+    }
+}
+
+// Remove a friend
+export async function removeFriend(event) {
+    try {
+        // Extract and verify token
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+
+        // Parse request body
+        const { friendId } = JSON.parse(event.body);
+
+        if (!friendId) {
+            return createResponse(400, { message: 'friendId is required' });
+        }
+
+        // Connect to database
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Find and delete the friendship
+        const result = await friendships.deleteOne({
+            $or: [
+                { userId1: userId, userId2: friendId, status: 'accepted' },
+                { userId1: friendId, userId2: userId, status: 'accepted' }
+            ]
+        });
+
+        if (result.deletedCount === 0) {
+            return createResponse(404, { message: 'Friendship not found' });
+        }
+
+        return createResponse(200, { message: 'Friend removed successfully' });
+    } catch (error) {
+        console.error('Error in removeFriend:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return createResponse(401, { message: 'Invalid token', error: error.message });
+        }
+
+        return createResponse(500, { message: 'Error removing friend' });
+    }
+}
+
+// Check if users are friends
+export async function checkFriendship(event) {
+    try {
+        // Extract and verify token
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+
+        // Get query parameter
+        const otherId = event.queryStringParameters?.userId;
+
+        if (!otherId) {
+            return createResponse(400, { message: 'userId query parameter is required' });
+        }
+
+        // Connect to database
+        const friendsDb = await connectToDatabase();
+        const friendships = friendsDb.collection('friendships');
+
+        // Check friendship status
+        const friendship = await friendships.findOne({
+            $or: [
+                { userId1: userId, userId2: otherId },
+                { userId1: otherId, userId2: userId }
+            ]
+        });
+
+        if (!friendship) {
+            return createResponse(200, { status: 'none' });
+        }
+
+        if (friendship.status === 'pending') {
+            if (friendship.userId1 === userId) {
+                return createResponse(200, { status: 'requested' });
+            } else {
+                return createResponse(200, { status: 'pending' });
+            }
+        }
+
+        return createResponse(200, { status: friendship.status });
+    } catch (error) {
+        console.error('Error in checkFriendship:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return createResponse(401, { message: 'Invalid token', error: error.message });
+        }
+
+        return createResponse(500, { message: 'Error checking friendship status' });
     }
 }

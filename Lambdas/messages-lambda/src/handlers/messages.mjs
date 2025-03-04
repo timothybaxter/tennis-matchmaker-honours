@@ -2,6 +2,7 @@
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
+import fetch from 'node-fetch';
 
 export async function getConversations(event) {
     try {
@@ -26,7 +27,7 @@ export async function getConversations(event) {
 
         console.log(`Found ${userConversations.length} conversations`);
 
-        // Format for frontend - this is the key change
+        // Format for frontend
         const formattedConversations = [];
 
         // Connect to users database
@@ -86,7 +87,6 @@ export async function getConversations(event) {
     }
 }
 
-// Get messages for a specific conversation
 export async function getMessages(event) {
     try {
         // Extract and verify token
@@ -205,7 +205,7 @@ export async function getMessages(event) {
 
 export async function sendMessage(event) {
     try {
-        // ✅ Extract and verify token
+        // Extract and verify token
         const token = extractAndVerifyToken(event);
         if (!token.isValid) {
             return token.response;
@@ -214,10 +214,10 @@ export async function sendMessage(event) {
         const senderId = token.decoded.userId;
         console.log('🔹 Received send message request from:', senderId);
 
-        // ✅ Log the full event for debugging
+        // Log the full event for debugging
         console.log('Full event:', JSON.stringify(event, null, 2));
 
-        // ✅ Ensure request body exists
+        // Ensure request body exists
         if (!event.body) {
             console.error('❌ Request body is missing');
             return createResponse(400, { message: 'Request body is required' });
@@ -232,10 +232,10 @@ export async function sendMessage(event) {
             return createResponse(400, { message: 'Invalid JSON format', details: error.message });
         }
 
-        // ✅ Extract fields from the parsed body
+        // Extract fields from the parsed body
         const { conversationId, content, recipientId } = parsedBody;
 
-        // ✅ Validate required fields with detailed errors
+        // Validate required fields with detailed errors
         if (!conversationId) {
             console.error('❌ Missing conversationId');
             return createResponse(400, { message: 'conversationId is required' });
@@ -253,16 +253,14 @@ export async function sendMessage(event) {
 
         let actualConversationId = conversationId;
 
-        // ✅ Connect to databases
+        // Connect to databases
         const messagesDb = await connectToDatabase();
         const conversations = messagesDb.collection('conversations');
         const messages = messagesDb.collection('messages');
         const usersDb = await connectToSpecificDatabase('users-db');
         const users = usersDb.collection('users');
-        const notificationsDb = await connectToSpecificDatabase('notifications-db');
-        const notifications = notificationsDb.collection('notifications');
 
-        // ✅ Handle new conversation case
+        // Handle new conversation case
         if (conversationId === 'new') {
             if (!recipientId) {
                 console.error('❌ recipientId is missing for a new conversation');
@@ -289,7 +287,7 @@ export async function sendMessage(event) {
                 console.log('✅ Created new conversation:', actualConversationId);
             }
         } else {
-            // ✅ Validate `conversationId` format for existing conversations
+            // Validate `conversationId` format for existing conversations
             let conversationObjectId;
             try {
                 conversationObjectId = new ObjectId(conversationId);
@@ -298,7 +296,7 @@ export async function sendMessage(event) {
                 return createResponse(400, { message: 'Invalid conversation ID format' });
             }
 
-            // ✅ Verify that conversation exists and sender is a participant
+            // Verify that conversation exists and sender is a participant
             console.log('🔹 Checking if conversation exists:', conversationId);
             const conversation = await conversations.findOne({
                 _id: conversationObjectId,
@@ -313,7 +311,7 @@ export async function sendMessage(event) {
             actualConversationId = conversationId;
         }
 
-        // ✅ Fetch sender details
+        // Fetch sender details
         let sender;
         try {
             sender = await users.findOne({ _id: new ObjectId(senderId) });
@@ -326,7 +324,7 @@ export async function sendMessage(event) {
             return createResponse(500, { message: 'Error finding sender', error: error.message });
         }
 
-        // ✅ Create the message object
+        // Create the message object
         const newMessage = {
             conversationId: actualConversationId,
             senderId,
@@ -336,12 +334,12 @@ export async function sendMessage(event) {
             read: false
         };
 
-        // ✅ Insert message into database
+        // Insert message into database
         try {
             const messageResult = await messages.insertOne(newMessage);
             console.log('✅ Message saved:', messageResult.insertedId.toString());
 
-            // ✅ Update conversation's last activity
+            // Update conversation's last activity
             await conversations.updateOne(
                 { _id: new ObjectId(actualConversationId) },
                 { $set: { updatedAt: new Date() } }
@@ -351,30 +349,44 @@ export async function sendMessage(event) {
             return createResponse(500, { message: 'Error saving message', error: error.message });
         }
 
-        // ✅ Send notifications to other participants
+        // Send real-time notifications
         try {
+            // Get the recipient user ID
             const conversation = await conversations.findOne({
                 _id: new ObjectId(actualConversationId)
             });
 
             if (conversation) {
-                for (const participantId of conversation.participants) {
-                    if (participantId !== senderId) {
-                        await notifications.insertOne({
-                            userId: participantId,
-                            sourceUserId: senderId,
-                            type: 'message',
-                            content: `New message from ${sender.name}`,
-                            relatedItemId: actualConversationId,
-                            isRead: false,
-                            createdAt: new Date()
-                        });
-                    }
+                // Find the recipient (the user who is not the sender)
+                const recipientId = conversation.participants.find(id => id !== senderId);
+                
+                if (recipientId) {
+                    // Create the notification request
+                    const notificationRequest = {
+                        recipientId: recipientId,
+                        senderId: senderId,
+                        senderName: sender.name,
+                        conversationId: actualConversationId,
+                        content: content.substring(0, 100) // Limit preview to 100 chars
+                    };
+                    
+                    // Make request to your API Gateway endpoint that forwards to your ASP.NET API
+                    const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/friend-request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`  // Use the JWT token instead of API key
+                        },
+                        body: JSON.stringify(notificationRequest)
+                    });
+                    
+                    const responseText = await notificationResponse.text();
+                    console.log('Real-time notification sent:', responseText);
                 }
             }
-        } catch (error) {
-            console.error('❌ Error sending notifications:', error);
-            // Continue even if notifications fail
+        } catch (notificationError) {
+            // Log but don't fail if notification fails
+            console.error('❌ Error sending real-time notification:', notificationError);
         }
 
         return createResponse(201, {
@@ -386,8 +398,6 @@ export async function sendMessage(event) {
         return createResponse(500, { message: 'Error sending message', error: error.message });
     }
 }
-
-
 
 // Create a new conversation
 export async function createConversation(event) {
@@ -500,5 +510,61 @@ function extractAndVerifyToken(event) {
             isValid: false,
             response: createResponse(401, { message: 'Invalid token' })
         };
+    }
+}
+
+// Mark message as read
+export async function markMessageRead(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        console.log('Marking message as read for user:', userId);
+
+        try {
+            const { messageId } = JSON.parse(event.body);
+
+            if (!messageId) {
+                return createResponse(400, { message: 'Message ID is required' });
+            }
+
+            // Connect to messages database
+            const messagesDb = await connectToDatabase();
+            const messagesCollection = messagesDb.collection('messages');
+
+            // Find the message and verify the current user is a recipient
+            try {
+                const messageObjectId = new ObjectId(messageId);
+                const message = await messagesCollection.findOne({ _id: messageObjectId });
+
+                if (!message) {
+                    return createResponse(404, { message: 'Message not found' });
+                }
+
+                // Only mark as read if the user is not the sender
+                if (message.senderId !== userId) {
+                    await messagesCollection.updateOne(
+                        { _id: messageObjectId },
+                        { $set: { read: true, readAt: new Date() } }
+                    );
+                    return createResponse(200, { message: 'Message marked as read' });
+                } else {
+                    return createResponse(200, { message: 'No action needed - user is sender' });
+                }
+            } catch (error) {
+                console.error('Error processing message update:', error);
+                return createResponse(400, { message: 'Invalid message ID format' });
+            }
+        } catch (parseError) {
+            console.error('Error parsing mark message read request body:', parseError);
+            return createResponse(400, { message: 'Invalid JSON in request body' });
+        }
+    } catch (error) {
+        console.error('Mark message read error:', error);
+        return createResponse(500, { message: 'Error marking message as read', error: error.message });
     }
 }
