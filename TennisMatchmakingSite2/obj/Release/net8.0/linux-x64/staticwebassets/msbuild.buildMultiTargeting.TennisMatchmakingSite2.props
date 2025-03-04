@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\TennisMatchmakingSite2.props" />
+</Project>

@@ -371,7 +371,7 @@ export async function sendMessage(event) {
                     };
                     
                     // Make request to your API Gateway endpoint that forwards to your ASP.NET API
-                    const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/friend-request', {
+                    const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/messages', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

@@ -1,0 +1,16 @@
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\TennisMatchmakingSite2.exe
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\appsettings.Development.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\appsettings.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\libman.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\TennisMatchmakingSite2.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\TennisMatchmakingSite2.deps.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\TennisMatchmakingSite2.runtimeconfig.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\TennisMatchmakingSite2.pdb
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.ObjectPool.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Microsoft.Extensions.Options.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\Newtonsoft.Json.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Release\net8.0\publish\System.Net.WebSockets.WebSocketProtocol.dll
