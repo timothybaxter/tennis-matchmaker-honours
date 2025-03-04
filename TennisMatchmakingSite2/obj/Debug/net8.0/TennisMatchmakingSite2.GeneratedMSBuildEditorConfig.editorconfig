@@ -72,8 +72,32 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9NYXRjaENhcmQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_NotificationWrapper.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9Ob3RpZmljYXRpb25XcmFwcGVyLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Social/Conversation.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU29jaWFsXENvbnZlcnNhdGlvbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Social/FriendRequests.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU29jaWFsXEZyaWVuZFJlcXVlc3RzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Social/Friends.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU29jaWFsXEZyaWVuZHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Social/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU29jaWFsXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Social/Messages.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU29jaWFsXE1lc3NhZ2VzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/_ViewImports.cshtml]

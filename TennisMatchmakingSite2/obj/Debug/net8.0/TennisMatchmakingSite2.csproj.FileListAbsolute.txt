@@ -34,3 +34,13 @@ C:\Users\Tim\honours-repo\TennisMatchmakingSite2\obj\Debug\net8.0\TennisMatchmak
 C:\Users\Tim\honours-repo\TennisMatchmakingSite2\obj\Debug\net8.0\TennisMatchmakingSite2.genruntimeconfig.cache
 C:\Users\Tim\honours-repo\TennisMatchmakingSite2\obj\Debug\net8.0\ref\TennisMatchmakingSite2.dll
 C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\libman.json
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\obj\Debug\net8.0\TennisMatchmakingSite2.csproj.AssemblyReference.cache
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.ObjectPool.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Microsoft.Extensions.Options.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\Newtonsoft.Json.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\bin\Debug\net8.0\System.Net.WebSockets.WebSocketProtocol.dll
+C:\Users\Tim\honours-repo\TennisMatchmakingSite2\obj\Debug\net8.0\TennisMa.F0DB7794.Up2Date

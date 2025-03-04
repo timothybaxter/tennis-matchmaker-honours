@@ -1,4 +1,54 @@
-﻿<!DOCTYPE html>
+﻿@{
+    // Get current theme
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
+    var userId = Context.Session.GetString("UserId");
+    var userName = Context.Session.GetString("UserName");
+
+    // Define theme colors based on the current theme
+    string navbarColor, backgroundImage, bottomNavColor, bottomNavLinkColor, bottomNavLinkHoverColor, bottomNavLinkActiveColor, iconColor;
+
+    switch(currentTheme)
+    {
+        case "RolandGarros":
+            navbarColor = "#084e2e";
+            backgroundImage = "url('/images/court_background_clay.png')";
+            bottomNavColor = "#084e2e";
+            bottomNavLinkColor = "rgba(255, 255, 255, 0.7)";
+            bottomNavLinkHoverColor = "rgba(255, 255, 255, 0.9)";
+            bottomNavLinkActiveColor = "white";
+            iconColor = "white";
+            break;
+        case "USOpen":
+            navbarColor = "#426892";
+            backgroundImage = "url('/images/court_background_hard.png')";
+            bottomNavColor = "#426892";
+            bottomNavLinkColor = "rgba(0, 0, 0, 0.7)";
+            bottomNavLinkHoverColor = "rgba(0, 0, 0, 0.9)";
+            bottomNavLinkActiveColor = "white";
+            iconColor = "white";
+            break;
+        case "AustralianOpen":
+            navbarColor = "#e9f7ff";
+            backgroundImage = "url('/images/court_background_blue.png')";
+            bottomNavColor = "#e9f7ff";
+            bottomNavLinkColor = "rgba(0, 0, 0, 0.7)";
+            bottomNavLinkHoverColor = "rgba(0, 0, 0, 0.9)";
+            bottomNavLinkActiveColor = "black";
+            iconColor = "black";
+            break;
+        default: // Wimbledon
+            navbarColor = "#64408a";
+            backgroundImage = "url('/images/court_background_green.png')";
+            bottomNavColor = "#64408a";
+            bottomNavLinkColor = "rgba(255, 255, 255, 0.7)";
+            bottomNavLinkHoverColor = "rgba(255, 255, 255, 0.9)";
+            bottomNavLinkActiveColor = "white";
+            iconColor = "white";
+            break;
+    }
+}
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -8,6 +58,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.min.js"></script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
@@ -33,6 +84,7 @@
             z-index: -1;
             pointer-events: none;
             opacity: 0.6;
+            background-image: @backgroundImage;
         }
 
         .header {
@@ -41,7 +93,7 @@
             left: 0;
             right: 0;
             height: 100px;
-            background-color: #64408a;
+            background-color: @navbarColor;
             z-index: 10;
             display: flex;
             justify-content: center;
@@ -61,41 +113,123 @@
             }
 
         .bottom-nav {
-            background-color: #64408a;
+            background-color: @bottomNavColor;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .bottom-nav a {
-            color: rgba(255, 255, 255, 0.7);
+            color: @bottomNavLinkColor;
         }
 
         .bottom-nav a:hover {
-            color: rgba(255, 255, 255, 0.9);
+            color: @bottomNavLinkHoverColor;
         }
 
         .bottom-nav a.active {
-            color: white;
+            color: @bottomNavLinkActiveColor;
         }
 
        @@media (orientation: portrait) {
             .bg-tennis {
-        background-size: auto 100vh;
-        background-position: center;
-    }
-}
+                background-size: auto 100vh;
+                background-position: center;
+            }
+        }
 
-    @@media (orientation: landscape) {
-    .bg-tennis {
-        background-size: 100vw auto;
-        background-position: center;
-    }
-}
+        @@media (orientation: landscape) {
+            .bg-tennis {
+                background-size: 100vw auto;
+                background-position: center;
+            }
+        }
+
+        /* Toast container */
+        #toast-container {
+            z-index: 9999;
+        }
+
+        /* Toast animation */
+        #toast-container > div {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Notification styles */
+        .notification-item.new-notification {
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .notification-item.new-notification.shown {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Message list styles */
+        .message-item {
+            margin-bottom: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message-item.sent {
+            text-align: right;
+        }
+
+        .message-item.received {
+            text-align: left;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+        }
+
+        .message-item.sent .message-content {
+            background-color: #dcf8c6;
+        }
+
+        .message-item.received .message-content {
+            background-color: #f1f0f0;
+        }
+
+        .message-time {
+            display: block;
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* Notification badge */
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #FF3B30;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @@keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
     @inject IConfiguration Configuration
     <script>
         window.API_BASE_URL = '@Configuration["ApiBaseUrl"]';
+        // Store current user information for SignalR
+        const currentUserId = '@userId';
+        const currentUserName = '@userName';
     </script>
 
     @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
@@ -111,6 +245,9 @@
         </div>
     </div>
 
+    <!-- Toast container for notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs"></div>
+
     <div class="container">
         <main role="main" class="pb-20 mt-28">
             @RenderBody()
@@ -122,39 +259,55 @@
     <nav class="fixed bottom-0 left-0 right-0 bottom-nav z-50" style="padding-bottom: env(safe-area-inset-bottom);">
         <div class="flex justify-around items-center h-16">
             <a asp-controller="Match" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Match" ? "active" : "")">
-                <i data-lucide="home" class="w-6 h-6"></i>
+                <i data-lucide="home" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Home</span>
             </a>
-            <a asp-controller="Social" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Social" ? "active" : "")">
-                <i data-lucide="users" class="w-6 h-6"></i>
+            <a asp-controller="Social" asp-action="Index" class="social-icon-container flex flex-col items-center justify-center w-full h-full relative @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Social" ? "active" : "")">
+                <i data-lucide="users" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Social</span>
+                <!-- Notification badge -->
+                <span id="notification-badge" class="notification-badge hidden">0</span>
             </a>
             <a asp-controller="Map" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Map" ? "active" : "")">
-                <i data-lucide="map" class="w-6 h-6"></i>
+                <i data-lucide="map" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Map</span>
             </a>
             <a asp-controller="Tournament" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tournament" ? "active" : "")">
-                <i data-lucide="trophy" class="w-6 h-6"></i>
+                <i data-lucide="trophy" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Tournaments</span>
             </a>
             <a asp-controller="Settings" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Settings" ? "active" : "")">
-                <i data-lucide="settings" class="w-6 h-6"></i>
+                <i data-lucide="settings" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Settings</span>
             </a>
         </div>
     </nav>
     }
 
+    <!-- Connection status indicator (can be hidden in production) -->
+    <div id="connection-status-indicator" class="fixed bottom-20 right-4 text-sm bg-white shadow rounded-full px-3 py-1 border z-50">
+        Status: <span id="connection-status" class="text-gray-500">Connecting...</span>
+    </div>
+
+    <!-- Hidden audio element for notification sounds -->
+    <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
+
     @await RenderSectionAsync("Scripts", required: false)
 
     <script>
         lucide.createIcons();
-        // Initialize theme
+        // Initialize theme - still useful for dynamic elements like hover effects
         document.addEventListener('DOMContentLoaded', function() {
-            const currentTheme = '@(Context.Session.GetString("Theme") ?? "Wimbledon")';
+            const currentTheme = '@currentTheme';
             window.applyTheme(currentTheme);
+
+            // Hide connection status after 5 seconds
+            setTimeout(() => {
+                document.getElementById('connection-status-indicator').classList.add('hidden');
+            }, 5000);
         });
     </script>
     <script src="~/js/match-functions.js"></script>
+    <script src="~/js/signalr-connection.js"></script>
 </body>
 </html>

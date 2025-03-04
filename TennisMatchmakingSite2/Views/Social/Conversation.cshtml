@@ -1,0 +1,275 @@
+@model List<TennisMatchmakingSite2.Models.MessageModel>
+    @{
+    ViewData["Title"] = "Conversation";
+    var conversationId = ViewBag.ConversationId;
+    var recipientId = ViewBag.RecipientId;
+    var recipientName = ViewBag.RecipientName;
+    var currentUserId = Context.Session.GetString("UserId");
+    }
+
+    <div class="container mx-auto px-4 pb-20">
+        <div class="max-w-3xl mx-auto mt-8">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">
+                            @if (!string.IsNullOrEmpty(recipientName))
+                        {
+                            <span>Conversation with @recipientName</span>
+                        }
+                        else
+                        {
+                            <span>Conversation</span>
+                        }
+                        </h2>
+                        <a href="@Url.Action("Messages", "Social")" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-arrow-left mr-1"></i> Back to Messages
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Messages Container -->
+                <div class="p-4 h-96 overflow-y-auto space-y-4" id="messagesContainer">
+                    @if (!Model.Any())
+                {
+                    <div class="text-center text-gray-500 my-8" id="no-messages-placeholder">
+                        <p>No messages yet. Start a conversation!</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var message in Model)
+                    {
+                        var isCurrentUser = message.SenderId == currentUserId;
+                    <div class="flex @(isCurrentUser ? "justify-end" : "justify-start")"
+                         data-message-id="@message.Id"
+                            data-unread="@(message.Read ? "false" : "true")">
+                        <div class="max-w-xs sm:max-w-md @(isCurrentUser ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800") p-3 rounded-lg">
+                            <div class="text-sm font-medium">
+                                @(isCurrentUser ? "You" : (message.SenderName ?? "User"))
+                            </div>
+                            <div class="mt-1">@message.Content</div>
+                            <div class="text-xs text-gray-500 mt-1 text-right">
+                                @(message.Timestamp?.ToString("g") ?? "")
+                            </div>
+                        </div>
+                    </div>
+                    }
+                }
+                </div>
+
+                <!-- Message Form -->
+                <div class="p-4 border-t border-gray-200">
+                    @if (TempData["ErrorMessage"] != null)
+                {
+                    <div class="mb-3 p-3 bg-red-100 text-red-700 rounded-md">
+                        @TempData["ErrorMessage"]
+                    </div>
+                }
+                    <form asp-controller="Social" asp-action="SendMessage" method="post" id="messageForm">
+                        <input type="hidden" name="conversationId" id="conversationId" value="@conversationId" />
+                        @if (conversationId == "new" && !string.IsNullOrEmpty(recipientId))
+                    {
+                        <input type="hidden" name="recipientId" id="recipientId" value="@recipientId" />
+                    }
+
+                        <div class="flex items-end space-x-2">
+                            <div class="flex-grow">
+                                <textarea name="content" id="messageContent" rows="2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Type your message..." required></textarea>
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-paper-plane mr-1"></i> Send
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden notification sound element -->
+    <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
+
+    @section Scripts {
+        <script>
+        // Current user data for messaging
+        const currentUserId = '@currentUserId';
+        const conversationId = '@conversationId';
+        const recipientId = '@recipientId';
+
+        // Scroll to bottom of messages container
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('messagesContainer');
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // Add a new message to the UI
+        function addMessageToUI(message, isSent) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const noMessagesPlaceholder = document.getElementById('no-messages-placeholder');
+
+            // Remove the "no messages" placeholder if it exists
+            if (noMessagesPlaceholder) {
+                noMessagesPlaceholder.remove();
+            }
+
+            // Create message element
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isSent ? 'justify-end' : 'justify-start'}`;
+            if (message.id) {
+                messageDiv.setAttribute('data-message-id', message.id);
+            }
+            messageDiv.setAttribute('data-unread', 'false'); // New messages are marked as read for the sender
+
+            // Set message content
+            messageDiv.innerHTML = `
+                <div class="max-w-xs sm:max-w-md ${isSent ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'} p-3 rounded-lg">
+                    <div class="text-sm font-medium">
+                        ${isSent ? 'You' : (message.senderName || 'User')}
+                    </div>
+                    <div class="mt-1">${message.content}</div>
+                    <div class="text-xs text-gray-500 mt-1 text-right">
+                        ${new Date(message.timestamp).toLocaleString()}
+                    </div>
+                </div>
+            `;
+
+            // Add to container
+            messagesContainer.appendChild(messageDiv);
+
+            // Scroll to bottom
+            scrollToBottom();
+
+            // Play sound for received messages
+            if (!isSent) {
+                playNotificationSound();
+            }
+        }
+
+        // Play notification sound
+        function playNotificationSound() {
+            const audio = document.getElementById('notification-sound');
+            if (audio) {
+                // Create user interaction context
+                const playPromise = audio.play();
+
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('Sound play error:', error);
+                        // Store that we need to play sound when user interacts
+                        document.addEventListener('click', function playOnInteraction() {
+                            audio.play();
+                            document.removeEventListener('click', playOnInteraction);
+                        }, { once: true });
+                    });
+                }
+            }
+        }
+
+        // Mark unread messages as read
+        function markMessagesAsRead() {
+            const unreadMessages = document.querySelectorAll('[data-unread="true"]');
+            console.log(`Found ${unreadMessages.length} unread messages`);
+
+            unreadMessages.forEach(message => {
+                const messageId = message.getAttribute('data-message-id');
+                if (messageId) {
+                    console.log(`Marking message ${messageId} as read`);
+                    fetch('/Social/MarkMessageAsRead', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                        },
+                        body: `messageId=${messageId}`
+                    }).then(response => {
+                        if (response.ok) {
+                            message.setAttribute('data-unread', 'false');
+                        }
+                    }).catch(error => {
+                        console.error('Error marking message as read:', error);
+                    });
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Scroll to bottom initially
+            scrollToBottom();
+
+            // Focus the message input
+            document.getElementById('messageContent').focus();
+
+            // Mark messages as read
+            markMessagesAsRead();
+
+            // Listen for SignalR message events directly
+            if (typeof connection !== 'undefined') {
+                // Handle receiving messages
+                connection.on('ReceiveMessage', function(message) {
+                    console.log('Real-time message received:', message);
+
+                    // Only process messages for this conversation
+                    if (message.conversationId === conversationId) {
+                        const isFromCurrentUser = message.senderId === currentUserId;
+                        addMessageToUI(message, isFromCurrentUser);
+                    }
+                });
+
+                // Handle sent message confirmation
+                connection.on('MessageSent', function(message) {
+                    console.log('Message sent successfully:', message);
+
+                    // Only add if it's for the current conversation
+                    if (message.conversationId === conversationId) {
+                        addMessageToUI(message, true);
+                    }
+                });
+
+                // Handle message failures
+                connection.on('MessageFailed', function(error) {
+                    console.error('Failed to send message:', error);
+                    alert('Failed to send message: ' + (error.error || 'Unknown error'));
+                });
+            } else {
+                console.warn('SignalR connection not available - real-time updates disabled');
+            }
+
+            // Intercept form submission to try both SignalR and traditional method
+            document.getElementById('messageForm').addEventListener('submit', async function(e) {
+                // Only intercept if we have SignalR available
+                if (typeof connection !== 'undefined' && connection.state === 1) { // 1 = Connected
+                    e.preventDefault();
+
+                    const messageContent = document.getElementById('messageContent').value.trim();
+                    if (!messageContent) return;
+
+                    // Clear input immediately for better UX
+                    document.getElementById('messageContent').value = '';
+
+                    // Extract recipient and conversation IDs
+                    const convId = document.getElementById('conversationId').value;
+                    const recId = convId === 'new' ?
+                        document.getElementById('recipientId').value :
+                        recipientId;
+
+                    try {
+                        // First try SignalR
+                        const success = await window.sendDirectMessage(recId, messageContent, convId);
+
+                        if (!success) {
+                            // If SignalR fails, submit the form normally
+                            this.submit();
+                        }
+                    } catch (error) {
+                        console.error('Error sending message via SignalR:', error);
+                        this.submit(); // Fall back to normal form submission
+                    }
+                }
+                // If no SignalR, let the form submit normally
+            });
+        });
+        </script>
+    }

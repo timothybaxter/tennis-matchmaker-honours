@@ -148,7 +148,7 @@ namespace TennisMatchmakingSite2.Controllers
                     HttpContext.Session.SetString("UserName", result.User.Name);
                     HttpContext.Session.SetString("UserEmail", result.User.Email);
                     HttpContext.Session.SetString("SkillLevel", result.User.PlayerLevel);
-                    HttpContext.Session.SetString("Theme", "Wimbledon"); // Set default theme
+                    HttpContext.Session.SetString("Theme", result.User.Theme ?? "Wimbledon");
 
                     // Get user settings
                     var settingsRequest = new HttpRequestMessage(HttpMethod.Get, "settings");
@@ -158,7 +158,10 @@ namespace TennisMatchmakingSite2.Controllers
                     if (settingsResponse.IsSuccessStatusCode)
                     {
                         var settings = await settingsResponse.Content.ReadFromJsonAsync<UserSettings>();
-                        HttpContext.Session.SetString("Theme", settings.Theme);
+                        if (settings?.Theme != null)
+                        {
+                            HttpContext.Session.SetString("Theme", settings.Theme);
+                        }
                         HttpContext.Session.SetString("Hometown", settings.Hometown ?? "");
                     }
 

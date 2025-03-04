@@ -1,0 +1,111 @@
+@model List<TennisMatchmakingSite2.Models.ConversationModel>
+    @{
+    ViewData["Title"] = "Messages";
+    }
+
+    <div class="container mx-auto px-4 pb-20">
+        <div class="max-w-3xl mx-auto mt-8">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Messages</h1>
+                <a href="@Url.Action("Index", "Social")" class="text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-arrow-left mr-1"></i> Back to Social
+                </a>
+            </div>
+
+            <!-- Debug information -->
+            <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4 text-sm">
+                <h3 class="font-bold">Debug Information</h3>
+                <p>Total conversations: @Model.Count</p>
+                @foreach (var conv in Model)
+            {
+                <div class="mt-2 p-2 bg-white rounded border">
+                    <p><strong>ID:</strong> "@conv.ConversationId"</p>
+                    <p><strong>Other User ID:</strong> @conv.OtherUser?.Id</p>
+                    <p><strong>Other User:</strong> @(conv.OtherUser?.Name ?? "Unknown")</p>
+                    <p><strong>Last Message:</strong> @conv.LastMessageAt</p>
+                    <a href="@Url.Action("Conversation", "Social", new { id = conv.ConversationId })"
+                       class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 inline-block mt-2">
+                        View
+                    </a>
+                </div>
+            }
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                @if (!Model.Any())
+            {
+                <div class="p-8 text-center text-gray-500">
+                    <p>You don't have any conversations yet.</p>
+                    <p class="mt-2">Start a conversation with a friend from your friends list.</p>
+                    <div class="mt-4">
+                        <a href="@Url.Action("Friends", "Social")" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-users mr-2"></i> Go to Friends
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <ul class="divide-y divide-gray-200">
+                    @foreach (var conversation in Model)
+                    {
+                    <li class="border-b border-gray-200 last:border-b-0">
+                        <a href="@Url.Action("Conversation", "Social", new { id = conversation.ConversationId })"
+                           class="block p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <h3 class="text-sm font-medium text-gray-900">
+                                            @(conversation.OtherUser?.Name ?? "Unknown User")
+                                        </h3>
+                                        <p class="text-sm text-gray-500">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                @(string.IsNullOrEmpty(conversation.OtherUser?.PlayerLevel) ? "Player" : conversation.OtherUser.PlayerLevel)
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-end">
+                                    <span class="text-xs text-gray-500">
+                                        @(conversation.LastMessageAt.Year > 1 ? conversation.LastMessageAt.ToString("g") : "No messages yet")
+                                    </span>
+                                    @if (conversation.UnreadCount > 0)
+                                        {
+                                    <span class="mt-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                        @conversation.UnreadCount
+                                    </span>
+                                        }
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                    }
+                </ul>
+            }
+            </div>
+        </div>
+    </div>
+
+    @section Scripts {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                console.log('Messages view loaded');
+
+                // Debug conversation links
+                document.querySelectorAll('a[href*="Conversation"]').forEach(link => {
+                    console.log('Conversation link:', link.href);
+
+                    // Add explicit click handler for debugging
+                    link.addEventListener('click', function (e) {
+                        console.log('Conversation link clicked:', this.href);
+                        // Let the default navigation happen
+                    });
+                });
+            });
+        </script>
+    }

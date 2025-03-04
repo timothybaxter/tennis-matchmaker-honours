@@ -1,0 +1,300 @@
+@model List<TennisMatchmakingSite2.Models.UserModel>
+    @{
+    ViewData["Title"] = "Friends";
+    var currentUserId = Context.Session.GetString("UserId");
+    }
+
+    <div class="container mx-auto px-4 pb-20">
+        <div class="max-w-4xl mx-auto mt-8">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Friends</h1>
+                <div class="flex gap-2">
+                    <a href="@Url.Action("FriendRequests", "Social")" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-user-plus mr-2"></i> Friend Requests
+                    </a>
+                </div>
+            </div>
+
+            <!-- Toast container for notifications -->
+            <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs"></div>
+
+            <!-- Friend Search -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                <h2 class="text-lg font-semibold mb-3">Find Friends</h2>
+                <div class="relative">
+                    <input type="text" id="userSearch" class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-12" placeholder="Search by name or email...">
+                    <button id="searchButton" class="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="searchResults" class="mt-3 hidden">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Search Results</h3>
+                    <div id="resultsContent" class="space-y-2 max-h-64 overflow-y-auto p-1"></div>
+                </div>
+            </div>
+
+            <!-- Friends List -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h2 class="text-lg font-semibold mb-4">My Friends</h2>
+
+                @if (!Model.Any())
+            {
+                <div class="text-center py-8 text-gray-500">
+                    <p>You haven't added any friends yet.</p>
+                    <p class="mt-2">Use the search above to find and add friends.</p>
+                </div>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    @foreach (var friend in Model)
+                    {
+                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-md hover:bg-gray-50" data-friend-id="@friend.Id">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-gray-900">@friend.Name</h3>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                        @(string.IsNullOrEmpty(friend.PlayerLevel) ? "Player" : friend.PlayerLevel)
+                                    </span>
+                                    <span class="status-indicator w-3 h-3 rounded-full bg-gray-400" title="Offline"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="startConversation('@friend.Id', '@friend.Name')" class="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                                <i class="fas fa-comment mr-1"></i> Message
+                            </button>
+                            <button onclick="inviteToMatch('@friend.Id')" class="inline-flex items-center px-3 py-1 text-sm font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition-colors">
+                                <i class="fas fa-calendar-plus mr-1"></i> Invite
+                            </button>
+                        </div>
+                    </div>
+                    }
+                </div>
+            }
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden notification sound element -->
+    <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
+
+    @section Scripts {
+        <script>
+        // Current user ID for messaging
+        const currentUserId = '@currentUserId';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('userSearch');
+            const searchButton = document.getElementById('searchButton');
+            const searchResults = document.getElementById('searchResults');
+            const resultsContent = document.getElementById('resultsContent');
+
+            let searchTimeout;
+
+            searchInput.addEventListener('input', function () {
+                clearTimeout(searchTimeout);
+                const query = searchInput.value.trim();
+
+                if (query.length < 2) {
+                    searchResults.classList.add('hidden');
+                    return;
+                }
+
+                searchTimeout = setTimeout(() => {
+                    performSearch(query);
+                }, 500);
+            });
+
+            searchButton.addEventListener('click', function () {
+                const query = searchInput.value.trim();
+                if (query.length >= 2) {
+                    performSearch(query);
+                }
+            });
+
+            function performSearch(query) {
+                resultsContent.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+                searchResults.classList.remove('hidden');
+
+                fetch(`/Social/SearchUsers?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.users.length === 0) {
+                                resultsContent.innerHTML = '<div class="text-center py-2 text-gray-500">No users found</div>';
+                            } else {
+                                resultsContent.innerHTML = '';
+                                data.users.forEach(user => {
+                                    const userItem = document.createElement('div');
+                                    userItem.className = 'flex items-center justify-between p-2 border border-gray-200 rounded-md hover:bg-gray-50';
+
+                                    const playerLevel = user.playerLevel || 'Player';
+
+                                    userItem.innerHTML = `
+                                            <div class="flex items-center">
+                                                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div class="ml-2">
+                                                    <h3 class="text-sm font-medium">${user.name}</h3>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                        ${playerLevel}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button onclick="sendFriendRequest('${user.id}')" class="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-md hover:bg-green-100">
+                                                    <i class="fas fa-user-plus mr-1"></i> Add
+                                                </button>
+                                                <button onclick="startConversation('${user.id}', '${user.name}')" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                                                    <i class="fas fa-comment mr-1"></i> Message
+                                                </button>
+                                            </div>
+                                        `;
+
+                                    resultsContent.appendChild(userItem);
+                                });
+                            }
+                        } else {
+                            resultsContent.innerHTML = `<div class="text-center py-2 text-red-500">${data.message || 'Search failed'}</div>`;
+                        }
+                    })
+                    .catch(error => {
+                        resultsContent.innerHTML = '<div class="text-center py-2 text-red-500">Error searching users</div>';
+                        console.error('Search error:', error);
+                    });
+            }
+        });
+
+        // Function to send friend request using SignalR
+        async function sendFriendRequest(userId) {
+            try {
+                // Try to use SignalR
+                if (window.sendFriendRequest) {
+                    const success = await window.sendFriendRequest(userId);
+                    if (success) {
+                        showToast('Friend Request', 'Friend request sent successfully');
+                        return;
+                    }
+                }
+
+                // Fall back to traditional form submission
+                submitFriendRequestForm(userId);
+            } catch (error) {
+                console.error('Error sending friend request:', error);
+                submitFriendRequestForm(userId);
+            }
+        }
+
+        // Traditional form submission fallback
+        function submitFriendRequestForm(userId) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/Social/SendFriendRequest';
+            form.style.display = 'none';
+
+            const userIdInput = document.createElement('input');
+            userIdInput.type = 'hidden';
+            userIdInput.name = 'userId';
+            userIdInput.value = userId;
+
+            // Add CSRF token if needed
+            const tokenElement = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (tokenElement) {
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '__RequestVerificationToken';
+                tokenInput.value = tokenElement.value;
+                form.appendChild(tokenInput);
+            }
+
+            form.appendChild(userIdInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Function to start conversation
+        function startConversation(userId, userName) {
+            window.location.href = `/Social/NewConversation?userId=${encodeURIComponent(userId)}&userName=${encodeURIComponent(userName)}`;
+        }
+
+        // Function to invite to match
+        function inviteToMatch(userId) {
+            // This would ideally get the current match ID
+            const matchId = prompt("Enter match ID to invite to:");
+            if (!matchId) return;
+
+            if (window.sendMatchInvite) {
+                window.sendMatchInvite(userId, matchId)
+                    .then(success => {
+                        if (success) {
+                            showToast('Match Invite', 'Invitation sent successfully');
+                        } else {
+                            alert('Failed to send match invitation');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending match invite:', error);
+                        alert('Error sending match invitation');
+                    });
+            } else {
+                alert('Match invitation functionality not available');
+            }
+        }
+
+        // Display toast notification
+        function showToast(title, message) {
+            // Create container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Create toast
+            const toast = document.createElement('div');
+            toast.className = 'bg-white rounded-lg shadow-lg border border-gray-200 p-3 transform translate-x-full transition-transform duration-300';
+            toast.innerHTML = `
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 text-green-500 mr-2">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium">${title}</div>
+                        <div class="text-sm text-gray-600">${message}</div>
+                    </div>
+                    <button class="ml-2 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            // Add to container
+            toastContainer.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 10);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 300);
+            }, 5000);
+        }
+        </script>
+    }

@@ -1,0 +1,209 @@
+@model List<TennisMatchmakingSite2.Models.NotificationModel>
+    @{
+    ViewData["Title"] = "Social";
+    var currentUserId = Context.Session.GetString("UserId");
+    }
+
+    <div class="container mx-auto px-4 pb-20">
+        <div class="mt-4">
+            <h1 class="text-2xl font-bold mb-4">Social Hub</h1>
+
+            <!-- Navigation Buttons -->
+            <div class="flex flex-wrap gap-2 mb-6">
+                <a href="@Url.Action("Friends", "Social")"
+                   class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                    <i class="fas fa-user-friends mr-2"></i>
+                    Friends
+                </a>
+                <a href="@Url.Action("Messages", "Social")"
+                   class="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+                    <i class="fas fa-comment-alt mr-2"></i>
+                    Messages
+                </a>
+                <a href="@Url.Action("FriendRequests", "Social")"
+                   class="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Friend Requests
+                    <!-- Badge for unread requests - we'd need to query this separately -->
+                    @if (false) {
+                    <span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-purple-700 text-white">3</span>
+            }
+                </a>
+            </div>
+
+            <!-- Toast container for notifications -->
+            <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs"></div>
+
+            <!-- Latest Notifications -->
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold mb-3">Recent Notifications</h2>
+
+                @if (!Model.Any())
+            {
+                <div class="bg-blue-50 text-blue-700 p-4 rounded-md">
+                    No notifications yet.
+                </div>
+            }
+            else
+            {
+                <div id="notifications-container" class="space-y-3">
+                    @foreach (var notification in Model)
+                    {
+                    <div class="bg-white rounded-lg shadow-sm border @(notification.IsRead ? "border-gray-200" : "border-blue-300") p-4 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                @switch (notification.Type)
+                                    {
+                                        case "friend_request":
+                                <h3 class="text-lg font-semibold">Friend Request</h3>
+                                <p class="text-gray-600">@notification.Content</p>
+                                <div class="mt-3 flex gap-2">
+                                    <form asp-action="RespondToFriendRequest" asp-route-requestId="@notification.RelatedItemId" asp-route-accept="true" method="post">
+                                        <button type="submit" class="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200">Accept</button>
+                                    </form>
+                                    <form asp-action="RespondToFriendRequest" asp-route-requestId="@notification.RelatedItemId" asp-route-accept="false" method="post">
+                                        <button type="submit" class="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200">Decline</button>
+                                    </form>
+                                    <button class="notification-action px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                                            data-action="mark-read" data-id="@notification.Id">
+                                        Dismiss
+                                    </button>
+                                </div>
+                                            break;
+                                        case "message":
+                                <h3 class="text-lg font-semibold">New Message</h3>
+                                <p class="text-gray-600">@notification.Content</p>
+                                <div class="mt-3">
+                                    <a href="@Url.Action("Conversation", "Social", new { id = notification.RelatedItemId })"
+                                       class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                        View Conversation
+                                    </a>
+                                    <button class="notification-action px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                                            data-action="mark-read" data-id="@notification.Id">
+                                        Dismiss
+                                    </button>
+                                </div>
+                                            break;
+                                        case "match_invite":
+                                <h3 class="text-lg font-semibold">Match Invitation</h3>
+                                <p class="text-gray-600">@notification.Content</p>
+                                <div class="mt-3 flex gap-2">
+                                    <a href="@Url.Action("Detail", "Match", new { id = notification.RelatedItemId })"
+                                       class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                        View Match
+                                    </a>
+                                    <button class="notification-action px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                                            data-action="mark-read" data-id="@notification.Id">
+                                        Dismiss
+                                    </button>
+                                </div>
+                                            break;
+                                        default:
+                                <h3 class="text-lg font-semibold">Notification</h3>
+                                <p class="text-gray-600">@notification.Content</p>
+                                <div class="mt-3">
+                                    <button class="notification-action px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                                            data-action="mark-read" data-id="@notification.Id">
+                                        Dismiss
+                                    </button>
+                                </div>
+                                            break;
+                                    }
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="text-sm text-gray-500">
+                                    @notification.CreatedAt.ToString("MMM d, h:mm tt")
+                                </span>
+                                @if (!notification.IsRead)
+                                    {
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    New
+                                </span>
+                                    }
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+            }
+            </div>
+
+            <!-- Connection Status -->
+            <div id="connection-status-indicator" class="fixed bottom-20 right-4">
+                <div class="flex items-center bg-white rounded-full shadow-md px-3 py-1 text-sm">
+                    <span class="mr-2">SignalR:</span>
+                    <span id="connection-status" class="text-red-500">Disconnected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden notification sound element -->
+    <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
+
+    @section Scripts {
+        <script>
+        // Current user ID for messaging
+        const currentUserId = '@currentUserId';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle notification dismiss/mark as read actions
+            document.querySelectorAll('.notification-action').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const action = this.getAttribute('data-action');
+                    const id = this.getAttribute('data-id');
+
+                    if (action === 'mark-read') {
+                        markNotificationAsRead(id);
+                    }
+                });
+            });
+
+            // Hide connection status after 5 seconds
+            setTimeout(() => {
+                const statusIndicator = document.getElementById('connection-status-indicator');
+                if (statusIndicator) {
+                    statusIndicator.classList.add('opacity-0');
+                    setTimeout(() => {
+                        statusIndicator.classList.add('hidden');
+                    }, 500);
+                }
+            }, 5000);
+        });
+
+        // Function to mark a notification as read
+        function markNotificationAsRead(notificationId) {
+            fetch('@Url.Action("MarkNotificationRead", "Social")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: `notificationId=${notificationId}`
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Find the notification element
+                    const notification = document.querySelector(`[data-id="${notificationId}"]`).closest('.bg-white');
+
+                    // Fade it out
+                    notification.style.opacity = '0.5';
+
+                    // Remove the "New" badge if present
+                    const badge = notification.querySelector('.bg-blue-100.text-blue-800');
+                    if (badge) {
+                        badge.remove();
+                    }
+
+                    // Change the border color
+                    notification.classList.remove('border-blue-300');
+                    notification.classList.add('border-gray-200');
+                }
+            })
+            .catch(error => {
+                console.error('Error marking notification as read:', error);
+            });
+        }
+        </script>
+    }

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System;
+using System.Linq;
 
 namespace TennisMatchmakingSite2.Controllers
 {
@@ -24,7 +25,7 @@ namespace TennisMatchmakingSite2.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
             try
             {
@@ -82,7 +83,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update auth database
                 var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
-                authRequest.Headers.Add("Authorization", $"Bearer {token}");
+                authRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var authBody = new { name = model.Name };
                 authRequest.Content = JsonContent.Create(authBody);
 
@@ -101,7 +102,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update settings database
                 var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
-                settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
+                settingsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 settingsRequest.Content = JsonContent.Create(new { name = model.Name });
 
                 _logger.LogInformation($"Sending settings request to update name");
@@ -143,14 +144,14 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update auth database
                 var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
-                authRequest.Headers.Add("Authorization", $"Bearer {token}");
+                authRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var authBody = new { email = model.Email };
                 authRequest.Content = JsonContent.Create(authBody);
 
                 _logger.LogInformation($"Base URL: {_httpClient.BaseAddress}");
                 _logger.LogInformation($"Endpoint: auth/update-user");
                 _logger.LogInformation($"Full request URL: {authRequest.RequestUri}");
-                _logger.LogInformation($"Authorization: {authRequest.Headers.GetValues("Authorization").FirstOrDefault()}");
+                _logger.LogInformation($"Authorization: {authRequest.Headers.Authorization}");
                 var bodyContent = await authRequest.Content.ReadAsStringAsync();
                 _logger.LogInformation($"Request body: {bodyContent}");
 
@@ -168,7 +169,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update settings database
                 var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
-                settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
+                settingsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 settingsRequest.Content = JsonContent.Create(new { email = model.Email });
 
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
@@ -220,9 +221,9 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Updated path to match API Gateway structure
-                var request = new HttpRequestMessage(HttpMethod.Post, "auth/update-password");
-                request.Headers.Add("Authorization", $"Bearer {token}");
+                // Now uses the regular auth/update-user endpoint with password fields
+                var request = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var requestBody = new
                 {
@@ -233,7 +234,7 @@ namespace TennisMatchmakingSite2.Controllers
                 request.Content = JsonContent.Create(requestBody);
 
                 _logger.LogInformation("Sending password update request");
-                _logger.LogInformation($"Authorization header: {request.Headers.GetValues("Authorization").FirstOrDefault()}");
+                _logger.LogInformation($"Authorization header: {request.Headers.Authorization}");
                 _logger.LogInformation($"Request body: {await request.Content.ReadAsStringAsync()}");
 
                 var response = await _httpClient.SendAsync(request);
@@ -272,7 +273,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update auth database
                 var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
-                authRequest.Headers.Add("Authorization", $"Bearer {token}");
+                authRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var authBody = new { playerLevel = model.PlayerLevel.ToString() };
                 authRequest.Content = JsonContent.Create(authBody);
 
@@ -291,7 +292,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 // Update settings database
                 var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
-                settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
+                settingsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 settingsRequest.Content = JsonContent.Create(new { playerLevel = model.PlayerLevel.ToString() });
 
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
@@ -330,8 +331,8 @@ namespace TennisMatchmakingSite2.Controllers
                 }
 
                 // Only update settings database for hometown
-                var request = new HttpRequestMessage(HttpMethod.Post, "settings");
-                request.Headers.Add("Authorization", $"Bearer {token}");
+                var request = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var requestBody = new { hometown = model.Hometown };
                 request.Content = JsonContent.Create(requestBody);
@@ -372,16 +373,33 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Update settings database only for theme
+                // Update auth database with theme
+                var authRequest = new HttpRequestMessage(HttpMethod.Post, "auth/update-user");
+                authRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                authRequest.Content = JsonContent.Create(new { theme = model.Theme.ToString() });
+
+                _logger.LogInformation($"Sending auth request to update theme: {model.Theme}");
+                var authResponse = await _httpClient.SendAsync(authRequest);
+                var authResponseContent = await authResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Auth response status: {authResponse.StatusCode}");
+                _logger.LogInformation($"Auth response content: {authResponseContent}");
+
+                if (!authResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning($"Failed to update theme in auth database: {authResponse.StatusCode}");
+                    // Continue anyway to try settings update
+                }
+
+                // Update settings database for theme
                 var settingsRequest = new HttpRequestMessage(HttpMethod.Post, "settings/update-settings");
-                settingsRequest.Headers.Add("Authorization", $"Bearer {token}");
+                settingsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 settingsRequest.Content = JsonContent.Create(new { theme = model.Theme.ToString() });
 
-                _logger.LogInformation($"Sending theme update request: {model.Theme}");
+                _logger.LogInformation($"Sending settings request to update theme: {model.Theme}");
                 var settingsResponse = await _httpClient.SendAsync(settingsRequest);
                 var settingsResponseContent = await settingsResponse.Content.ReadAsStringAsync();
-                _logger.LogInformation($"Theme update response status: {settingsResponse.StatusCode}");
-                _logger.LogInformation($"Theme update response content: {settingsResponseContent}");
+                _logger.LogInformation($"Settings response status: {settingsResponse.StatusCode}");
+                _logger.LogInformation($"Settings response content: {settingsResponseContent}");
 
                 if (settingsResponse.IsSuccessStatusCode)
                 {
@@ -391,7 +409,7 @@ namespace TennisMatchmakingSite2.Controllers
                 else
                 {
                     var error = await settingsResponse.Content.ReadFromJsonAsync<ErrorResponse>();
-                    ModelState.AddModelError("", error?.Message ?? "Failed to update theme");
+                    ModelState.AddModelError("", error?.Message ?? "Failed to update theme in settings");
                 }
             }
             catch (Exception ex)

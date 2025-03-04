@@ -9,6 +9,7 @@ wwwroot\images\logo2.png
 wwwroot\js\court-autocomplete.js
 wwwroot\js\match.js
 wwwroot\js\match-functions.js
+wwwroot\js\signalr-connection.js
 wwwroot\js\site.js
 wwwroot\js\theme-handler.js
 wwwroot\lib\bootstrap\css\bootstrap.css
@@ -335,3 +336,6 @@ wwwroot\lib\jquery-validation\LICENSE.md
 wwwroot\lib\jquery-validation-unobtrusive\jquery.validate.unobtrusive.js
 wwwroot\lib\jquery-validation-unobtrusive\jquery.validate.unobtrusive.min.js
 wwwroot\lib\jquery-validation-unobtrusive\LICENSE.txt
+wwwroot\lib\microsoft\signalr\dist\browser\signalr.js
+wwwroot\lib\microsoft\signalr\dist\browser\signalr.min.js
+wwwroot\sounds\notification.mp3

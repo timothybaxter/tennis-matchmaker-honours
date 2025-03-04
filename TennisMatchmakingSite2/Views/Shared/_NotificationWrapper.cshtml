@@ -1,0 +1,137 @@
+@model List<TennisMatchmakingSite2.Models.NotificationModel>
+
+    <div id="notification-wrapper">
+        <!-- Toast container - for popup notifications -->
+        <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs"></div>
+
+        <!-- Notifications container - for the notifications page -->
+        <div id="notifications-container" class="space-y-4">
+            @if (Model == null || !Model.Any())
+        {
+            <div class="bg-blue-50 text-blue-700 p-4 rounded-md">
+                No notifications to display.
+            </div>
+        }
+        else
+        {
+            foreach (var notification in Model.OrderByDescending(n => n.CreatedAt))
+            {
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-3 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        @switch (notification.Type)
+                            {
+                                case "message":
+                        <h3 class="text-lg font-semibold">New Message</h3>
+                        <p class="text-gray-600">From: @notification.SourceUserName</p>
+                        <p class="mt-2">@notification.Content</p>
+                        <div class="mt-3">
+                            <a href="/Social/Conversation/@notification.RelatedItemId"
+                               class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                View Conversation
+                            </a>
+                        </div>
+                                    break;
+
+                                case "friend_request":
+                        <h3 class="text-lg font-semibold">Friend Request</h3>
+                        <p class="text-gray-600">@notification.SourceUserName wants to be your friend</p>
+                        <div class="mt-3 flex gap-2">
+                            <form action="/Social/RespondToFriendRequest" method="post">
+                                <input type="hidden" name="requestId" value="@notification.RelatedItemId">
+                                <input type="hidden" name="accept" value="true">
+                                <button type="submit" class="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200">Accept</button>
+                            </form>
+                            <form action="/Social/RespondToFriendRequest" method="post">
+                                <input type="hidden" name="requestId" value="@notification.RelatedItemId">
+                                <input type="hidden" name="accept" value="false">
+                                <button type="submit" class="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200">Decline</button>
+                            </form>
+                        </div>
+                                    break;
+
+                                case "match_invite":
+                        <h3 class="text-lg font-semibold">Match Invitation</h3>
+                        <p class="text-gray-600">@notification.SourceUserName invited you to a match</p>
+                        <div class="mt-3 flex gap-2">
+                            <a href="/Match/Detail/@notification.RelatedItemId"
+                               class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                View Details
+                            </a>
+                        </div>
+                                    break;
+
+                                case "friend_accepted":
+                        <h3 class="text-lg font-semibold">Friend Request Accepted</h3>
+                        <p class="text-gray-600">@notification.Content</p>
+                        <div class="mt-3 flex gap-2">
+                            <a href="/Social/Friends"
+                               class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                View Friends
+                            </a>
+                        </div>
+                                    break;
+
+                                default:
+                        <h3 class="text-lg font-semibold">Notification</h3>
+                        <p class="mt-2">@notification.Content</p>
+                                    break;
+                            }
+                    </div>
+                    <span class="text-sm text-gray-500">
+                        @notification.CreatedAt.ToString("g")
+                    </span>
+                </div>
+            </div>
+            }
+        }
+        </div>
+
+        <!-- Hidden audio element for notification sounds -->
+        <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
+    </div>
+
+    <!-- Connection status indicator (can be hidden in production) -->
+    <div id="connection-status-indicator" class="fixed bottom-20 right-4 text-sm bg-white shadow rounded-full px-3 py-1 border z-50">
+        Status: <span id="connection-status" class="text-gray-500">Connecting...</span>
+    </div>
+
+    <script>
+    // This script adds the necessary event listeners for notification actions
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hide connection status after 5 seconds
+        setTimeout(() => {
+            document.getElementById('connection-status-indicator').classList.add('hidden');
+        }, 5000);
+
+        // Add event listeners for notification buttons
+        document.querySelectorAll('.notification-action').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const action = this.getAttribute('data-action');
+                const id = this.getAttribute('data-id');
+
+                if (action === 'mark-read') {
+                    markNotificationAsRead(id);
+                }
+            });
+        });
+    });
+
+    // Function to mark notification as read
+    function markNotificationAsRead(notificationId) {
+        fetch(`/Social/MarkNotificationAsRead?id=${notificationId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const notification = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                if (notification) {
+                    notification.classList.add('opacity-50');
+                }
+            }
+        })
+        .catch(error => console.error('Error marking notification as read:', error));
+    }
+    </script>
