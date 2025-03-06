@@ -399,7 +399,6 @@ export async function getFriendRequests(event) {
         const requesters = await users.find({
             _id: { $in: requesterObjectIds }
         }).project({
-            password: 0,
             _id: 1,
             name: 1,
             email: 1,
