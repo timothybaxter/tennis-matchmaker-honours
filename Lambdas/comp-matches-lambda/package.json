@@ -1,0 +1,15 @@
+{
+  "name": "auth-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "build": "powershell -File .\\build.ps1"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "mongodb": "5.5",
+    "node-fetch": "^3.3.0"
+  }
+}
