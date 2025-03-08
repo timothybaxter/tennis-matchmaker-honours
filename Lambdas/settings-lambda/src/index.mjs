@@ -1,4 +1,4 @@
-import { createSettings, getSettings, partialUpdateSettings } from './handlers/settings.mjs';
+import { createSettings, getSettings, partialUpdateSettings, getProfile } from './handlers/settings.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -15,6 +15,8 @@ export const handler = async (event) => {
             return await getSettings(event);
         case 'POST /settings/update-settings':
             return await partialUpdateSettings(event);
+        case 'GET /settings/profile/{id}':
+            return await getProfile(event);
         default:
             return createResponse(404, { message: 'Route not found', route: `${event.httpMethod} ${event.resource}` });
     }

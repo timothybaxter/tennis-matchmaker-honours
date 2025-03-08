@@ -94,7 +94,84 @@ export async function getSettings(event) {
         return createResponse(500, { message: 'Error retrieving settings' });
     }
 }
+// Add this function to settings.mjs
+export async function getProfile(event) {
+    try {
+        // Extract authorization token - checking all possible header formats
+        const authHeader = event.headers.Authorization ||
+            event.headers.authorization ||
+            event.headers['Authorization'] ||
+            event.headers['authorization'];
 
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization token provided' });
+        }
+
+        // Extract token
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            console.error('Token verification error:', error);
+            return createResponse(401, { message: 'Invalid token' });
+        }
+
+        // Get the requested profile's userId from path parameters
+        const profileUserId = event.pathParameters?.id;
+        if (!profileUserId) {
+            return createResponse(400, { message: 'User ID is required' });
+        }
+
+        // Connect to settings database
+        const db = await connectToDatabase();
+        const settings = db.collection('user-settings');
+
+        // Try to find the user's settings
+        const userSettings = await settings.findOne({ userId: profileUserId });
+
+        // Connect to auth database to get basic user info
+        const authDb = await connectToSpecificDatabase('users-db');
+        const users = authDb.collection('users');
+
+        let userBasicInfo;
+        try {
+            userBasicInfo = await users.findOne({ _id: new ObjectId(profileUserId) });
+        } catch (error) {
+            console.error('Invalid user ID format:', error);
+            return createResponse(400, { message: 'Invalid user ID format' });
+        }
+
+        if (!userBasicInfo) {
+            return createResponse(404, { message: 'User not found' });
+        }
+
+        // Combine data from both sources
+        const profile = {
+            id: profileUserId,
+            name: userBasicInfo.name,
+            email: userBasicInfo.email,
+            playerLevel: userBasicInfo.playerLevel,
+            joinedAt: userBasicInfo.createdAt || new Date(),
+            lastActive: new Date(), // Can be updated with actual data if tracked
+
+            // Settings data (if available)
+            hometown: userSettings?.hometown || '',
+            theme: userSettings?.theme || 'Wimbledon',
+            bio: userSettings?.bio || ''
+        };
+
+        return createResponse(200, { profile });
+    } catch (error) {
+        console.error('Get profile error:', error);
+        return createResponse(500, { message: 'Error retrieving profile', error: error.message });
+    }
+}
 export async function partialUpdateSettings(event) {
     try {
         console.log('Partial update settings event:', JSON.stringify(event));
