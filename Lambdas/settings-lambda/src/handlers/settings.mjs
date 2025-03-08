@@ -127,45 +127,35 @@ export async function getProfile(event) {
             return createResponse(400, { message: 'User ID is required' });
         }
 
-        console.log(`Looking up profile for user ID: ${profileUserId}`);
-
         // Connect to settings database
         const db = await connectToDatabase();
         const settings = db.collection('user-settings');
 
-        // Try to find the user's settings by string userId
+        // Try to find the user's settings
         const userSettings = await settings.findOne({ userId: profileUserId });
-        console.log(`Found settings: ${userSettings ? 'Yes' : 'No'}`);
 
-        // Connect to users database to get basic user info
+        // Connect to auth database to get basic user info
+        // Use the same database connection for auth
         const users = db.collection('users');
 
-        // First try to find user by straight ID (if stored as string)
-        let userBasicInfo = await users.findOne({ _id: profileUserId });
-
-        // If not found, try with ObjectId
-        if (!userBasicInfo) {
-            try {
-                userBasicInfo = await users.findOne({ _id: new ObjectId(profileUserId) });
-            } catch (error) {
-                console.log(`Error converting to ObjectId: ${error.message}`);
-                // Not returning error here, will check if user was found below
-            }
+        let userBasicInfo;
+        try {
+            userBasicInfo = await users.findOne({ _id: new ObjectId(profileUserId) });
+        } catch (error) {
+            console.error('Invalid user ID format:', error);
+            return createResponse(400, { message: 'Invalid user ID format' });
         }
 
         if (!userBasicInfo) {
-            console.log('User not found in database');
             return createResponse(404, { message: 'User not found' });
         }
-
-        console.log(`Found user basic info: ${JSON.stringify(userBasicInfo)}`);
 
         // Combine data from both sources
         const profile = {
             id: profileUserId,
-            name: userBasicInfo.name || 'Unknown User',
-            email: userBasicInfo.email || '',
-            playerLevel: userBasicInfo.playerLevel || 'Beginner',
+            name: userBasicInfo.name,
+            email: userBasicInfo.email,
+            playerLevel: userBasicInfo.playerLevel,
             joinedAt: userBasicInfo.createdAt || new Date(),
             lastActive: new Date(), // Can be updated with actual data if tracked
 
