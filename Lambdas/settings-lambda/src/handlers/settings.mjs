@@ -94,7 +94,6 @@ export async function getSettings(event) {
         return createResponse(500, { message: 'Error retrieving settings' });
     }
 }
-// Add this function to settings.mjs
 export async function getProfile(event) {
     try {
         // Extract authorization token - checking all possible header formats
@@ -136,8 +135,8 @@ export async function getProfile(event) {
         const userSettings = await settings.findOne({ userId: profileUserId });
 
         // Connect to auth database to get basic user info
-        const authDb = await connectToSpecificDatabase('users-db');
-        const users = authDb.collection('users');
+        // Use the same database connection for auth
+        const users = db.collection('users');
 
         let userBasicInfo;
         try {
