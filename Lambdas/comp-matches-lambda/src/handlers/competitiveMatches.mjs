@@ -421,36 +421,76 @@ export async function getActiveMatches(event) {
         const userId = token.decoded.userId;
         const queryParams = event.queryStringParameters || {};
 
-        // Connect to matches database
-        const db = await connectToDatabase();
-        const matches = db.collection('competitiveMatches');
+        // Initialize combined matches array
+        let allMatches = [];
 
-        // Build query
-        const query = {
-            $or: [
-                { challengerId: userId },
-                { challengeeId: userId },
-                { player1: userId },
-                { player2: userId }
-            ],
-            status: { $in: ['scheduled', 'accepted'] }
-        };
+        // 1. Get competitive matches (tournaments and ladders)
+        try {
+            const compDb = await connectToDatabase();
+            const compMatches = compDb.collection('competitiveMatches');
 
-        // Filter by type if provided
-        if (queryParams.type) {
-            if (queryParams.type === 'tournament') {
-                query.tournamentId = { $exists: true };
-            } else if (queryParams.type === 'ladder') {
-                query.ladderId = { $exists: true };
+            // Build query for competitive matches
+            const compQuery = {
+                $or: [
+                    { challengerId: userId },
+                    { challengeeId: userId },
+                    { player1: userId },
+                    { player2: userId }
+                ],
+                status: { $in: ['scheduled', 'accepted'] }
+            };
+
+            // Filter by type if provided
+            if (queryParams.type) {
+                if (queryParams.type === 'tournament') {
+                    compQuery.tournamentId = { $exists: true };
+                } else if (queryParams.type === 'ladder') {
+                    compQuery.ladderId = { $exists: true };
+                }
             }
+
+            const activeCompMatches = await compMatches.find(compQuery)
+                .sort({ createdAt: -1 })
+                .toArray();
+
+            console.log(`Found ${activeCompMatches.length} competitive matches`);
+            allMatches = [...activeCompMatches];
+        } catch (error) {
+            console.error('Error getting competitive matches:', error);
         }
 
-        // Get matches
-        const activeMatches = await matches.find(query)
-            .sort({ createdAt: -1 })
-            .toArray();
+        // 2. Get casual matches from matches-db
+        try {
+            const casualDb = await connectToSpecificDatabase('matches-db');
+            const casualMatches = casualDb.collection('matches');
 
-        console.log(`Found ${activeMatches.length} active matches`);
+            const casualQuery = {
+                $or: [
+                    { creatorId: userId },
+                    { participants: userId }
+                ],
+                status: { $in: ['open', 'scheduled', 'accepted'] }
+            };
+
+            const activeCasualMatches = await casualMatches.find(casualQuery)
+                .sort({ matchTime: 1 })
+                .toArray();
+
+            console.log(`Found ${activeCasualMatches.length} casual matches`);
+
+            // Add a type marker to help differentiate in the frontend
+            const enhancedCasualMatches = activeCasualMatches.map(match => ({
+                ...match,
+                id: match._id.toString(),
+                matchType: match.matchType || 'singles',
+                isCompetitive: false,
+                matchSource: 'casual'
+            }));
+
+            allMatches = [...allMatches, ...enhancedCasualMatches];
+        } catch (error) {
+            console.error('Error getting casual matches:', error);
+        }
 
         // Get user details for all participants
         const usersDb = await connectToSpecificDatabase('users-db');
@@ -458,11 +498,16 @@ export async function getActiveMatches(event) {
 
         // Extract all user IDs from matches
         const userIds = new Set();
-        activeMatches.forEach(match => {
+        allMatches.forEach(match => {
+            if (match.creatorId) userIds.add(match.creatorId);
             if (match.challengerId) userIds.add(match.challengerId);
             if (match.challengeeId) userIds.add(match.challengeeId);
             if (match.player1) userIds.add(match.player1);
             if (match.player2) userIds.add(match.player2);
+            // For casual matches
+            if (match.participants && Array.isArray(match.participants)) {
+                match.participants.forEach(id => userIds.add(id));
+            }
         });
 
         // Convert to ObjectIds for MongoDB query
@@ -498,7 +543,7 @@ export async function getActiveMatches(event) {
             ladders: new Set()
         };
 
-        activeMatches.forEach(match => {
+        allMatches.forEach(match => {
             if (match.tournamentId) contextIds.tournaments.add(match.tournamentId);
             if (match.ladderId) contextIds.ladders.add(match.ladderId);
         });
@@ -558,53 +603,70 @@ export async function getActiveMatches(event) {
         });
 
         // Enhance match history with details
-        const enhancedMatches = activeMatches.map(match => {
+        const enhancedMatches = allMatches.map(match => {
+            // Convert _id to string id if not already done
             const enhancedMatch = {
                 ...match,
-                id: match._id.toString()
+                id: match.id || match._id.toString()
             };
 
-            // Add tournament details if applicable
-            if (match.tournamentId && tournamentLookup[match.tournamentId]) {
-                enhancedMatch.tournament = tournamentLookup[match.tournamentId];
-                enhancedMatch.contextType = 'tournament';
+            // Handle competitive matches
+            if (!match.matchSource || match.matchSource !== 'casual') {
+                // Add tournament details if applicable
+                if (match.tournamentId && tournamentLookup[match.tournamentId]) {
+                    enhancedMatch.tournament = tournamentLookup[match.tournamentId];
+                    enhancedMatch.matchSource = 'tournament';
+                }
+
+                // Add ladder details if applicable
+                if (match.ladderId && ladderLookup[match.ladderId]) {
+                    enhancedMatch.ladder = ladderLookup[match.ladderId];
+                    enhancedMatch.matchSource = 'ladder';
+                }
+
+                // Add player details
+                if (match.challengerId && userLookup[match.challengerId]) {
+                    enhancedMatch.challenger = userLookup[match.challengerId];
+                }
+
+                if (match.challengeeId && userLookup[match.challengeeId]) {
+                    enhancedMatch.challengee = userLookup[match.challengeeId];
+                }
+
+                if (match.player1 && userLookup[match.player1]) {
+                    enhancedMatch.player1Details = userLookup[match.player1];
+                }
+
+                if (match.player2 && userLookup[match.player2]) {
+                    enhancedMatch.player2Details = userLookup[match.player2];
+                }
+
+                // Determine opponent
+                if (match.challenger && match.challengee) {
+                    enhancedMatch.opponent = match.challengerId === userId
+                        ? enhancedMatch.challengee
+                        : enhancedMatch.challenger;
+                } else if (match.player1Details && match.player2Details) {
+                    enhancedMatch.opponent = match.player1 === userId
+                        ? enhancedMatch.player2Details
+                        : enhancedMatch.player1Details;
+                }
+            }
+            // Handle casual matches
+            else {
+                // For casual matches, the opponent is the creator (if the user is not the creator)
+                if (match.creatorId && match.creatorId !== userId && userLookup[match.creatorId]) {
+                    enhancedMatch.opponent = userLookup[match.creatorId];
+                } else if (match.posterName) {
+                    // Fallback to using the posterName if available
+                    enhancedMatch.opponent = {
+                        name: match.posterName,
+                        playerLevel: match.skillLevel || 'Unknown'
+                    };
+                }
             }
 
-            // Add ladder details if applicable
-            if (match.ladderId && ladderLookup[match.ladderId]) {
-                enhancedMatch.ladder = ladderLookup[match.ladderId];
-                enhancedMatch.contextType = 'ladder';
-            }
-
-            // Add player details
-            if (match.challengerId && userLookup[match.challengerId]) {
-                enhancedMatch.challenger = userLookup[match.challengerId];
-            }
-
-            if (match.challengeeId && userLookup[match.challengeeId]) {
-                enhancedMatch.challengee = userLookup[match.challengeeId];
-            }
-
-            if (match.player1 && userLookup[match.player1]) {
-                enhancedMatch.player1Details = userLookup[match.player1];
-            }
-
-            if (match.player2 && userLookup[match.player2]) {
-                enhancedMatch.player2Details = userLookup[match.player2];
-            }
-
-            // Determine opponent
-            if (match.challenger && match.challengee) {
-                enhancedMatch.opponent = match.challengerId === userId
-                    ? enhancedMatch.challengee
-                    : enhancedMatch.challenger;
-            } else if (match.player1Details && match.player2Details) {
-                enhancedMatch.opponent = match.player1 === userId
-                    ? enhancedMatch.player2Details
-                    : enhancedMatch.player1Details;
-            }
-
-            // Calculate time remaining
+            // Calculate time remaining for both competitive and casual matches
             if (match.deadline) {
                 const now = new Date();
                 const deadline = new Date(match.deadline);
@@ -617,13 +679,13 @@ export async function getActiveMatches(event) {
             return enhancedMatch;
         });
 
+        console.log(`Returning ${enhancedMatches.length} total active matches`);
         return createResponse(200, { matches: enhancedMatches });
     } catch (error) {
         console.error('Get active matches error:', error);
         return createResponse(500, { message: 'Error retrieving active matches', error: error.message });
     }
 }
-
 // Get user stats
 export async function getUserStats(event) {
     try {
