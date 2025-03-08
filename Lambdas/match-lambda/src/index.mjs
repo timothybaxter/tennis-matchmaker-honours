@@ -1,4 +1,4 @@
-import { createMatch, getMatches, getMatch, deleteMatch, updateMatch } from './handlers/match.mjs';
+import { createMatch, getMatches, getMatch, deleteMatch, updateMatch, getActiveMatches } from './handlers/match.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -19,6 +19,8 @@ export const handler = async (event) => {
             return await deleteMatch(event);
         case 'PUT /matches/{id}':
             return await updateMatch(event);
+        case 'GET /matches/active':
+            return await getActiveMatches(event);
         default:
             return createResponse(404, { message: 'Route not found' });
     }

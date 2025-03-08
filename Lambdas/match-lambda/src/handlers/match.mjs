@@ -42,7 +42,36 @@ export async function createMatch(event) {
         return createResponse(500, { message: 'Error creating match' });
     }
 }
+export async function getActiveMatches(event) {
+    try {
+        const db = await connectToDatabase();
+        const matches = db.collection('matches');
 
+        // Get user ID from JWT token
+        const token = event.headers.Authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+
+        // Build query to find matches where the user is participating
+        // and the status is active (open, scheduled, accepted)
+        const query = {
+            $or: [
+                { creatorId: userId },
+                { participants: userId }
+            ],
+            status: { $in: ['scheduled', 'accepted'] }
+        };
+
+        const activeMatches = await matches.find(query)
+            .sort({ matchTime: 1 })
+            .toArray();
+
+        return createResponse(200, { matches: activeMatches });
+    } catch (error) {
+        console.error('Get active matches error:', error);
+        return createResponse(500, { message: 'Error retrieving active matches', error: error.message });
+    }
+}
 export async function getMatches(event) {
     try {
         const db = await connectToDatabase();
