@@ -127,42 +127,32 @@ export async function getProfile(event) {
             return createResponse(400, { message: 'User ID is required' });
         }
 
-        // Connect to settings database
-        const db = await connectToDatabase();
+        console.log(`Looking up profile for user ID: ${profileUserId}`);
+
+        // Connect to settings database - this is the same database that other functions use
+        const db = await connectToDatabase(); // This connects to settings-db
         const settings = db.collection('user-settings');
 
-        // Try to find the user's settings
+        // Find user settings
         const userSettings = await settings.findOne({ userId: profileUserId });
+        console.log(`Settings lookup result: ${JSON.stringify(userSettings)}`);
 
-        // Connect to auth database to get basic user info
-        // Use the same database connection for auth
-        const users = db.collection('users');
-
-        let userBasicInfo;
-        try {
-            userBasicInfo = await users.findOne({ _id: new ObjectId(profileUserId) });
-        } catch (error) {
-            console.error('Invalid user ID format:', error);
-            return createResponse(400, { message: 'Invalid user ID format' });
+        if (!userSettings) {
+            console.log(`No settings found for user ID: ${profileUserId}`);
+            return createResponse(404, { message: 'User profile not found' });
         }
 
-        if (!userBasicInfo) {
-            return createResponse(404, { message: 'User not found' });
-        }
-
-        // Combine data from both sources
+        // Parse the MongoDB ObjectId if needed for any fields
         const profile = {
             id: profileUserId,
-            name: userBasicInfo.name,
-            email: userBasicInfo.email,
-            playerLevel: userBasicInfo.playerLevel,
-            joinedAt: userBasicInfo.createdAt || new Date(),
-            lastActive: new Date(), // Can be updated with actual data if tracked
-
-            // Settings data (if available)
-            hometown: userSettings?.hometown || '',
-            theme: userSettings?.theme || 'Wimbledon',
-            bio: userSettings?.bio || ''
+            name: userSettings.name || 'Unknown User',
+            email: userSettings.email || '',
+            playerLevel: userSettings.playerLevel || 'Beginner',
+            hometown: userSettings.hometown || '',
+            theme: userSettings.theme || 'Wimbledon',
+            bio: userSettings.bio || '',
+            joinedAt: userSettings.createdAt || new Date(),
+            lastActive: userSettings.updatedAt || new Date()
         };
 
         return createResponse(200, { profile });
