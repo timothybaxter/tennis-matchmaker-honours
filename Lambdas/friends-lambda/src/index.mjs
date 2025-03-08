@@ -31,6 +31,9 @@ export const handler = async (event) => {
             case 'POST /friends/respond':
                 console.log('Routing to respondToFriendRequest');
                 return await respondToFriendRequest(event);
+            case 'GET /friends/check/{id}':
+                console.log('Routing to checkFriendshipStatus');
+                return await checkFriendshipStatus(event);
 
             case 'GET /friends/search':
                 console.log('Routing to searchUsers with query:', event.queryStringParameters);
