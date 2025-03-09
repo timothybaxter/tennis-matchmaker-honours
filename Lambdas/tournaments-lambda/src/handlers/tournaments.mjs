@@ -604,7 +604,7 @@ export async function submitMatchResult(event) {
         }
 
         // Validate required fields
-        const { scores, winner } = parsedBody;
+        const { scores, winner, isResubmission } = parsedBody;
 
         if (!scores || !Array.isArray(scores)) {
             return createResponse(400, { message: 'Scores array is required' });
@@ -634,6 +634,26 @@ export async function submitMatchResult(event) {
 
         if (!match) {
             return createResponse(404, { message: 'Match not found in this tournament' });
+        }
+
+        // Check if this is a resubmission for a disputed match
+        if (isResubmission && match.status === 'disputed') {
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                {
+                    $set: {
+                        status: 'scheduled',
+                        player1Submitted: false,
+                        player2Submitted: false,
+                        submittedScores: null,
+                        submittedWinner: null,
+                        player1Scores: null,
+                        player2Scores: null,
+                        player1Winner: null,
+                        player2Winner: null
+                    }
+                }
+            );
         }
 
         // Check if tournament is active
@@ -739,7 +759,6 @@ export async function submitMatchResult(event) {
                             type: 'match_disputed'
                         };
 
-                        // Make request to your notification API
                         if (process.env.NOTIFICATION_API_URL) {
                             await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/tournaments', {
                                 method: 'POST',
@@ -753,7 +772,6 @@ export async function submitMatchResult(event) {
                     }
                 } catch (notificationError) {
                     console.error('Error sending dispute notification:', notificationError);
-                    // Continue without failing
                 }
 
                 return createResponse(200, {
@@ -779,7 +797,6 @@ export async function submitMatchResult(event) {
                 type: 'match_result_submitted'
             };
 
-            // Make request to your notification API
             if (process.env.NOTIFICATION_API_URL) {
                 await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/tournaments', {
                     method: 'POST',
@@ -792,10 +809,8 @@ export async function submitMatchResult(event) {
             }
         } catch (notificationError) {
             console.error('Error sending result submission notification:', notificationError);
-            // Continue without failing
         }
 
-        // Return success for the first submission
         return createResponse(200, {
             message: 'Match result submitted. Waiting for other player to confirm.',
             status: 'pending_confirmation'

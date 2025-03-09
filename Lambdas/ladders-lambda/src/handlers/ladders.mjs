@@ -748,7 +748,6 @@ export async function respondToChallenge(event) {
     }
 }
 
-// Submit match result
 export async function submitMatchResult(event) {
     try {
         // Extract and verify token
@@ -778,7 +777,7 @@ export async function submitMatchResult(event) {
         }
 
         // Validate required fields
-        const { scores, winner } = parsedBody;
+        const { scores, winner, isResubmission } = parsedBody;
 
         if (!scores || !Array.isArray(scores)) {
             return createResponse(400, { message: 'Scores array is required' });
@@ -816,6 +815,34 @@ export async function submitMatchResult(event) {
         // Check if user is a participant
         if (match.challengerId !== userId && match.challengeeId !== userId) {
             return createResponse(403, { message: 'Only match participants can submit results' });
+        }
+
+        // Handle resubmission for disputed matches
+        if (isResubmission && match.status === 'disputed') {
+            console.log(`Resubmission requested for disputed match: ${matchId}`);
+
+            // Reset the match status and clear previous submissions
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                {
+                    $set: {
+                        status: 'accepted',  // Reset to 'accepted' since both players need to submit again
+                        challengerSubmitted: false,
+                        challengeeSubmitted: false,
+                        challengerSubmittedScores: null,
+                        challengeeSubmittedScores: null,
+                        challengerSubmittedWinner: null,
+                        challengeeSubmittedWinner: null,
+                        disputedAt: null
+                    }
+                }
+            );
+
+            console.log(`Match ${matchId} reset from disputed to accepted for resubmission`);
+
+            match.status = 'accepted';
+            match.challengerSubmitted = false;
+            match.challengeeSubmitted = false;
         }
 
         // Check if match is in accepted status
