@@ -434,7 +434,7 @@ export async function getActiveMatches(event) {
                     { player1: userId },
                     { player2: userId }
                 ],
-                status: "scheduled"
+                status: { $in: ["scheduled", "disputed"] }  
             };
 
             console.log("Tournament query:", JSON.stringify(tournamentQuery));
@@ -482,7 +482,7 @@ export async function getActiveMatches(event) {
                     { challengerId: userId },
                     { challengeeId: userId }
                 ],
-                status: "scheduled"
+                status: { $in: ["scheduled", "accepted", "disputed"] }  
             };
 
             console.log("Ladder query:", JSON.stringify(ladderQuery));
