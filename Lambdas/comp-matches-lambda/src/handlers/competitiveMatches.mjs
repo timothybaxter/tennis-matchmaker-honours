@@ -418,92 +418,97 @@ export async function getActiveMatches(event) {
         }
 
         const userId = token.decoded.userId;
-        console.log(`User ID: ${userId}`);
+        console.log(`Getting active matches for user: ${userId}`);
 
-        // Results object to hold all matches and debug info
-        const results = {
-            matches: [],
-            debug: {
-                tournamentCount: 0,
-                ladderCount: 0,
-                casualCount: 0,
-                tournamentDB: "",
-                ladderDB: "",
-                casualDB: ""
-            }
+        // Connect to the competitive matches database
+        const db = await connectToDatabase();
+        const competitiveMatches = db.collection('competitiveMatches');
+
+        // Build query for user's active matches
+        const query = {
+            $or: [
+                { player1: userId },
+                { player2: userId },
+                { challengerId: userId },
+                { challengeeId: userId }
+            ],
+            status: { $in: ['scheduled', 'accepted'] }
         };
 
-        // 1. Try to get ALL tournament matches without filtering
-        try {
-            const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
-            results.debug.tournamentDB = tournamentsDb.databaseName;
-            const tournamentMatches = tournamentsDb.collection('competitiveMatches');
+        console.log(`Query: ${JSON.stringify(query)}`);
 
-            // Get count of ALL documents
-            const totalTournamentMatches = await tournamentMatches.countDocuments({});
-            results.debug.tournamentCount = totalTournamentMatches;
+        // Get active matches
+        const activeMatches = await competitiveMatches.find(query)
+            .sort({ deadline: 1 })
+            .toArray();
 
-            console.log(`Found ${totalTournamentMatches} total tournament matches`);
+        console.log(`Found ${activeMatches.length} active matches`);
 
-            if (totalTournamentMatches > 0) {
-                // Get sample match
-                const sampleMatch = await tournamentMatches.findOne({});
-                console.log(`Sample tournament match: ${JSON.stringify(sampleMatch)}`);
+        // Get user details for opponents
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Extract all user IDs from matches
+        const userIds = new Set();
+        activeMatches.forEach(match => {
+            if (match.player1 && match.player1 !== userId) userIds.add(match.player1);
+            if (match.player2 && match.player2 !== userId) userIds.add(match.player2);
+            if (match.challengerId && match.challengerId !== userId) userIds.add(match.challengerId);
+            if (match.challengeeId && match.challengeeId !== userId) userIds.add(match.challengeeId);
+        });
+
+        // Convert to ObjectIds
+        const userObjectIds = Array.from(userIds)
+            .map(id => {
+                try { return new ObjectId(id); }
+                catch (e) { return null; }
+            })
+            .filter(id => id !== null);
+
+        // Get user details
+        const userDetails = await users.find({
+            _id: { $in: userObjectIds }
+        }).project({
+            _id: 1,
+            name: 1,
+            playerLevel: 1
+        }).toArray();
+
+        // Create lookup for user details
+        const userLookup = {};
+        userDetails.forEach(user => {
+            userLookup[user._id.toString()] = {
+                id: user._id.toString(),
+                name: user.name,
+                playerLevel: user.playerLevel
+            };
+        });
+
+        // Enhance matches with details
+        const enhancedMatches = activeMatches.map(match => {
+            const enhancedMatch = {
+                ...match,
+                id: match._id.toString()
+            };
+
+            // Determine opponent
+            if (match.player1 && match.player2) {
+                const opponentId = match.player1 === userId ? match.player2 : match.player1;
+                enhancedMatch.opponent = userLookup[opponentId] || { name: "Unknown", playerLevel: "Unknown" };
+            } else if (match.challengerId && match.challengeeId) {
+                const opponentId = match.challengerId === userId ? match.challengeeId : match.challengerId;
+                enhancedMatch.opponent = userLookup[opponentId] || { name: "Unknown", playerLevel: "Unknown" };
             }
-        } catch (error) {
-            console.error('Error getting tournament matches:', error);
-        }
 
-        // 2. Try to get ALL ladder matches without filtering
-        try {
-            const laddersDb = await connectToSpecificDatabase('ladders-db');
-            results.debug.ladderDB = laddersDb.databaseName;
-            const ladderMatches = laddersDb.collection('competitiveMatches');
+            return enhancedMatch;
+        });
 
-            // Get count of ALL documents
-            const totalLadderMatches = await ladderMatches.countDocuments({});
-            results.debug.ladderCount = totalLadderMatches;
-
-            console.log(`Found ${totalLadderMatches} total ladder matches`);
-
-            if (totalLadderMatches > 0) {
-                // Get sample match
-                const sampleMatch = await ladderMatches.findOne({});
-                console.log(`Sample ladder match: ${JSON.stringify(sampleMatch)}`);
-            }
-        } catch (error) {
-            console.error('Error getting ladder matches:', error);
-        }
-
-        // 3. Try to get ALL casual matches without filtering
-        try {
-            const casualDb = await connectToSpecificDatabase('matches-db');
-            results.debug.casualDB = casualDb.databaseName;
-            const casualMatches = casualDb.collection('matches');
-
-            // Get count of ALL documents
-            const totalCasualMatches = await casualMatches.countDocuments({});
-            results.debug.casualCount = totalCasualMatches;
-
-            console.log(`Found ${totalCasualMatches} total casual matches`);
-
-            if (totalCasualMatches > 0) {
-                // Get sample match
-                const sampleMatch = await casualMatches.findOne({});
-                console.log(`Sample casual match: ${JSON.stringify(sampleMatch)}`);
-            }
-        } catch (error) {
-            console.error('Error getting casual matches:', error);
-        }
-
-        // Return debug information
-        return createResponse(200, results);
+        return createResponse(200, { matches: enhancedMatches });
     } catch (error) {
         console.error('Get active matches error:', error);
         return createResponse(500, { message: 'Error retrieving active matches', error: error.message });
     }
 }
-
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
