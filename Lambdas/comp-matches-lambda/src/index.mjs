@@ -15,23 +15,20 @@ export const handler = async (event) => {
 
         console.log(`Processing ${method} ${resource}`);
 
-        // GET /matches/history
-        if (method === 'GET' && resource === '/matches/history') {
+        // GET /comp-matches/history
+        if (method === 'GET' && resource === '/comp-matches/history') {
             return await getMatchHistory(event);
         }
-
-        // GET /matches/{id}
-        else if (method === 'GET' && resource === '/matches/{id}') {
+        // GET /comp-matches/{id}
+        else if (method === 'GET' && resource === '/comp-matches/{id}') {
             return await getMatchById(event);
         }
-
-        // GET /matches/active
-        else if (method === 'GET' && resource === '/matches/active') {
+        // GET /comp-matches/active
+        else if (method === 'GET' && resource === '/comp-matches/active') {
             return await getActiveMatches(event);
         }
-
-        // GET /matches/stats
-        else if (method === 'GET' && resource === '/matches/stats') {
+        // GET /comp-matches/stats
+        else if (method === 'GET' && resource === '/comp-matches/stats') {
             return await getUserStats(event);
         }
 
