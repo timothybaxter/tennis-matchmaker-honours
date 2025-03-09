@@ -543,7 +543,32 @@ export async function getActiveMatches(event) {
         console.error('Get active matches error:', error);
         return createResponse(500, { message: 'Error retrieving active matches', error: error.message });
     }
-}// Helper function to extract and verify JWT token
+}
+
+export async function getUserStats(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        // For now, return a simple response
+        return createResponse(200, {
+            message: "Stats functionality coming soon",
+            stats: {
+                totalMatches: 0,
+                wins: 0,
+                losses: 0
+            }
+        });
+    } catch (error) {
+        console.error('Get user stats error:', error);
+        return createResponse(500, { message: 'Error retrieving user stats', error: error.message });
+    }
+}
+
+// Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
         event.headers.authorization ||
