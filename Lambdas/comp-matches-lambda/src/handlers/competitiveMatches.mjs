@@ -418,301 +418,86 @@ export async function getActiveMatches(event) {
         }
 
         const userId = token.decoded.userId;
-        console.log(`Looking for matches for user: ${userId}`);
-        const queryParams = event.queryStringParameters || {};
+        console.log(`User ID: ${userId}`);
 
-        // Initialize combined matches array
-        let allMatches = [];
+        // Results object to hold all matches and debug info
+        const results = {
+            matches: [],
+            debug: {
+                tournamentCount: 0,
+                ladderCount: 0,
+                casualCount: 0,
+                tournamentDB: "",
+                ladderDB: "",
+                casualDB: ""
+            }
+        };
 
-        // 1. Get tournament matches
+        // 1. Try to get ALL tournament matches without filtering
         try {
             const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
-            console.log(`Connected to tournaments database: ${tournamentsDb.databaseName}`);
+            results.debug.tournamentDB = tournamentsDb.databaseName;
             const tournamentMatches = tournamentsDb.collection('competitiveMatches');
 
-            // Build query for tournament matches
-            const tournamentQuery = {
-                $or: [
-                    { player1: userId },
-                    { player2: userId },
-                    { participants: userId } // Check participants array too
-                ],
-                status: { $in: ['scheduled', 'accepted'] }
-            };
+            // Get count of ALL documents
+            const totalTournamentMatches = await tournamentMatches.countDocuments({});
+            results.debug.tournamentCount = totalTournamentMatches;
 
-            const activeTournamentMatches = await tournamentMatches.find(tournamentQuery)
-                .sort({ createdAt: -1 })
-                .toArray();
+            console.log(`Found ${totalTournamentMatches} total tournament matches`);
 
-            console.log(`Found ${activeTournamentMatches.length} tournament matches`);
-
-            // Mark the source of these matches
-            const enhancedTournamentMatches = activeTournamentMatches.map(match => ({
-                ...match,
-                id: match._id.toString(),
-                matchSource: 'tournament'
-            }));
-
-            allMatches = [...allMatches, ...enhancedTournamentMatches];
+            if (totalTournamentMatches > 0) {
+                // Get sample match
+                const sampleMatch = await tournamentMatches.findOne({});
+                console.log(`Sample tournament match: ${JSON.stringify(sampleMatch)}`);
+            }
         } catch (error) {
             console.error('Error getting tournament matches:', error);
         }
 
-        // 2. Get ladder matches
+        // 2. Try to get ALL ladder matches without filtering
         try {
             const laddersDb = await connectToSpecificDatabase('ladders-db');
-            console.log(`Connected to ladders database: ${laddersDb.databaseName}`);
+            results.debug.ladderDB = laddersDb.databaseName;
             const ladderMatches = laddersDb.collection('competitiveMatches');
 
-            // Build query for ladder matches
-            const ladderQuery = {
-                $or: [
-                    { challengerId: userId },
-                    { challengeeId: userId },
-                    { player1: userId },
-                    { player2: userId },
-                    { participants: userId } // Check participants array too
-                ],
-                status: { $in: ['scheduled', 'accepted'] }
-            };
+            // Get count of ALL documents
+            const totalLadderMatches = await ladderMatches.countDocuments({});
+            results.debug.ladderCount = totalLadderMatches;
 
-            const activeLadderMatches = await ladderMatches.find(ladderQuery)
-                .sort({ createdAt: -1 })
-                .toArray();
+            console.log(`Found ${totalLadderMatches} total ladder matches`);
 
-            console.log(`Found ${activeLadderMatches.length} ladder matches`);
-
-            // Mark the source of these matches
-            const enhancedLadderMatches = activeLadderMatches.map(match => ({
-                ...match,
-                id: match._id.toString(),
-                matchSource: 'ladder'
-            }));
-
-            allMatches = [...allMatches, ...enhancedLadderMatches];
+            if (totalLadderMatches > 0) {
+                // Get sample match
+                const sampleMatch = await ladderMatches.findOne({});
+                console.log(`Sample ladder match: ${JSON.stringify(sampleMatch)}`);
+            }
         } catch (error) {
             console.error('Error getting ladder matches:', error);
         }
 
-        // 3. Get casual matches
+        // 3. Try to get ALL casual matches without filtering
         try {
             const casualDb = await connectToSpecificDatabase('matches-db');
-            console.log(`Connected to casual matches database: ${casualDb.databaseName}`);
+            results.debug.casualDB = casualDb.databaseName;
             const casualMatches = casualDb.collection('matches');
 
-            const casualQuery = {
-                $or: [
-                    { creatorId: userId },
-                    { participants: userId }
-                ],
-                status: { $in: ['open', 'scheduled', 'accepted'] }
-            };
+            // Get count of ALL documents
+            const totalCasualMatches = await casualMatches.countDocuments({});
+            results.debug.casualCount = totalCasualMatches;
 
-            const activeCasualMatches = await casualMatches.find(casualQuery)
-                .sort({ matchTime: 1 })
-                .toArray();
+            console.log(`Found ${totalCasualMatches} total casual matches`);
 
-            console.log(`Found ${activeCasualMatches.length} casual matches`);
-
-            // Mark the source of these matches
-            const enhancedCasualMatches = activeCasualMatches.map(match => ({
-                ...match,
-                id: match._id.toString(),
-                matchSource: 'casual'
-            }));
-
-            allMatches = [...allMatches, ...enhancedCasualMatches];
+            if (totalCasualMatches > 0) {
+                // Get sample match
+                const sampleMatch = await casualMatches.findOne({});
+                console.log(`Sample casual match: ${JSON.stringify(sampleMatch)}`);
+            }
         } catch (error) {
             console.error('Error getting casual matches:', error);
         }
 
-        console.log(`Total matches found: ${allMatches.length}`);
-
-        if (allMatches.length === 0) {
-            return createResponse(200, { matches: [] });
-        }
-
-        // Get user details for all participants
-        const usersDb = await connectToSpecificDatabase('users-db');
-        const users = usersDb.collection('users');
-
-        // Extract all user IDs from matches
-        const userIds = new Set();
-        allMatches.forEach(match => {
-            if (match.creatorId) userIds.add(match.creatorId);
-            if (match.challengerId) userIds.add(match.challengerId);
-            if (match.challengeeId) userIds.add(match.challengeeId);
-            if (match.player1) userIds.add(match.player1);
-            if (match.player2) userIds.add(match.player2);
-            // For matches with participants array
-            if (match.participants && Array.isArray(match.participants)) {
-                match.participants.forEach(id => userIds.add(id));
-            }
-        });
-
-        // Convert to ObjectIds for MongoDB query
-        const userObjectIds = Array.from(userIds)
-            .map(id => {
-                try { return new ObjectId(id); }
-                catch (e) { return null; }
-            })
-            .filter(id => id !== null);
-
-        // Get user details
-        const userDetails = await users.find({
-            _id: { $in: userObjectIds }
-        }).project({
-            _id: 1,
-            name: 1,
-            playerLevel: 1
-        }).toArray();
-
-        // Create user lookup
-        const userLookup = {};
-        userDetails.forEach(user => {
-            userLookup[user._id.toString()] = {
-                id: user._id.toString(),
-                name: user.name,
-                playerLevel: user.playerLevel
-            };
-        });
-
-        // Get tournament and ladder details
-        const contextIds = {
-            tournaments: new Set(),
-            ladders: new Set()
-        };
-
-        allMatches.forEach(match => {
-            if (match.tournamentId) contextIds.tournaments.add(match.tournamentId);
-            if (match.ladderId) contextIds.ladders.add(match.ladderId);
-        });
-
-        // Get tournament details
-        const tournamentLookup = {};
-        if (contextIds.tournaments.size > 0) {
-            const tournaments = tournamentsDb.collection('tournaments');
-            const tournamentObjectIds = Array.from(contextIds.tournaments)
-                .map(id => {
-                    try { return new ObjectId(id); }
-                    catch (e) { return null; }
-                })
-                .filter(id => id !== null);
-
-            const tournamentDetails = await tournaments.find({
-                _id: { $in: tournamentObjectIds }
-            }).project({
-                _id: 1,
-                name: 1,
-                format: 1
-            }).toArray();
-
-            tournamentDetails.forEach(tournament => {
-                tournamentLookup[tournament._id.toString()] = {
-                    id: tournament._id.toString(),
-                    name: tournament.name,
-                    format: tournament.format
-                };
-            });
-        }
-
-        // Get ladder details
-        const ladderLookup = {};
-        if (contextIds.ladders.size > 0) {
-            const ladders = laddersDb.collection('ladders');
-            const ladderObjectIds = Array.from(contextIds.ladders)
-                .map(id => {
-                    try { return new ObjectId(id); }
-                    catch (e) { return null; }
-                })
-                .filter(id => id !== null);
-
-            const ladderDetails = await ladders.find({
-                _id: { $in: ladderObjectIds }
-            }).project({
-                _id: 1,
-                name: 1
-            }).toArray();
-
-            ladderDetails.forEach(ladder => {
-                ladderLookup[ladder._id.toString()] = {
-                    id: ladder._id.toString(),
-                    name: ladder.name
-                };
-            });
-        }
-
-        // Enhance match details
-        const enhancedMatches = allMatches.map(match => {
-            const enhancedMatch = { ...match };
-
-            // Add tournament details
-            if (match.tournamentId && tournamentLookup[match.tournamentId]) {
-                enhancedMatch.tournament = tournamentLookup[match.tournamentId];
-            }
-
-            // Add ladder details
-            if (match.ladderId && ladderLookup[match.ladderId]) {
-                enhancedMatch.ladder = ladderLookup[match.ladderId];
-            }
-
-            // Add player details based on match source
-            if (match.matchSource === 'tournament') {
-                if (match.player1 && userLookup[match.player1]) {
-                    enhancedMatch.player1Details = userLookup[match.player1];
-                }
-                if (match.player2 && userLookup[match.player2]) {
-                    enhancedMatch.player2Details = userLookup[match.player2];
-                }
-                // Determine opponent
-                if (match.player1 === userId && match.player2 && userLookup[match.player2]) {
-                    enhancedMatch.opponent = userLookup[match.player2];
-                } else if (match.player2 === userId && match.player1 && userLookup[match.player1]) {
-                    enhancedMatch.opponent = userLookup[match.player1];
-                }
-            }
-            else if (match.matchSource === 'ladder') {
-                if (match.challengerId && userLookup[match.challengerId]) {
-                    enhancedMatch.challenger = userLookup[match.challengerId];
-                }
-                if (match.challengeeId && userLookup[match.challengeeId]) {
-                    enhancedMatch.challengee = userLookup[match.challengeeId];
-                }
-                // Determine opponent
-                if (match.challengerId === userId && match.challengeeId && userLookup[match.challengeeId]) {
-                    enhancedMatch.opponent = userLookup[match.challengeeId];
-                } else if (match.challengeeId === userId && match.challengerId && userLookup[match.challengerId]) {
-                    enhancedMatch.opponent = userLookup[match.challengerId];
-                }
-            }
-            else if (match.matchSource === 'casual') {
-                // For casual matches, set the opponent to the creator if the user isn't the creator
-                if (match.creatorId && match.creatorId !== userId && userLookup[match.creatorId]) {
-                    enhancedMatch.opponent = userLookup[match.creatorId];
-                } else {
-                    // Fallback to posterName if available
-                    enhancedMatch.opponent = {
-                        name: match.posterName,
-                        playerLevel: match.skillLevel || 'Unknown'
-                    };
-                }
-            }
-
-            // Calculate time remaining
-            if (match.deadline) {
-                const now = new Date();
-                const deadline = new Date(match.deadline);
-                const timeRemaining = deadline - now;
-
-                enhancedMatch.timeRemaining = Math.max(0, timeRemaining);
-                enhancedMatch.isExpired = timeRemaining <= 0;
-            }
-
-            return enhancedMatch;
-        });
-
-        console.log(`Returning ${enhancedMatches.length} enhanced matches`);
-        return createResponse(200, { matches: enhancedMatches });
+        // Return debug information
+        return createResponse(200, results);
     } catch (error) {
         console.error('Get active matches error:', error);
         return createResponse(500, { message: 'Error retrieving active matches', error: error.message });
