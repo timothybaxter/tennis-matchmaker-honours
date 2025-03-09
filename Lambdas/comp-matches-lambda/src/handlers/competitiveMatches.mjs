@@ -426,8 +426,9 @@ export async function getActiveMatches(event) {
         // 1. Query tournament competitive matches
         try {
             const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
+            const tournaments = tournamentsDb.collection('tournaments');
             const tournamentMatches = tournamentsDb.collection('competitiveMatches');
-            
+
             const tournamentQuery = {
                 $or: [
                     { player1: userId },
@@ -439,12 +440,33 @@ export async function getActiveMatches(event) {
             console.log("Tournament query:", JSON.stringify(tournamentQuery));
             const tournamentResults = await tournamentMatches.find(tournamentQuery).toArray();
             console.log(`Found ${tournamentResults.length} tournament matches`);
-            
-            allMatches = allMatches.concat(tournamentResults.map(match => ({
-                ...match,
-                id: match._id.toString(),
-                matchType: "tournament"
-            })));
+
+            // Get tournament info for each match
+            for (const match of tournamentResults) {
+                let tournamentInfo = null;
+
+                if (match.tournamentId) {
+                    try {
+                        const tournament = await tournaments.findOne({ _id: new ObjectId(match.tournamentId) });
+                        if (tournament) {
+                            tournamentInfo = {
+                                id: tournament._id.toString(),
+                                name: tournament.name,
+                                format: tournament.format
+                            };
+                        }
+                    } catch (err) {
+                        console.error("Error fetching tournament info:", err);
+                    }
+                }
+
+                allMatches.push({
+                    ...match,
+                    id: match._id.toString(),
+                    matchType: "tournament",
+                    tournament: tournamentInfo
+                });
+            }
         } catch (tournamentError) {
             console.error("Tournament query error:", tournamentError);
         }
@@ -452,8 +474,9 @@ export async function getActiveMatches(event) {
         // 2. Query ladder competitive matches
         try {
             const laddersDb = await connectToSpecificDatabase('ladders-db');
+            const ladders = laddersDb.collection('ladders');
             const ladderMatches = laddersDb.collection('competitiveMatches');
-            
+
             const ladderQuery = {
                 $or: [
                     { challengerId: userId },
@@ -465,12 +488,36 @@ export async function getActiveMatches(event) {
             console.log("Ladder query:", JSON.stringify(ladderQuery));
             const ladderResults = await ladderMatches.find(ladderQuery).toArray();
             console.log(`Found ${ladderResults.length} ladder matches`);
-            
-            allMatches = allMatches.concat(ladderResults.map(match => ({
-                ...match,
-                id: match._id.toString(),
-                matchType: "ladder"
-            })));
+
+            // Get ladder info for each match
+            for (const match of ladderResults) {
+                let ladderInfo = null;
+
+                if (match.ladderId) {
+                    try {
+                        const ladder = await ladders.findOne({ _id: new ObjectId(match.ladderId) });
+                        if (ladder) {
+                            ladderInfo = {
+                                id: ladder._id.toString(),
+                                name: ladder.name
+                            };
+                        }
+                    } catch (err) {
+                        console.error("Error fetching ladder info:", err);
+                    }
+                }
+
+                // Determine if user is the challengee
+                const isChallengee = match.challengeeId === userId;
+
+                allMatches.push({
+                    ...match,
+                    id: match._id.toString(),
+                    matchType: "ladder",
+                    ladder: ladderInfo,
+                    isChallengee: isChallengee
+                });
+            }
         } catch (ladderError) {
             console.error("Ladder query error:", ladderError);
         }
@@ -522,9 +569,10 @@ export async function getActiveMatches(event) {
         });
 
         // Enhance matches with opponent details
+        const now = new Date();
         const enhancedMatches = allMatches.map(match => {
             const enhancedMatch = { ...match };
-            
+
             // Add opponent information based on match type
             if (match.matchType === "tournament") {
                 const opponentId = match.player1 === userId ? match.player2 : match.player1;
@@ -533,7 +581,15 @@ export async function getActiveMatches(event) {
                 const opponentId = match.challengerId === userId ? match.challengeeId : match.challengerId;
                 enhancedMatch.opponent = userLookup[opponentId] || { name: "Unknown", playerLevel: "Unknown" };
             }
-            
+
+            // Calculate time remaining and expired status
+            if (match.deadline) {
+                const deadlineDate = new Date(match.deadline);
+                const timeRemaining = deadlineDate - now;
+                enhancedMatch.isExpired = timeRemaining <= 0;
+                enhancedMatch.timeRemaining = Math.max(0, timeRemaining);
+            }
+
             return enhancedMatch;
         });
 
