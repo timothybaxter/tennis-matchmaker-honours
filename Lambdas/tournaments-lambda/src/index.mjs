@@ -1,4 +1,4 @@
-import { getTournaments, getTournamentById, createTournament, joinTournament, startTournament, submitMatchResult, resolveDisputedMatch } from './handlers/tournaments.mjs';
+import { getTournaments, getTournamentById, createTournament, joinTournament, startTournament, submitMatchResult, resolveDisputedMatch, resetMatchSubmission } from './handlers/tournaments.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -43,6 +43,11 @@ export const handler = async (event) => {
         // POST /tournaments/{id}/matches/{matchId}/result
         else if (method === 'POST' && resource === '/tournaments/{id}/matches/{matchId}/result') {
             return await submitMatchResult(event);
+        }
+
+        // POST /tournaments/{id}/matches/{matchId}/reset
+        else if (method === 'POST' && resource === '/tournaments/{id}/matches/{matchId}/reset') {
+            return await resetMatchSubmission(event);
         }
 
         // POST /tournaments/{id}/matches/{matchId}/resolve

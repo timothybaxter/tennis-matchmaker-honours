@@ -1,4 +1,4 @@
-import { getLadders, getLadderById, createLadder, joinLadder, issueChallenge, respondToChallenge, submitMatchResult, resolveDisputedMatch, leaveLadder } from './handlers/ladders.mjs';
+import { getLadders, getLadderById, createLadder, joinLadder, issueChallenge, respondToChallenge, submitMatchResult, resolveDisputedMatch, leaveLadder, resetMatchSubmission } from './handlers/ladders.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -48,6 +48,11 @@ export const handler = async (event) => {
         // POST /ladders/{id}/matches/{matchId}/result
         else if (method === 'POST' && resource === '/ladders/{id}/matches/{matchId}/result') {
             return await submitMatchResult(event);
+        }
+
+        // POST /ladders/{id}/matches/{matchId}/reset
+        else if (method === 'POST' && resource === '/ladders/{id}/matches/{matchId}/reset') {
+            return await resetMatchSubmission(event);
         }
 
         // POST /ladders/{id}/matches/{matchId}/resolve

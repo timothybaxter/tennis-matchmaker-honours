@@ -804,6 +804,36 @@ export async function submitMatchResult(event) {
             return createResponse(400, { message: 'Invalid ID format' });
         }
 
+        // Handle resubmission for disputed matches
+        if (isResubmission === true && match.status === 'disputed') {
+            console.log(`Resubmission requested for disputed match: ${matchId}`);
+
+            // Reset the player's submission state
+            const isChallenger = match.challengerId === userId;
+            const updateField = isChallenger ? 'challengerSubmitted' : 'challengeeSubmitted';
+
+            // Update match to clear this player's submission
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                {
+                    $set: {
+                        [updateField]: false,
+                        [`${updateField}At`]: null,
+                        [`${updateField}Scores`]: null,
+                        [`${updateField}Winner`]: null
+                    }
+                }
+            );
+
+            // Re-fetch the match after update
+            match = await matches.findOne({
+                _id: new ObjectId(matchId),
+                ladderId: ladderId
+            });
+
+            console.log(`Reset submission state for ${isChallenger ? 'challenger' : 'challengee'}`);
+        }
+
         if (!ladder) {
             return createResponse(404, { message: 'Ladder not found' });
         }
@@ -1009,6 +1039,85 @@ export async function submitMatchResult(event) {
         return createResponse(500, { message: 'Error submitting match result', error: error.message });
     }
 }
+
+export async function resetMatchSubmission(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const ladderId = event.pathParameters?.id;
+        const matchId = event.pathParameters?.matchId;
+
+        if (!ladderId || !matchId) {
+            return createResponse(400, { message: 'Ladder ID and Match ID are required' });
+        }
+
+        // Connect to ladders database
+        const db = await connectToDatabase();
+        const ladders = db.collection('ladders');
+        const matches = db.collection('competitiveMatches');
+
+        // Get ladder and match
+        let ladder, match;
+        try {
+            ladder = await ladders.findOne({ _id: new ObjectId(ladderId) });
+            match = await matches.findOne({
+                _id: new ObjectId(matchId),
+                ladderId: ladderId
+            });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid ID format', details: error.message });
+        }
+
+        if (!ladder) {
+            return createResponse(404, { message: 'Ladder not found' });
+        }
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found in this ladder' });
+        }
+
+        // Check if user is a participant
+        if (match.challengerId !== userId && match.challengeeId !== userId) {
+            return createResponse(403, { message: 'You are not a participant in this match' });
+        }
+
+        // Check if the match is in disputed status
+        if (match.status !== 'disputed') {
+            // Only allow resets for disputed matches
+            return createResponse(400, { message: 'Only disputed matches can be reset for resubmission' });
+        }
+
+        // Reset submission state for this user
+        const isChallenger = match.challengerId === userId;
+        const updateField = isChallenger ? 'challengerSubmitted' : 'challengeeSubmitted';
+
+        // Reset this player's submission
+        await matches.updateOne(
+            { _id: new ObjectId(matchId) },
+            {
+                $set: {
+                    [updateField]: false,
+                    [`${updateField}At`]: null
+                }
+            }
+        );
+
+        return createResponse(200, {
+            message: 'Match submission state reset successfully',
+            match: matchId,
+            player: isChallenger ? 'challenger' : 'challengee'
+        });
+    } catch (error) {
+        console.error('Reset match submission error:', error);
+        return createResponse(500, { message: 'Error resetting match submission', error: error.message });
+    }
+}
+
 
 // Resolve disputed match (ladder creator only)
 export async function resolveDisputedMatch(event) {

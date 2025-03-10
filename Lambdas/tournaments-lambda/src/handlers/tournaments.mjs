@@ -628,6 +628,36 @@ export async function submitMatchResult(event) {
             return createResponse(400, { message: 'Invalid ID format', details: error.message });
         }
 
+        // Handle resubmission for disputed matches
+        if (isResubmission === true && match.status === 'disputed') {
+            console.log(`Resubmission requested for disputed match: ${matchId}`);
+
+            // Reset the player's submission state
+            const isPlayer1 = match.player1 === userId;
+            const updateField = isPlayer1 ? 'player1Submitted' : 'player2Submitted';
+
+            // Update match to clear this player's submission
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                {
+                    $set: {
+                        [updateField]: false,
+                        [`${updateField}At`]: null,
+                        [`${updateField}Scores`]: null,
+                        [`${updateField}Winner`]: null
+                    }
+                }
+            );
+
+            // Re-fetch the match after update
+            match = await matches.findOne({
+                _id: new ObjectId(matchId),
+                tournamentId: tournamentId
+            });
+
+            console.log(`Reset submission state for ${isPlayer1 ? 'player1' : 'player2'}`);
+        }
+
         if (!tournament) {
             return createResponse(404, { message: 'Tournament not found' });
         }
@@ -975,6 +1005,85 @@ export async function resolveDisputedMatch(event) {
     } catch (error) {
         console.error('Resolve disputed match error:', error);
         return createResponse(500, { message: 'Error resolving disputed match', error: error.message });
+    }
+}
+
+// Add this new endpoint function to tournament.mjs
+export async function resetMatchSubmission(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const tournamentId = event.pathParameters?.id;
+        const matchId = event.pathParameters?.matchId;
+
+        if (!tournamentId || !matchId) {
+            return createResponse(400, { message: 'Tournament ID and Match ID are required' });
+        }
+
+        // Connect to tournaments database
+        const db = await connectToDatabase();
+        const tournaments = db.collection('tournaments');
+        const matches = db.collection('competitiveMatches');
+
+        // Get tournament and match
+        let tournament, match;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+            match = await matches.findOne({
+                _id: new ObjectId(matchId),
+                tournamentId: tournamentId
+            });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid ID format', details: error.message });
+        }
+
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found in this tournament' });
+        }
+
+        // Check if user is a participant
+        if (match.player1 !== userId && match.player2 !== userId) {
+            return createResponse(403, { message: 'You are not a participant in this match' });
+        }
+
+        // Check if the match is in disputed status
+        if (match.status !== 'disputed') {
+            // Only allow resets for disputed matches
+            return createResponse(400, { message: 'Only disputed matches can be reset for resubmission' });
+        }
+
+        // Reset submission state for this user
+        const isPlayer1 = match.player1 === userId;
+        const updateField = isPlayer1 ? 'player1Submitted' : 'player2Submitted';
+
+        // Reset this player's submission
+        await matches.updateOne(
+            { _id: new ObjectId(matchId) },
+            {
+                $set: {
+                    [updateField]: false,
+                    [`${updateField}At`]: null
+                }
+            }
+        );
+
+        return createResponse(200, {
+            message: 'Match submission state reset successfully',
+            match: matchId,
+            player: isPlayer1 ? 'player1' : 'player2'
+        });
+    } catch (error) {
+        console.error('Reset match submission error:', error);
+        return createResponse(500, { message: 'Error resetting match submission', error: error.message });
     }
 }
 

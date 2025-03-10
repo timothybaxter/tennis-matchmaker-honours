@@ -371,7 +371,6 @@ export async function getMatchById(event) {
             }
         }
 
-        // Enhance match with details
         const enhancedMatch = {
             ...match,
             id: match._id.toString(),
