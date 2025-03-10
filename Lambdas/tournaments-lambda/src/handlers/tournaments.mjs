@@ -575,6 +575,7 @@ export async function startTournament(event) {
 }
 
 // Submit match result
+// Submit match result for Tournament
 export async function submitMatchResult(event) {
     try {
         // Extract and verify token
@@ -628,6 +629,14 @@ export async function submitMatchResult(event) {
             return createResponse(400, { message: 'Invalid ID format', details: error.message });
         }
 
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found in this tournament' });
+        }
+
         // Handle resubmission for disputed matches
         if (isResubmission === true && match.status === 'disputed') {
             console.log(`Resubmission requested for disputed match: ${matchId}`);
@@ -658,34 +667,6 @@ export async function submitMatchResult(event) {
             console.log(`Reset submission state for ${isPlayer1 ? 'player1' : 'player2'}`);
         }
 
-        if (!tournament) {
-            return createResponse(404, { message: 'Tournament not found' });
-        }
-
-        if (!match) {
-            return createResponse(404, { message: 'Match not found in this tournament' });
-        }
-
-        // Check if this is a resubmission for a disputed match
-        if (isResubmission && match.status === 'disputed') {
-            await matches.updateOne(
-                { _id: new ObjectId(matchId) },
-                {
-                    $set: {
-                        status: 'scheduled',
-                        player1Submitted: false,
-                        player2Submitted: false,
-                        submittedScores: null,
-                        submittedWinner: null,
-                        player1Scores: null,
-                        player2Scores: null,
-                        player1Winner: null,
-                        player2Winner: null
-                    }
-                }
-            );
-        }
-
         // Check if tournament is active
         if (tournament.status !== 'active') {
             return createResponse(400, { message: 'Tournament is not active' });
@@ -709,72 +690,84 @@ export async function submitMatchResult(event) {
 
         // Determine which submission field to update
         const updateField = isPlayer1 ? 'player1Submitted' : 'player2Submitted';
-        const otherPlayerSubmitted = isPlayer1 ? match.player2Submitted : match.player1Submitted;
+        const scoresField = isPlayer1 ? 'player1Scores' : 'player2Scores';
+        const winnerField = isPlayer1 ? 'player1Winner' : 'player2Winner';
         const otherPlayerId = isPlayer1 ? match.player2 : match.player1;
 
-        // Update the match with this player's submission
+        // Update with this submission
         const updateObj = {
             $set: {
-                [updateField]: true
+                [updateField]: true,
+                [`${updateField}At`]: new Date(),
+                [scoresField]: scores,
+                [winnerField]: winner
             }
         };
-
-        // If this is the first submission, save the scores and winner
-        if (!match.player1Submitted && !match.player2Submitted) {
-            updateObj.$set.submittedScores = scores;
-            updateObj.$set.submittedWinner = winner;
-        }
 
         await matches.updateOne(
             { _id: new ObjectId(matchId) },
             updateObj
         );
 
-        // If both players have now submitted
-        if (otherPlayerSubmitted) {
+        // Re-fetch the match with updated submission data
+        match = await matches.findOne({
+            _id: new ObjectId(matchId),
+            tournamentId: tournamentId
+        });
+
+        // Check if both players have now submitted
+        if (match.player1Submitted && match.player2Submitted) {
+            // Both players have submitted, compare results
+            console.log(`Match ${matchId}: Both players have submitted results`);
+
             // Compare submissions
-            const submissionsMatch = compareSubmissions(match.submittedScores, scores, match.submittedWinner, winner);
+            const submissionsMatch = (
+                JSON.stringify(match.player1Scores) === JSON.stringify(match.player2Scores) &&
+                match.player1Winner === match.player2Winner
+            );
 
             if (submissionsMatch) {
+                console.log(`Match ${matchId}: Both players submitted matching results`);
+
                 // Update match as completed with agreed results
                 await matches.updateOne(
                     { _id: new ObjectId(matchId) },
                     {
                         $set: {
                             status: 'completed',
-                            scores: scores,
-                            winner: winner,
+                            scores: match.player1Scores, // Can use either player's scores as they match
+                            winner: match.player1Winner, // Can use either player's winner as they match
                             completedAt: new Date()
                         }
                     }
                 );
 
                 // Advance the winner to the next round
-                await advanceWinner(tournamentId, match, winner, tournaments, matches);
+                await advanceWinner(tournamentId, match, match.player1Winner, tournaments, matches);
 
                 return createResponse(200, {
                     message: 'Match result submitted and verified. Winner has advanced.',
                     status: 'completed',
-                    winner: winner
+                    winner: match.player1Winner
                 });
             } else {
+                console.log(`Match ${matchId}: Players submitted different results, marking as disputed`);
+
                 // Results don't match - set match to disputed
                 await matches.updateOne(
                     { _id: new ObjectId(matchId) },
                     {
                         $set: {
                             status: 'disputed',
-                            player1Scores: isPlayer1 ? scores : match.submittedScores,
-                            player2Scores: isPlayer1 ? match.submittedScores : scores,
-                            player1Winner: isPlayer1 ? winner : match.submittedWinner,
-                            player2Winner: isPlayer1 ? match.submittedWinner : winner
+                            disputedAt: new Date()
+                            // We already have player1Scores, player2Scores, player1Winner, player2Winner
                         }
                     }
                 );
 
                 // Notify tournament creator about the dispute
                 try {
-                    if (tournament.creatorId !== userId && tournament.creatorId !== otherPlayerId) {
+                    if (tournament.creatorId !== match.player1 && tournament.creatorId !== match.player2) {
                         const usersDb = await connectToSpecificDatabase('users-db');
                         const users = usersDb.collection('users');
                         const user = await users.findOne({ _id: new ObjectId(userId) });
@@ -809,48 +802,50 @@ export async function submitMatchResult(event) {
                     status: 'disputed'
                 });
             }
-        }
+        } else {
+            // Only one player has submitted - waiting for other player
+            console.log(`Match ${matchId}: One player submitted, waiting for other player`);
 
-        // Notify the other player that a result has been submitted
-        try {
-            const usersDb = await connectToSpecificDatabase('users-db');
-            const users = usersDb.collection('users');
-            const user = await users.findOne({ _id: new ObjectId(userId) });
+            // Notify the other player that a result has been submitted
+            try {
+                const usersDb = await connectToSpecificDatabase('users-db');
+                const users = usersDb.collection('users');
+                const user = await users.findOne({ _id: new ObjectId(userId) });
 
-            const notificationRequest = {
-                recipientId: otherPlayerId,
-                senderId: userId,
-                senderName: user?.name || 'Unknown User',
-                tournamentId: tournamentId,
-                tournamentName: tournament.name,
-                matchId: matchId,
-                type: 'match_result_submitted'
-            };
+                const notificationRequest = {
+                    recipientId: otherPlayerId,
+                    senderId: userId,
+                    senderName: user?.name || 'Unknown User',
+                    tournamentId: tournamentId,
+                    tournamentName: tournament.name,
+                    matchId: matchId,
+                    type: 'match_result_submitted'
+                };
 
-            if (process.env.NOTIFICATION_API_URL) {
-                await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/tournaments', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(notificationRequest)
-                });
+                if (process.env.NOTIFICATION_API_URL) {
+                    await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/tournaments', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(notificationRequest)
+                    });
+                }
+            } catch (notificationError) {
+                console.error('Error sending result submission notification:', notificationError);
             }
-        } catch (notificationError) {
-            console.error('Error sending result submission notification:', notificationError);
-        }
 
-        return createResponse(200, {
-            message: 'Match result submitted. Waiting for other player to confirm.',
-            status: 'pending_confirmation'
-        });
+            return createResponse(200, {
+                message: 'Result submitted successfully. Waiting for other player to confirm.',
+                status: 'pending_confirmation'
+            });
+        }
     } catch (error) {
         console.error('Submit match result error:', error);
         return createResponse(500, { message: 'Error submitting match result', error: error.message });
     }
 }
-
 // Resolve disputed match (tournament creator only)
 export async function resolveDisputedMatch(event) {
     try {
@@ -1414,6 +1409,76 @@ async function removePlayersFromTournament(tournamentId, playerIds, tournaments,
     }
 }
 
+async function auditMatchState(match, operation, userId, db) {
+    try {
+        // Create an audit collection if you want to track these issues
+        const audits = db.collection('matchAudits');
+
+        // Check for inconsistent state
+        const issues = [];
+
+        // 1. Check if match is marked completed but only one player submitted
+        if (match.status === 'completed' &&
+            ((!match.player1Submitted && match.player2Submitted) ||
+                (match.player1Submitted && !match.player2Submitted))) {
+            issues.push('Match marked completed but only one player submitted');
+
+            // Auto-fix this issue
+            await db.collection('competitiveMatches').updateOne(
+                { _id: match._id },
+                {
+                    $set: {
+                        status: 'disputed',
+                        winner: null,
+                        completedAt: null
+                    }
+                }
+            );
+        }
+
+        // 2. Check if winner is set but no scores are recorded
+        if (match.winner && (!match.scores || match.scores.length === 0)) {
+            issues.push('Winner set but no scores recorded');
+        }
+
+        // 3. Check for player mismatch - winner isn't player1 or player2
+        if (match.winner &&
+            match.winner !== match.player1 &&
+            match.winner !== match.player2 &&
+            match.winner !== match.challengerId &&
+            match.winner !== match.challengeeId) {
+            issues.push('Winner is not a match participant');
+        }
+
+        // 4. If time permits, call this at the START of submitMatchResult
+        // to check for and fix any improper state before processing
+
+        // Log issues if found
+        if (issues.length > 0) {
+            console.error(`Match state issues found for match ${match._id}:`, issues);
+
+            // Save audit record
+            await audits.insertOne({
+                matchId: match._id.toString(),
+                operation: operation,
+                userId: userId,
+                issues: issues,
+                timestamp: new Date(),
+                matchState: match
+            });
+
+            return {
+                hasIssues: true,
+                issues: issues
+            };
+        }
+
+        return { hasIssues: false };
+    } catch (error) {
+        console.error('Error in match state audit:', error);
+        return { hasIssues: false }; // Don't block operation on audit failure
+    }
+}
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||

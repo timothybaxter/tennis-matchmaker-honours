@@ -748,6 +748,7 @@ export async function respondToChallenge(event) {
     }
 }
 
+// Submit match result for Ladder
 export async function submitMatchResult(event) {
     try {
         // Extract and verify token
@@ -804,6 +805,14 @@ export async function submitMatchResult(event) {
             return createResponse(400, { message: 'Invalid ID format' });
         }
 
+        if (!ladder) {
+            return createResponse(404, { message: 'Ladder not found' });
+        }
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found in this ladder' });
+        }
+
         // Handle resubmission for disputed matches
         if (isResubmission === true && match.status === 'disputed') {
             console.log(`Resubmission requested for disputed match: ${matchId}`);
@@ -834,45 +843,9 @@ export async function submitMatchResult(event) {
             console.log(`Reset submission state for ${isChallenger ? 'challenger' : 'challengee'}`);
         }
 
-        if (!ladder) {
-            return createResponse(404, { message: 'Ladder not found' });
-        }
-
-        if (!match) {
-            return createResponse(404, { message: 'Match not found in this ladder' });
-        }
-
         // Check if user is a participant
         if (match.challengerId !== userId && match.challengeeId !== userId) {
             return createResponse(403, { message: 'Only match participants can submit results' });
-        }
-
-        // Handle resubmission for disputed matches
-        if (isResubmission && match.status === 'disputed') {
-            console.log(`Resubmission requested for disputed match: ${matchId}`);
-
-            // Reset the match status and clear previous submissions
-            await matches.updateOne(
-                { _id: new ObjectId(matchId) },
-                {
-                    $set: {
-                        status: 'accepted',  // Reset to 'accepted' since both players need to submit again
-                        challengerSubmitted: false,
-                        challengeeSubmitted: false,
-                        challengerSubmittedScores: null,
-                        challengeeSubmittedScores: null,
-                        challengerSubmittedWinner: null,
-                        challengeeSubmittedWinner: null,
-                        disputedAt: null
-                    }
-                }
-            );
-
-            console.log(`Match ${matchId} reset from disputed to accepted for resubmission`);
-
-            match.status = 'accepted';
-            match.challengerSubmitted = false;
-            match.challengeeSubmitted = false;
         }
 
         // Check if match is in accepted status
@@ -888,7 +861,10 @@ export async function submitMatchResult(event) {
         // Check if player already submitted
         const isChallenger = match.challengerId === userId;
         const submissionField = isChallenger ? 'challengerSubmitted' : 'challengeeSubmitted';
+        const scoresField = isChallenger ? 'challengerSubmittedScores' : 'challengeeSubmittedScores';
+        const winnerField = isChallenger ? 'challengerSubmittedWinner' : 'challengeeSubmittedWinner';
         const otherSubmissionField = isChallenger ? 'challengeeSubmitted' : 'challengerSubmitted';
+        const otherPlayerId = isChallenger ? match.challengeeId : match.challengerId;
 
         if (match[submissionField]) {
             return createResponse(400, { message: 'You have already submitted a result' });
@@ -899,8 +875,8 @@ export async function submitMatchResult(event) {
             $set: {
                 [submissionField]: true,
                 [`${submissionField}At`]: new Date(),
-                [`${submissionField}Scores`]: scores,
-                [`${submissionField}Winner`]: winner
+                [scoresField]: scores,
+                [winnerField]: winner
             }
         };
 
@@ -909,15 +885,25 @@ export async function submitMatchResult(event) {
             updateObj
         );
 
-        // If other player has submitted
-        if (match[otherSubmissionField]) {
+        // Re-fetch the match after update
+        match = await matches.findOne({
+            _id: new ObjectId(matchId),
+            ladderId: ladderId
+        });
+
+        // If both players have now submitted
+        if (match.challengerSubmitted && match.challengeeSubmitted) {
+            console.log(`Match ${matchId}: Both players have submitted results`);
+
             // Check if submissions match
             const submissionsMatch = (
-                JSON.stringify(match[`${otherSubmissionField}Scores`]) === JSON.stringify(scores) &&
-                match[`${otherSubmissionField}Winner`] === winner
+                JSON.stringify(match.challengerSubmittedScores) === JSON.stringify(match.challengeeSubmittedScores) &&
+                match.challengerSubmittedWinner === match.challengeeSubmittedWinner
             );
 
             if (submissionsMatch) {
+                console.log(`Match ${matchId}: Both players submitted matching results`);
+
                 // Update match as completed
                 await matches.updateOne(
                     { _id: new ObjectId(matchId) },
@@ -925,26 +911,28 @@ export async function submitMatchResult(event) {
                         $set: {
                             status: 'completed',
                             completedAt: new Date(),
-                            scores: scores,
-                            winner: winner
+                            scores: match.challengerSubmittedScores, // Can use either player's scores
+                            winner: match.challengerSubmittedWinner // Can use either player's winner
                         }
                     }
                 );
 
                 // Update ladder positions if challenger won
-                if (winner === match.challengerId) {
+                if (match.challengerSubmittedWinner === match.challengerId) {
                     await updateLadderPositions(ladder, match.challengerId, match.challengeeId, ladders);
                 }
 
                 // Notify both players
-                await notifyMatchCompletion(ladder, match, winner, token);
+                await notifyMatchCompletion(ladder, match, match.challengerSubmittedWinner, token);
 
                 return createResponse(200, {
                     message: 'Match result submitted and verified',
                     status: 'completed',
-                    winner: winner
+                    winner: match.challengerSubmittedWinner
                 });
             } else {
+                console.log(`Match ${matchId}: Players submitted different results, marking as disputed`);
+
                 // Results don't match - set to disputed
                 await matches.updateOne(
                     { _id: new ObjectId(matchId) },
@@ -952,6 +940,8 @@ export async function submitMatchResult(event) {
                         $set: {
                             status: 'disputed',
                             disputedAt: new Date()
+                            // We already have challengerSubmittedScores, challengeeSubmittedScores, 
+                            // challengerSubmittedWinner, challengeeSubmittedWinner stored
                         }
                     }
                 );
@@ -995,51 +985,52 @@ export async function submitMatchResult(event) {
                     status: 'disputed'
                 });
             }
-        }
+        } else {
+            // Only one player has submitted - waiting for the other player
+            console.log(`Match ${matchId}: One player submitted, waiting for other player`);
 
-        // Notify other player
-        const otherPlayerId = isChallenger ? match.challengeeId : match.challengerId;
-        try {
-            const usersDb = await connectToSpecificDatabase('users-db');
-            const users = usersDb.collection('users');
-            const user = await users.findOne({ _id: new ObjectId(userId) });
+            // Notify other player
+            try {
+                const usersDb = await connectToSpecificDatabase('users-db');
+                const users = usersDb.collection('users');
+                const user = await users.findOne({ _id: new ObjectId(userId) });
 
-            const notificationRequest = {
-                recipientId: otherPlayerId,
-                senderId: userId,
-                senderName: user?.name || 'Unknown User',
-                ladderId: ladderId,
-                ladderName: ladder.name,
-                matchId: matchId,
-                type: 'match_result_submitted'
-            };
+                const notificationRequest = {
+                    recipientId: otherPlayerId,
+                    senderId: userId,
+                    senderName: user?.name || 'Unknown User',
+                    ladderId: ladderId,
+                    ladderName: ladder.name,
+                    matchId: matchId,
+                    type: 'match_result_submitted'
+                };
 
-            // Make request to your notification API
-            if (process.env.NOTIFICATION_API_URL) {
-                await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/ladders', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(notificationRequest)
-                });
+                // Make request to your notification API
+                if (process.env.NOTIFICATION_API_URL) {
+                    await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/ladders', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(notificationRequest)
+                    });
+                }
+            } catch (notificationError) {
+                console.error('Error sending result submission notification:', notificationError);
+                // Continue without failing
             }
-        } catch (notificationError) {
-            console.error('Error sending result submission notification:', notificationError);
-            // Continue without failing
-        }
 
-        return createResponse(200, {
-            message: 'Result submitted successfully. Waiting for other player to confirm.',
-            status: 'waiting_confirmation'
-        });
+            return createResponse(200, {
+                message: 'Result submitted successfully. Waiting for other player to confirm.',
+                status: 'waiting_confirmation'
+            });
+        }
     } catch (error) {
         console.error('Submit match result error:', error);
         return createResponse(500, { message: 'Error submitting match result', error: error.message });
     }
 }
-
 export async function resetMatchSubmission(event) {
     try {
         // Extract and verify token
@@ -1513,6 +1504,77 @@ async function notifyMatchCompletion(ladder, match, winner, token) {
     }
 }
 
+
+async function auditMatchState(match, operation, userId, db) {
+    try {
+        // Create an audit collection if you want to track these issues
+        const audits = db.collection('matchAudits');
+
+        // Check for inconsistent state
+        const issues = [];
+
+        // 1. Check if match is marked completed but only one player submitted
+        if (match.status === 'completed' &&
+            ((!match.player1Submitted && match.player2Submitted) ||
+                (match.player1Submitted && !match.player2Submitted))) {
+            issues.push('Match marked completed but only one player submitted');
+
+            // Auto-fix this issue
+            await db.collection('competitiveMatches').updateOne(
+                { _id: match._id },
+                {
+                    $set: {
+                        status: 'disputed',
+                        winner: null,
+                        completedAt: null
+                    }
+                }
+            );
+        }
+
+        // 2. Check if winner is set but no scores are recorded
+        if (match.winner && (!match.scores || match.scores.length === 0)) {
+            issues.push('Winner set but no scores recorded');
+        }
+
+        // 3. Check for player mismatch - winner isn't player1 or player2
+        if (match.winner &&
+            match.winner !== match.player1 &&
+            match.winner !== match.player2 &&
+            match.winner !== match.challengerId &&
+            match.winner !== match.challengeeId) {
+            issues.push('Winner is not a match participant');
+        }
+
+        // 4. If time permits, call this at the START of submitMatchResult
+        // to check for and fix any improper state before processing
+
+        // Log issues if found
+        if (issues.length > 0) {
+            console.error(`Match state issues found for match ${match._id}:`, issues);
+
+            // Save audit record
+            await audits.insertOne({
+                matchId: match._id.toString(),
+                operation: operation,
+                userId: userId,
+                issues: issues,
+                timestamp: new Date(),
+                matchState: match
+            });
+
+            return {
+                hasIssues: true,
+                issues: issues
+            };
+        }
+
+        return { hasIssues: false };
+    } catch (error) {
+        console.error('Error in match state audit:', error);
+        return { hasIssues: false }; // Don't block operation on audit failure
+    }
+}
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
