@@ -65,6 +65,9 @@
     <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="~/js/theme-handler.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.css" />
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
+
     <style>
         html, body {
             height: 100%;
@@ -272,9 +275,9 @@
                 <i data-lucide="map" class="w-6 h-6" color="@iconColor"></i>
                 <span class="text-xs mt-1">Map</span>
             </a>
-            <a asp-controller="Tournament" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tournament" ? "active" : "")">
+            <a asp-controller="Tournaments" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tournaments" ? "active" : "")">
                 <i data-lucide="trophy" class="w-6 h-6" color="@iconColor"></i>
-                <span class="text-xs mt-1">Tournaments</span>
+                <span class="text-xs mt-1">Competitions</span>
             </a>
             <a asp-controller="Settings" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Settings" ? "active" : "")">
                 <i data-lucide="settings" class="w-6 h-6" color="@iconColor"></i>
@@ -307,6 +310,13 @@
             }, 5000);
         });
     </script>
+
+    <script>
+    // Store session values globally for SignalR and other scripts
+    window.currentUserId = '@Context.Session.GetString("UserId")';
+    console.log("Current user ID set from session:", window.currentUserId);
+    </script>
+
     <script src="~/js/match-functions.js"></script>
     <script src="~/js/signalr-connection.js"></script>
 </body>

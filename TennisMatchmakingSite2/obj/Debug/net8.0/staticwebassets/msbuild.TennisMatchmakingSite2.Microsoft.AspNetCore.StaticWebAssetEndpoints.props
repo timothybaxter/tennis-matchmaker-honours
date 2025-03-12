@@ -1,16 +1,16 @@
 ﻿<Project>
   <ItemGroup>
-    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/css/site.3fsj6qax0q.css">
+    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/css/site.0cavfsn5kp.css">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\css\site.css'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"3fsj6qax0q"},{"Name":"integrity","Value":"sha256-YZvuSruQNiyCudB56CicuQvwtOPsPFyMxXbdsgBWzhE="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/css/site.css"}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"10787"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022YZvuSruQNiyCudB56CicuQvwtOPsPFyMxXbdsgBWzhE=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:34:00 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"0cavfsn5kp"},{"Name":"integrity","Value":"sha256-8KqlyunLF4\u002BSpb44DQ5MnFbgamR1WVk1jbI6Jbmwfdk="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/css/site.css"}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"14368"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u00228KqlyunLF4\u002BSpb44DQ5MnFbgamR1WVk1jbI6Jbmwfdk=\u0022"},{"Name":"Last-Modified","Value":"Mon, 10 Mar 2025 18:44:07 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/css/site.css">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\css\site.css'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-YZvuSruQNiyCudB56CicuQvwtOPsPFyMxXbdsgBWzhE="}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"10787"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022YZvuSruQNiyCudB56CicuQvwtOPsPFyMxXbdsgBWzhE=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:34:00 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-8KqlyunLF4\u002BSpb44DQ5MnFbgamR1WVk1jbI6Jbmwfdk="}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"14368"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u00228KqlyunLF4\u002BSpb44DQ5MnFbgamR1WVk1jbI6Jbmwfdk=\u0022"},{"Name":"Last-Modified","Value":"Mon, 10 Mar 2025 18:44:07 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/favicon.61n19gt1b8.ico">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\favicon.ico'))</AssetFile>
@@ -132,17 +132,17 @@
       <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-RZNuk1lmlhPm\u002BBidVlygyZqUbxgMeeW\u002BoOfEJR0qEZ8="}]]]></EndpointProperties>
       <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"731"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022RZNuk1lmlhPm\u002BBidVlygyZqUbxgMeeW\u002BoOfEJR0qEZ8=\u0022"},{"Name":"Last-Modified","Value":"Thu, 20 Feb 2025 15:00:29 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
-    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.9fc7i2tfl8.js">
+    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.at93m86w07.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\signalr-connection.js'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"9fc7i2tfl8"},{"Name":"integrity","Value":"sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/signalr-connection.js"}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"10148"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:41:42 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"at93m86w07"},{"Name":"integrity","Value":"sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/signalr-connection.js"}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"16215"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA=\u0022"},{"Name":"Last-Modified","Value":"Thu, 06 Mar 2025 18:57:47 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\signalr-connection.js'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8="}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"10148"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:41:42 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA="}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"16215"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA=\u0022"},{"Name":"Last-Modified","Value":"Thu, 06 Mar 2025 18:57:47 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/site.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\site.js'))</AssetFile>
@@ -167,6 +167,18 @@
       <Selectors><![CDATA[[]]]></Selectors>
       <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"x0ko9igkm5"},{"Name":"integrity","Value":"sha256-n1MQr9sI/Z2AnypNZE\u002BVvNDai1yqfZ2/xynTzsOaaEk="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/theme-handler.js"}]]]></EndpointProperties>
       <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"4095"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022n1MQr9sI/Z2AnypNZE\u002BVvNDai1yqfZ2/xynTzsOaaEk=\u0022"},{"Name":"Last-Modified","Value":"Sun, 23 Feb 2025 14:15:48 GMT"}]]]></ResponseHeaders>
+    </StaticWebAssetEndpoint>
+    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/tournament-scripts.3j9imwf5ea.js">
+      <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\tournament-scripts.js'))</AssetFile>
+      <Selectors><![CDATA[[]]]></Selectors>
+      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"3j9imwf5ea"},{"Name":"integrity","Value":"sha256-v4Yk1RFgnAF6xNn2Dl\u002BWW8h1F\u002ByK4OgUjYshYjqh1ws="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/tournament-scripts.js"}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"4631"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022v4Yk1RFgnAF6xNn2Dl\u002BWW8h1F\u002ByK4OgUjYshYjqh1ws=\u0022"},{"Name":"Last-Modified","Value":"Fri, 07 Mar 2025 15:59:07 GMT"}]]]></ResponseHeaders>
+    </StaticWebAssetEndpoint>
+    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/tournament-scripts.js">
+      <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\tournament-scripts.js'))</AssetFile>
+      <Selectors><![CDATA[[]]]></Selectors>
+      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-v4Yk1RFgnAF6xNn2Dl\u002BWW8h1F\u002ByK4OgUjYshYjqh1ws="}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"4631"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022v4Yk1RFgnAF6xNn2Dl\u002BWW8h1F\u002ByK4OgUjYshYjqh1ws=\u0022"},{"Name":"Last-Modified","Value":"Fri, 07 Mar 2025 15:59:07 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/lib/bootstrap/css/bootstrap-grid.4qewknlhhe.css">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\lib\bootstrap\css\bootstrap-grid.css'))</AssetFile>

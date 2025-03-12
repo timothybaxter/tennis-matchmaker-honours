@@ -1,0 +1,606 @@
+@model List<TennisMatchmakingSite2.Models.CompMatchData>
+    @{
+    ViewData["Title"] = "My Active Matches";
+    var tournamentMatches = ViewBag.TournamentMatches as List<TennisMatchmakingSite2.Models.CompMatchData> ?? new List<TennisMatchmakingSite2.Models.CompMatchData>();
+    var ladderMatches = ViewBag.LadderMatches as List<TennisMatchmakingSite2.Models.CompMatchData> ?? new List<TennisMatchmakingSite2.Models.CompMatchData>();
+    var userId = Context.Session.GetString("UserId");
+    }
+
+    <div class="container mx-auto px-4 pb-20">
+        <div class="mt-4">
+            <h1 class="text-2xl font-bold mb-6">My Active Matches</h1>
+
+            @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
+                @TempData["SuccessMessage"]
+            </div>
+        }
+
+            @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
+                @TempData["ErrorMessage"]
+            </div>
+        }
+
+            @if (!Model.Any())
+        {
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                <p class="text-gray-600 mb-4">You don't have any active matches.</p>
+                <div class="flex justify-center gap-4">
+                    <a href="@Url.Action("Index", "Match")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-search mr-2"></i>Find Casual Matches
+                    </a>
+                    <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-purple-800 bg-purple-100 rounded-md hover:bg-purple-200 transition-colors">
+                        <i class="fas fa-trophy mr-2"></i>Browse Tournaments & Ladders
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+ <!-- Tournament Matches -->
+            @if (tournamentMatches.Any())
+            {
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-trophy text-yellow-500 mr-2"></i>Tournament Matches
+                </h2>
+                <div class="space-y-4">
+                    <!-- For tournament matches -->
+                    @foreach (var match in tournamentMatches)
+                        {
+                            var opponent = match.Opponent;
+                            var deadline = match.Deadline;
+                            var isExpired = match.IsExpired ?? false;
+                            var timeRemaining = match.TimeRemaining ?? 0;
+                            var hours = (int)(timeRemaining / (1000 * 60 * 60));
+                            var minutes = (int)((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                            var tournamentName = match.Tournament?.Name ?? "Unknown";
+                            var playerSubmitted = (match.Player1 == userId && match.Player1Submitted) ||
+                                                 (match.Player2 == userId && match.Player2Submitted);
+                            var isDisputed = match.Status == "disputed";
+
+                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-500" : isExpired ? "border-red-300" : "border-gray-200") hover:shadow-md transition-shadow">
+                        <div class="p-4">
+                            <div class="flex flex-col md:flex-row justify-between items-start gap-4">
+                                <!-- Match Details -->
+                                <div>
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <h3 class="font-semibold text-lg">Tournament: @tournamentName</h3>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    @(isDisputed ? "bg-red-100 text-red-800" :
+                                                    isExpired ? "bg-red-100 text-red-800" :
+                                                    "bg-blue-100 text-blue-800")">
+                                            @match.Status.ToUpper()
+                                        </span>
+                                    </div>
+                                    <p class="text-gray-700">
+                                        <span class="font-medium">Opponent:</span>
+                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = opponent?.Id })" class="text-blue-600 hover:underline">
+                                            @(opponent?.Name ?? "Unknown")
+                                        </a>
+                                        <span class="ml-2 text-sm text-gray-500">(@(opponent?.PlayerLevel ?? "Unknown"))</span>
+                                    </p>
+
+                                    @if (deadline.HasValue)
+                                            {
+                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700")">
+                                        <span class="font-medium">Deadline:</span>
+                                        @deadline.Value.ToString("MMM d, yyyy HH:mm")
+                                        @if (!isExpired && hours >= 0)
+                                                    {
+                                        <span class="ml-2 text-sm font-medium">
+                                            (@hours hours @minutes minutes remaining)
+                                        </span>
+                                                    }
+                                                    else if (isExpired)
+                                                    {
+                                        <span class="ml-2 text-sm font-medium text-red-600">
+                                            (Expired)
+                                        </span>
+                                                    }
+                                    </p>
+                                            }
+
+                                    @if (isDisputed)
+                                            {
+                                    <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm">
+                                        <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
+                                        <p>The submitted results don't match. Please resubmit or contact the tournament organizer.</p>
+                                        <p class="mt-1">You have until the deadline to resolve this issue or you may be removed from the tournament.</p>
+                                    </div>
+                                            }
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="md:text-right">
+                                    @if (match.Status == "scheduled" || match.Status == "accepted")
+                                            {
+                                                if (playerSubmitted)
+                                                {
+                                    <span class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
+                                        <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                                        Result Submitted
+                                    </span>
+                                                }
+                                                else
+                                                {
+                                    <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', false)"
+                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                                        <i class="fas fa-clipboard-check mr-2"></i>
+                                        Submit Result
+                                    </button>
+                                                }
+                                            }
+                                            else if (isDisputed)
+                                            {
+                                    <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', true)"
+                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                        <i class="fas fa-exclamation-circle mr-2"></i>
+                                        Resubmit Result
+                                    </button>
+                                            }
+
+                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = match.TournamentId })"
+                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors ml-2">
+                                        <i class="fas fa-eye mr-2"></i>
+                                        View Tournament
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                        }
+                </div>
+            </div>
+            }
+
+ <!-- Ladder Matches -->
+            @if (ladderMatches.Any())
+            {
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-chart-line text-purple-500 mr-2"></i>Ladder Matches
+                </h2>
+                <div class="space-y-4">
+                    @foreach (var match in ladderMatches)
+                        {
+                            var opponent = match.Opponent;
+                            var deadline = match.Deadline;
+                            var isExpired = match.IsExpired ?? false;
+                            var timeRemaining = match.TimeRemaining ?? 0;
+                            var hours = (int)(timeRemaining / (1000 * 60 * 60));
+                            var minutes = (int)((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                            var isChallengee = match.IsChallengee;
+                            var ladderName = match.Ladder?.Name ?? "Unknown";
+                            var playerSubmitted = (match.ChallengerId == userId && match.ChallengerSubmitted) ||
+                                                 (match.ChallengeeId == userId && match.ChallengeeSubmitted);
+                            var isDisputed = match.Status == "disputed";
+
+                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-500" : isExpired ? "border-red-300" : "border-gray-200") hover:shadow-md transition-shadow">
+                        <div class="p-4">
+                            <div class="flex flex-col md:flex-row justify-between items-start gap-4">
+                                <!-- Match Details -->
+                                <div>
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <h3 class="font-semibold text-lg">Ladder: @ladderName</h3>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                        @(isDisputed ? "bg-red-100 text-red-800" :
+                                                        match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
+                                                        match.Status == "accepted" ? "bg-green-100 text-green-800" :
+                                                        "bg-gray-100 text-gray-800")">
+                                            @match.Status.ToUpper()
+                                        </span>
+                                    </div>
+                                    <p class="text-gray-700">
+                                        <span class="font-medium">@(isChallengee ? "Challenger:" : "Opponent:")</span>
+                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = opponent?.Id })" class="text-blue-600 hover:underline">
+                                            @(opponent?.Name ?? "Unknown")
+                                        </a>
+                                        <span class="ml-2 text-sm text-gray-500">(@(opponent?.PlayerLevel ?? "Unknown"))</span>
+                                    </p>
+
+                                    @if (deadline.HasValue)
+                                            {
+                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700")">
+                                        <span class="font-medium">Deadline:</span>
+                                        @deadline.Value.ToString("MMM d, yyyy HH:mm")
+                                        @if (!isExpired && hours >= 0)
+                                                    {
+                                        <span class="ml-2 text-sm font-medium">
+                                            (@hours hours @minutes minutes remaining)
+                                        </span>
+                                                    }
+                                                    else if (isExpired)
+                                                    {
+                                        <span class="ml-2 text-sm font-medium text-red-600">
+                                            (Expired)
+                                        </span>
+                                                    }
+                                    </p>
+                                            }
+
+                                    @if (isDisputed)
+                                            {
+                                    <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm">
+                                        <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
+                                        <p>The submitted results don't match. Please resubmit or contact the ladder organizer.</p>
+                                        <p class="mt-1">You have until the deadline to resolve this issue or you may lose your position in the ladder.</p>
+                                    </div>
+                                            }
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="md:text-right">
+                                    @if (isChallengee && match.Status == "scheduled")
+                                            {
+                                                <!-- Respond to challenge buttons (for challengee) -->
+                                    <form asp-action="RespondToChallenge" method="post" class="inline">
+                                        <input type="hidden" name="ladderId" value="@match.LadderId" />
+                                        <input type="hidden" name="matchId" value="@match.Id" />
+                                        <input type="hidden" name="response" value="accept" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                                            <i class="fas fa-check mr-1"></i>Accept
+                                        </button>
+                                    </form>
+                                    <form asp-action="RespondToChallenge" method="post" class="inline ml-2">
+                                        <input type="hidden" name="ladderId" value="@match.LadderId" />
+                                        <input type="hidden" name="matchId" value="@match.Id" />
+                                        <input type="hidden" name="response" value="decline" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                            <i class="fas fa-times mr-1"></i>Decline
+                                        </button>
+                                    </form>
+                                            }
+                                            else if (match.Status == "accepted")
+                                            {
+ <!-- Submit result button (for both players in accepted matches) -->
+                                                if (playerSubmitted)
+                                                {
+                                    <span class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
+                                        <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                                        Result Submitted
+                                    </span>
+                                                }
+                                                else
+                                                {
+                                    <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', false)"
+                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                                        <i class="fas fa-clipboard-check mr-2"></i>
+                                        Submit Result
+                                    </button>
+                                                }
+                                            }
+                                            else if (isDisputed)
+                                            {
+                                    <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', true)"
+                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                        <i class="fas fa-exclamation-circle mr-2"></i>
+                                        Resubmit Result
+                                    </button>
+                                            }
+
+                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = match.LadderId })"
+                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors ml-2">
+                                        <i class="fas fa-eye mr-2"></i>
+                                        View Ladder
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                        }
+                </div>
+            </div>
+            }
+        }
+        </div>
+    </div>
+
+    <!-- Submit Result Modal -->
+    <div id="submitResultModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold" id="modalTitle">Submit Match Result</h3>
+                <button onclick="closeSubmitResultModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="tournamentFormContainer">
+                <form id="tournamentResultForm" method="post">
+                    <input type="hidden" id="tournamentId" name="tournamentId" value="" />
+                    <input type="hidden" id="tournamentMatchId" name="matchId" value="" />
+                    <input type="hidden" id="tournamentFormType" name="type" value="tournament" />
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Who won?</label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                                    <input type="radio" name="winner" id="tournamentSelf" value="" class="self-radio mr-2" required />
+                                    <span>You</span>
+                                </label>
+                                <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                                    <input type="radio" name="winner" id="tournamentOpponent" value="" class="opponent-radio mr-2" />
+                                    <span id="opponentNameTournament">Opponent</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Match Score</label>
+                            <p class="text-sm text-gray-600 mb-2">Enter the scores for each set played (e.g., 6-4, 7-5)</p>
+
+                            <div id="tournamentSets" class="space-y-2">
+                                <div class="set-score flex items-center gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-xs text-gray-600">Your Score</label>
+                                        <input type="number" name="Scores[0].Player1" min="0" max="99" required
+                                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                    </div>
+                                    <div class="flex-none">-</div>
+                                    <div class="flex-1">
+                                        <label class="block text-xs text-gray-600">Opponent Score</label>
+                                        <input type="number" name="Scores[0].Player2" min="0" max="99" required
+                                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-2">
+                                <button type="button" onclick="addSetForm('tournament')" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-plus-circle mr-1"></i>
+                                    Add another set
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-200">
+                            <p class="mb-4 text-sm text-gray-600">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Both players need to submit the same result. The tournament will update automatically when both results match.
+                            </p>
+                            <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                Submit Result
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id="ladderFormContainer" class="hidden">
+                <form id="ladderResultForm" method="post">
+                    <input type="hidden" id="ladderId" name="ladderId" value="" />
+                    <input type="hidden" id="ladderMatchId" name="matchId" value="" />
+                    <input type="hidden" id="ladderFormType" name="type" value="ladder" />
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Who won?</label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                                    <input type="radio" name="winner" id="ladderSelf" value="" class="self-radio mr-2" required />
+                                    <span>You</span>
+                                </label>
+                                <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                                    <input type="radio" name="winner" id="ladderOpponent" value="" class="opponent-radio mr-2" />
+                                    <span id="opponentNameLadder">Opponent</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Match Score</label>
+                            <p class="text-sm text-gray-600 mb-2">Enter the scores for each set played (e.g., 6-4, 7-5)</p>
+
+                            <div id="ladderSets" class="space-y-2">
+                                <div class="set-score flex items-center gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-xs text-gray-600">Your Score</label>
+                                        <input type="number" name="Scores[0].Player1" min="0" max="99" required
+                                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                    </div>
+                                    <div class="flex-none">-</div>
+                                    <div class="flex-1">
+                                        <label class="block text-xs text-gray-600">Opponent Score</label>
+                                        <input type="number" name="Scores[0].Player2" min="0" max="99" required
+                                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-2">
+                                <button type="button" onclick="addSetForm('ladder')" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-plus-circle mr-1"></i>
+                                    Add another set
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-200">
+                            <p class="mb-4 text-sm text-gray-600">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Both players need to submit the same result. Players swap positions in the ladder if the challenger wins.
+                            </p>
+                            <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                Submit Result
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @section Scripts {
+        <script>
+        // Submit Result Modal Functions
+        function openSubmitResultModal(type, matchId, competitionId, opponentId, opponentName, isDisputed = false) {
+            // Show debug info
+            console.log("Opening modal:", { type, matchId, competitionId, opponentId, opponentName, isDisputed });
+
+            const modal = document.getElementById('submitResultModal');
+            if (!modal) return;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            // Set modal title
+            document.getElementById('modalTitle').textContent = isDisputed ? 'Resubmit Match Result' : 'Submit Match Result';
+
+            // Hide both form containers initially
+            document.getElementById('tournamentFormContainer').classList.add('hidden');
+            document.getElementById('ladderFormContainer').classList.add('hidden');
+
+            const userId = '@userId';
+
+            if (type === 'tournament') {
+                // Show tournament form
+                const formContainer = document.getElementById('tournamentFormContainer');
+                formContainer.classList.remove('hidden');
+
+                const form = document.getElementById('tournamentResultForm');
+
+                // Set the correct action based on whether this is a resubmission
+                if (isDisputed) {
+                    form.action = '@Url.Action("ResubmitDisputedResult", "MyMatches")';
+                    document.getElementById('tournamentId').name = "id"; // For ResubmitDisputedResult
+                } else {
+                    form.action = '@Url.Action("SubmitTournamentResult", "MyMatches")';
+                    document.getElementById('tournamentId').name = "tournamentId"; // For SubmitTournamentResult
+                }
+
+                // Set form field values
+                document.getElementById('tournamentId').value = competitionId;
+                document.getElementById('tournamentMatchId').value = matchId;
+                document.getElementById('opponentNameTournament').textContent = opponentName || 'Opponent';
+
+                // Set radio button values
+                document.getElementById('tournamentSelf').value = userId;
+                document.getElementById('tournamentOpponent').value = opponentId;
+
+                // Reset score inputs
+                resetSetForms('tournament');
+
+            } else if (type === 'ladder') {
+                // Show ladder form
+                const formContainer = document.getElementById('ladderFormContainer');
+                formContainer.classList.remove('hidden');
+
+                const form = document.getElementById('ladderResultForm');
+
+                // Set the correct action based on whether this is a resubmission
+                if (isDisputed) {
+                    form.action = '@Url.Action("ResubmitDisputedResult", "MyMatches")';
+                    document.getElementById('ladderId').name = "id"; // For ResubmitDisputedResult
+                } else {
+                    form.action = '@Url.Action("SubmitLadderResult", "MyMatches")';
+                    document.getElementById('ladderId').name = "ladderId"; // For SubmitLadderResult
+                }
+
+                // Set form field values
+                document.getElementById('ladderId').value = competitionId;
+                document.getElementById('ladderMatchId').value = matchId;
+                document.getElementById('opponentNameLadder').textContent = opponentName || 'Opponent';
+
+                // Set radio button values
+                document.getElementById('ladderSelf').value = userId;
+                document.getElementById('ladderOpponent').value = opponentId;
+
+                // Reset score inputs
+                resetSetForms('ladder');
+            }
+        }
+
+        function closeSubmitResultModal() {
+            const modal = document.getElementById('submitResultModal');
+            if (!modal) return;
+
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+
+            // Reset forms
+            document.getElementById('tournamentResultForm').reset();
+            document.getElementById('ladderResultForm').reset();
+
+            // Reset set forms
+            resetSetForms('tournament');
+            resetSetForms('ladder');
+        }
+
+        function addSetForm(type) {
+            const container = document.getElementById(type + 'Sets');
+            const setCount = container.children.length;
+
+            if (setCount >= 5) return; // Limit to 5 sets
+
+            const newSet = document.createElement('div');
+            newSet.className = 'set-score flex items-center gap-3';
+            newSet.innerHTML = `
+                <div class="flex-1">
+                    <label class="block text-xs text-gray-600">Your Score</label>
+                    <input type="number" name="Scores[${setCount}].Player1" min="0" max="99" required
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                </div>
+                <div class="flex-none">-</div>
+                <div class="flex-1">
+                    <label class="block text-xs text-gray-600">Opponent Score</label>
+                    <input type="number" name="Scores[${setCount}].Player2" min="0" max="99" required
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                </div>
+                <button type="button" onclick="removeSetForm(this, '${type}')" class="text-red-500 hover:text-red-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+
+            container.appendChild(newSet);
+        }
+
+        function removeSetForm(button, type) {
+            const setDiv = button.parentElement;
+            const container = document.getElementById(type + 'Sets');
+
+            container.removeChild(setDiv);
+
+            // Renumber remaining sets
+            const setDivs = container.querySelectorAll('.set-score');
+            setDivs.forEach((div, index) => {
+                const inputs = div.querySelectorAll('input');
+                if (inputs[0]) inputs[0].name = `Scores[${index}].Player1`;
+                if (inputs[1]) inputs[1].name = `Scores[${index}].Player2`;
+            });
+        }
+
+        function resetSetForms(type) {
+            const container = document.getElementById(type + 'Sets');
+            if (!container) return;
+
+            // Keep only the first set and reset it
+            const firstSet = container.querySelector('.set-score');
+            if (firstSet) {
+                const inputs = firstSet.querySelectorAll('input');
+                inputs.forEach(input => input.value = '');
+
+                // Remove all other sets
+                while (container.children.length > 1) {
+                    container.removeChild(container.lastChild);
+                }
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('submitResultModal');
+            if (!modal) return;
+
+            if (modal.classList.contains('hidden')) return;
+
+            if (event.target === modal) {
+                closeSubmitResultModal();
+            }
+        });
+        </script>
+    }

@@ -132,17 +132,17 @@
       <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-RZNuk1lmlhPm\u002BBidVlygyZqUbxgMeeW\u002BoOfEJR0qEZ8="}]]]></EndpointProperties>
       <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"731"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022RZNuk1lmlhPm\u002BBidVlygyZqUbxgMeeW\u002BoOfEJR0qEZ8=\u0022"},{"Name":"Last-Modified","Value":"Thu, 20 Feb 2025 15:00:29 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
-    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.9fc7i2tfl8.js">
+    <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.at93m86w07.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\signalr-connection.js'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"9fc7i2tfl8"},{"Name":"integrity","Value":"sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/signalr-connection.js"}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"10148"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:41:42 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"at93m86w07"},{"Name":"integrity","Value":"sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA="},{"Name":"label","Value":"_content/TennisMatchmakingSite2/js/signalr-connection.js"}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"16215"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA=\u0022"},{"Name":"Last-Modified","Value":"Thu, 06 Mar 2025 18:42:00 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/signalr-connection.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\signalr-connection.js'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
-      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8="}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"10148"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022pWTnbS9qVMl8WDb3cjS6HN63pZHQS\u002BpKuxbGfTZgwp8=\u0022"},{"Name":"Last-Modified","Value":"Mon, 03 Mar 2025 16:41:42 GMT"}]]]></ResponseHeaders>
+      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA="}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"16215"},{"Name":"Content-Type","Value":"text/javascript"},{"Name":"ETag","Value":"\u0022klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf\u002BUc8bPmUA=\u0022"},{"Name":"Last-Modified","Value":"Thu, 06 Mar 2025 18:42:00 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/TennisMatchmakingSite2/js/site.js">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\site.js'))</AssetFile>

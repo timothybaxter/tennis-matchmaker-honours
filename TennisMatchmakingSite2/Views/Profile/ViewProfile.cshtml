@@ -1,0 +1,262 @@
+@{
+    ViewData["Title"] = "Player Profile";
+    var profile = ViewBag.Profile;
+    var stats = ViewBag.Stats;
+    var isCurrentUser = ViewBag.IsCurrentUser;
+    var isFriend = ViewBag.IsFriend ?? false;
+    var hasPendingRequest = ViewBag.HasPendingRequest ?? false;
+}
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4">
+        @if (TempData["ErrorMessage"] != null)
+        {
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
+            @TempData["ErrorMessage"]
+        </div>
+        }
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
+            @TempData["SuccessMessage"]
+        </div>
+        }
+
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Profile Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold">@profile.Name</h1>
+                        <p class="text-blue-100">@profile.PlayerLevel Player</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex flex-wrap gap-2">
+                        @if (!isCurrentUser)
+                        {
+                            if (!isFriend && !hasPendingRequest)
+                            {
+                            <form asp-controller="Social" asp-action="AddFriend" method="post">
+                            <input type="hidden" name="friendId" value="@profile.Id" />
+                            <button type="submit" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-blue-50 transition-colors">
+                                <i class="fas fa-user-plus mr-1"></i> Add Friend
+                            </button>
+                        </form>
+                            }
+                            else if (hasPendingRequest)
+                            {
+                        <button disabled class="bg-gray-200 text-gray-600 px-4 py-2 rounded-md font-medium cursor-not-allowed">
+                            <i class="fas fa-clock mr-1"></i> Request Sent
+                        </button>
+                        }
+                        else
+                        {
+                        <button disabled class="bg-green-100 text-green-700 px-4 py-2 rounded-md font-medium cursor-not-allowed">
+                            <i class="fas fa-check mr-1"></i> Friends
+                        </button>
+                        }
+
+
+                        <a href="@Url.Action("NewConversation", "Social", new { userId = profile.Id, userName = profile.Name })" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-blue-50 transition-colors">
+                            <i class="fas fa-comment mr-1"></i> Message
+                        </a>
+
+                        <a href="@Url.Action("Index", "Match", new { courtLocation = "", matchType = "", opponentId = profile.Id })"
+                           class="bg-yellow-50 text-yellow-700 px-4 py-2 rounded-md font-medium hover:bg-yellow-100 transition-colors">
+                            <i class="fas fa-table-tennis mr-1"></i> Challenge
+                        </a>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Content -->
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Left Column: Player Info -->
+                    <div class="col-span-1">
+                        <h2 class="text-lg font-semibold mb-4">Player Information</h2>
+                        <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                            @if (!string.IsNullOrEmpty(profile.Hometown))
+                            {
+                            <div>
+                                <p class="text-sm text-gray-500">Hometown</p>
+                                <p>@profile.Hometown</p>
+                            </div>
+                            }
+                            <div>
+                                <p class="text-sm text-gray-500">Skill Level</p>
+                                <p>@profile.PlayerLevel</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Member Since</p>
+                                <p>@profile.JoinedAt.ToString("MMMM yyyy")</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Last Active</p>
+                                <p>@profile.LastActive.ToString("MMM d, yyyy")</p>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(profile.Bio))
+                        {
+                        <div class="mt-4">
+                            <h3 class="font-medium mb-2">About Me</h3>
+                            <p class="text-gray-700">@profile.Bio</p>
+                        </div>
+                        }
+                    </div>
+
+                    <!-- Right Column: Stats and Matches -->
+                    <div class="md:col-span-2 space-y-6">
+                        @if (stats != null)
+                        {
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-lg font-semibold">Match Statistics</h2>
+                                <a href="@Url.Action("MatchHistory", "Profile", new { id = profile.Id })" class="text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-history mr-1"></i> View Full History
+                                </a>
+                            </div>
+
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                                    <p class="text-2xl font-bold text-blue-700">@stats.TotalMatches</p>
+                                    <p class="text-sm text-gray-600">Total Matches</p>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-4 text-center">
+                                    <p class="text-2xl font-bold text-green-700">@stats.Wins</p>
+                                    <p class="text-sm text-gray-600">Wins</p>
+                                </div>
+                                <div class="bg-red-50 rounded-lg p-4 text-center">
+                                    <p class="text-2xl font-bold text-red-700">@stats.Losses</p>
+                                    <p class="text-sm text-gray-600">Losses</p>
+                                </div>
+                                <div class="bg-purple-50 rounded-lg p-4 text-center">
+                                    <p class="text-2xl font-bold text-purple-700">@stats.WinRate%</p>
+                                    <p class="text-sm text-gray-600">Win Rate</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h3 class="font-medium mb-2">Tournament Stats</h3>
+                                    <div class="space-y-2">
+                                        <p><span class="text-gray-600">Tournaments:</span> @stats.TournamentsParticipated</p>
+                                        <p><span class="text-gray-600">Matches:</span> @stats.TournamentMatches</p>
+                                        <p><span class="text-gray-600">Wins:</span> @stats.TournamentWins</p>
+                                        <p><span class="text-gray-600">Win Rate:</span> @stats.TournamentWinRate%</p>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h3 class="font-medium mb-2">Ladder Stats</h3>
+                                    <div class="space-y-2">
+                                        <p><span class="text-gray-600">Ladders:</span> @stats.LaddersParticipated</p>
+                                        <p><span class="text-gray-600">Matches:</span> @stats.LadderMatches</p>
+                                        <p><span class="text-gray-600">Wins:</span> @stats.LadderWins</p>
+                                        <p><span class="text-gray-600">Rank Improvements:</span> @stats.LadderRankImprovements</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (stats.RecentPerformance != null && stats.RecentPerformance.Any())
+                            {
+                        <div>
+                            <h2 class="text-lg font-semibold mb-4">Recent Matches</h2>
+                            <div class="space-y-3">
+                                @foreach (var match in stats.RecentPerformance)
+                                        {
+                                <div class="border border-gray-200 rounded-md p-3 flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium">@(match.Type.ToUpper()) Match</p>
+                                        <p class="text-sm text-gray-600">@match.Date.ToString("MMM d, yyyy")</p>
+                                    </div>
+                                    <span class="px-3 py-1 rounded-full text-sm font-medium @(match.IsWin ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")">
+                                        @(match.IsWin ? "WIN" : "LOSS")
+                                    </span>
+                                </div>
+                                        }
+                            </div>
+                        </div>
+                            }
+                        }
+                        else
+                        {
+                        <div class="bg-gray-50 p-4 rounded-md text-center text-gray-600">
+                            <p>No match statistics available</p>
+                        </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // This ensures notifications are properly displayed when user actions are performed
+        document.addEventListener("DOMContentLoaded", function () {
+            // Success message handling
+            const successMessage = "@TempData["SuccessMessage"]";
+            if (successMessage && successMessage !== "") {
+                showToast("Success", successMessage);
+            }
+
+            // Error message handling
+            const errorMessage = "@TempData["ErrorMessage"]";
+            if (errorMessage && errorMessage !== "") {
+                showToast("Error", errorMessage);
+            }
+        });
+
+        // Helper function for showing toast notifications
+        function showToast(title, message) {
+            // Create container if it doesn't exist
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Create toast
+            const toast = document.createElement('div');
+            toast.className = 'bg-white rounded-lg shadow-lg border border-gray-200 p-3 transform translate-x-full transition-transform duration-300';
+            toast.innerHTML = `
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 text-${title.toLowerCase() === 'error' ? 'red' : 'green'}-500 mr-2">
+                        <i class="fas fa-${title.toLowerCase() === 'error' ? 'exclamation-circle' : 'check-circle'}"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-medium">${title}</div>
+                        <div class="text-sm text-gray-600">${message}</div>
+                    </div>
+                    <button class="ml-2 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            // Add to container
+            toastContainer.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 10);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 300);
+            }, 5000);
+        }
+    </script>
+}

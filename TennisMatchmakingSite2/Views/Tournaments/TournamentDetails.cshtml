@@ -1,0 +1,878 @@
+@model TennisMatchmakingSite2.Models.TournamentDetailData
+@{
+    ViewData["Title"] = Model.Name;
+    string currentUserId = Context.Session.GetString("UserId");
+    Model.IsCreator = Model.CreatorId == currentUserId;
+    Model.IsParticipant = Model.Players.Contains(currentUserId);
+
+    // Map of status to color classes
+    Dictionary<string, string> statusColors = new Dictionary<string, string>
+    {
+        { "pending", "yellow" },
+        { "active", "green" },
+        { "completed", "blue" }
+    };
+    string statusColor = statusColors.ContainsKey(Model.Status) ? statusColors[Model.Status] : "gray";
+}
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4">
+        <!-- Tournament Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">@Model.Name</h1>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-@(statusColor)-100 text-@(statusColor)-800">
+                        @Model.Status.ToUpper()
+                    </span>
+                    <span class="inline-flex items-center text-sm text-gray-600">
+                        <i class="fas fa-trophy mr-1"></i>
+                        @(Model.Format == "single" ? "Single Elimination" : "Double Elimination")
+                    </span>
+                    <span class="inline-flex items-center text-sm text-gray-600">
+                        <i class="fas fa-user-friends mr-1"></i>
+                        @Model.Players.Count Players
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                @if (!Model.IsParticipant && Model.Status == "pending")
+                {
+                <form asp-action="JoinTournament" asp-route-id="@Model.Id" method="post" class="inline">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Join Tournament
+                    </button>
+                </form>
+                }
+
+                @if (Model.IsCreator && Model.Status == "pending" && Model.Players.Count >= 2)
+                {
+                <form asp-action="StartTournament" asp-route-id="@Model.Id" method="post" class="inline">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-play mr-2"></i>
+                        Start Tournament
+                    </button>
+                </form>
+                }
+
+                <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to List
+                </a>
+            </div>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
+            @TempData["SuccessMessage"]
+        </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
+            @TempData["ErrorMessage"]
+        </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Tournament Info -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-semibold mb-4">Tournament Information</h2>
+
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Created by</p>
+                        <p>@Model.CreatorDetails.Name</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Created on</p>
+                        <p>@Model.CreatedAt.ToString("MMMM d, yyyy")</p>
+                    </div>
+
+                    @if (Model.StartedAt.HasValue)
+                    {
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Started on</p>
+                        <p>@Model.StartedAt.Value.ToString("MMMM d, yyyy")</p>
+                    </div>
+                    }
+
+                    @if (Model.CompletedAt.HasValue)
+                    {
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Completed on</p>
+                        <p>@Model.CompletedAt.Value.ToString("MMMM d, yyyy")</p>
+                    </div>
+                    }
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Match Window</p>
+                        <p>@Model.ChallengeWindow hours</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Visibility</p>
+                        <p>@(Model.Visibility == "public" ? "Public" : "Private")</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Skill Level</p>
+                        <p>@Model.SkillLevel</p>
+                    </div>
+
+                    @if (Model.Status == "completed" && !string.IsNullOrEmpty(Model.Winner))
+                    {
+                    <div class="pt-3 border-t border-gray-200">
+                        <p class="text-sm font-medium text-gray-700">Winner</p>
+                        <p class="font-semibold text-green-600">
+                            @(Model.WinnerDetails != null ? Model.WinnerDetails.Name : Model.PlayerDetails.FirstOrDefault(p => p.Id == Model.Winner)?.Name ?? "Unknown Player")
+                        </p>
+                    </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Tournament Bracket (or pending info if not started) -->
+            <div class="md:col-span-2">
+                @if (Model.Status == "pending")
+                {
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">Participants (@Model.Players.Count)</h2>
+
+                    @if (!Model.PlayerDetails.Any())
+                    {
+                    <p class="text-gray-600">No players have joined this tournament yet.</p>
+                    }
+                    else
+                    {
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach (var player in Model.PlayerDetails)
+                        {
+                        <div class="bg-gray-50 rounded-md p-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-medium @(player.Id == Model.Winner ? "text-green-600" : "")">@player.Name</p>
+                                    <p class="text-sm text-gray-600">@player.PlayerLevel</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    @if (player.Id == Model.CreatorId)
+                                    {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        Creator
+                                    </span>
+                                    }
+                                    @if (player.Id == Model.Winner)
+                                    {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Winner
+                                    </span>
+                                    }
+                                    <a href="@Url.Action("ViewProfile", "Profile", new { id = player.Id })"
+                                       class="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
+                                        <i class="fas fa-user mr-1"></i>
+                                        Profile
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        }
+                    </div>
+
+                    @if (Model.IsCreator && Model.Players.Count >= 2)
+                    {
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-600 mb-3">
+                            You have enough players to start the tournament.
+                            The bracket will be generated randomly when you start.
+                        </p>
+                        <form asp-action="StartTournament" asp-route-id="@Model.Id" method="post">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-play mr-2"></i>
+                                Start Tournament
+                            </button>
+                        </form>
+                    </div>
+                    }
+                    }
+                </div>
+                }
+                else
+                {
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">Tournament Bracket</h2>
+
+                    <!-- Add embedded data for the bracket visualization -->
+                    <script id="tournament-data" type="application/json">
+        @Html.Raw(Json.Serialize(Model))
+                    </script>
+
+                    <script id="matches-data" type="application/json">
+        @Html.Raw(Json.Serialize(Model.Matches))
+                    </script>
+
+                    <script id="player-details" type="application/json">
+        @Html.Raw(Json.Serialize(Model.PlayerDetails))
+                    </script>
+
+                    <div id="tournament-bracket" style="width: 100%; overflow-x: auto;"></div>
+                </div>
+                }
+
+                <!-- Matches Section -->
+                @if (Model.Status != "pending" && Model.Matches != null && Model.Matches.Any())
+                {
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+                    <h2 class="text-lg font-semibold mb-4">Matches</h2>
+
+                    <div class="space-y-4">
+                        @foreach (var match in Model.Matches.OrderBy(m => m.Round).ThenBy(m => m.MatchNumber))
+                        {
+                        <div id="match-@match.Id" class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="font-medium">
+                                        @if (match.Round == Model.Bracket.NumRounds && Model.Bracket.Rounds.Last().Matches.Count == 1)
+                                        {
+                                        <span>Final Match</span>
+                                        }
+                                        else
+                                        {
+                                        <span>Match #@match.MatchNumber (Round @match.Round)</span>
+                                        }
+                                    </h3>
+                                    <p class="text-sm text-gray-600">
+                                        Created: @match.CreatedAt.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                          @(match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
+                                          match.Status == "completed" ? "bg-green-100 text-green-800" :
+                                          "bg-gray-100 text-gray-800")">
+                                    @match.Status.ToUpper()
+                                </span>
+                            </div>
+
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                                        <div class="bg-gray-50 rounded-md p-2 flex-1 @(match.Winner == match.Player1 ? "border-r-4 border-green-500" : "")">
+                                            @{
+                                                var player1Details = match.Player1Details ?? Model.PlayerDetails.FirstOrDefault(p => p.Id == match.Player1);
+                                            }
+                                            @if (player1Details != null)
+                                            {
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="font-medium @(match.Winner == match.Player1 ? "text-green-600" : "")">
+                                                        @player1Details.Name
+                                                    </p>
+                                                    <p class="text-sm text-gray-600">@player1Details.PlayerLevel</p>
+                                                </div>
+                                                <a href="@Url.Action("ViewProfile", "Profile", new { id = match.Player1 })"
+                                                   class="text-xs text-purple-600 hover:text-purple-800">
+                                                    <i class="fas fa-user"></i>
+                                                </a>
+                                            </div>
+                                            }
+                                            else
+                                            {
+                                            <p class="font-medium text-gray-400 italic">BYE</p>
+                                            }
+                                        </div>
+                                        <div class="text-gray-500 text-center">vs</div>
+                                        <div class="bg-gray-50 rounded-md p-2 flex-1 @(match.Winner == match.Player2 ? "border-r-4 border-green-500" : "")">
+                                            @{
+                                                var player2Details = match.Player2Details ?? Model.PlayerDetails.FirstOrDefault(p => p.Id == match.Player2);
+                                            }
+                                            @if (player2Details != null)
+                                            {
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <p class="font-medium @(match.Winner == match.Player2 ? "text-green-600" : "")">
+                                                        @player2Details.Name
+                                                    </p>
+                                                    <p class="text-sm text-gray-600">@player2Details.PlayerLevel</p>
+                                                </div>
+                                                <a href="@Url.Action("ViewProfile", "Profile", new { id = match.Player2 })"
+                                                   class="text-xs text-purple-600 hover:text-purple-800">
+                                                    <i class="fas fa-user"></i>
+                                                </a>
+                                            </div>
+                                            }
+                                            else
+                                            {
+                                            <p class="font-medium text-gray-400 italic">BYE</p>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="md:flex-shrink-0">
+                                    @if (match.Status == "scheduled")
+                                    {
+                                    <div class="text-sm">
+                                        <p>
+                                            <span class="font-medium">Deadline:</span>
+                                            @match.Deadline?.ToString("MMM d, yyyy HH:mm")
+                                        </p>
+                                        @if ((match.Player1 == currentUserId || match.Player2 == currentUserId) &&
+                                           match.Player1 != null && match.Player2 != null)
+                                        {
+                                        <button onclick="openSubmitResultModal('@match.Id')" class="text-blue-600 hover:text-blue-800 hover:underline mt-2">
+                                            <i class="fas fa-edit mr-1"></i>
+                                            Submit Result
+                                        </button>
+                                        }
+                                    </div>
+                                    }
+                                    else if (match.Status == "completed" && match.Winner != null)
+                                    {
+                                    <div class="flex flex-col items-end">
+                                        <p class="font-medium text-green-600 mb-1">
+                                            Winner: @(match.WinnerDetails?.Name ?? Model.PlayerDetails.FirstOrDefault(p => p.Id == match.Winner)?.Name ?? "Unknown")
+                                        </p>
+                                        @if (match.Scores != null && match.Scores.Any())
+                                        {
+                                        <div class="text-sm">
+                                            @foreach (var score in match.Scores)
+                                            {
+                                            <span class="mx-1">@score.Player1-@score.Player2</span>
+                                            }
+                                        </div>
+                                        }
+                                    </div>
+                                    }
+                                    else if (match.Status == "disputed")
+                                    {
+                                    <div class="text-sm">
+                                        <p class="font-medium text-orange-600 mb-1">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                                            Score Disputed
+                                        </p>
+                                        @if (Model.IsCreator)
+                                        {
+                                        <button onclick="openResolveDisputeModal('@match.Id')" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                            <i class="fas fa-gavel mr-1"></i>
+                                            Resolve Dispute
+                                        </button>
+                                        }
+                                    </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        }
+                    </div>
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Result Modal -->
+<div id="submit-result-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Submit Match Result</h3>
+            <button onclick="closeSubmitResultModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="submit-result-form" asp-action="SubmitMatchResult" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" id="match-id-input" name="matchId" value="" />
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Who won?</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="winner" value="" class="player1-radio mr-2" required />
+                            <span class="player1-name"></span>
+                        </label>
+                        <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="winner" value="" class="player2-radio mr-2" />
+                            <span class="player2-name"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Match Score</label>
+                    <p class="text-sm text-gray-600 mb-2">Enter the scores for each set played (e.g., 6-4, 7-5)</p>
+
+                    <div id="score-sets" class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <input type="number" name="Scores[0].Player1" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                            <span>-</span>
+                            <input type="number" name="Scores[0].Player2" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <button type="button" onclick="addScoreSet()" class="text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-plus-circle mr-1"></i>
+                            Add another set
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200">
+                    <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        Submit Result
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resolve Dispute Modal -->
+<div id="resolve-dispute-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Resolve Disputed Match</h3>
+            <button onclick="closeResolveDisputeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="resolve-dispute-form" asp-action="ResolveDisputedMatch" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" id="dispute-match-id" name="matchId" value="" />
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Resolution</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="resolution" value="accept_player1" required class="mr-2" />
+                            <span>Accept Player 1's submission</span>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="resolution" value="accept_player2" class="mr-2" />
+                            <span>Accept Player 2's submission</span>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="resolution" value="no_contest" class="mr-2" />
+                            <span>No Contest (void match)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200">
+                    <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        Resolve Dispute
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+@section Scripts {
+    <!-- Include jQuery and jQuery Bracket -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.css" rel="stylesheet" />
+
+    <style>
+        /* jQuery Bracket enhanced styling */
+        .jQBracket {
+            font-family: inherit;
+            font-size: 14px;
+            padding: 20px 0;
+            min-height: 300px;
+            width: 100%;
+        }
+
+            .jQBracket .team {
+                background-color: #f3f4f6;
+                border: 1px solid #e5e7eb;
+                border-radius: 4px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                margin-bottom: 2px;
+                min-width: 120px;
+                position: relative;
+                z-index: 1;
+            }
+
+                .jQBracket .team.win {
+                    background-color: #ecfdf5;
+                    border-right: 2px solid #10b981;
+                }
+
+            .jQBracket .label {
+                color: #374151;
+                font-weight: 600;
+                margin-bottom: 8px;
+            }
+
+            .jQBracket .connector {
+                border-color: #d1d5db;
+                border-width: 2px;
+            }
+
+                .jQBracket .connector.highlightWinner,
+                .jQBracket .connector.highlight {
+                    border-color: #10b981;
+                }
+
+        /* Container styling */
+        #tournament-bracket-container {
+            padding: 0;
+            overflow-x: auto;
+            min-height: 400px;
+            position: relative;
+            z-index: 1;
+            display: block !important;
+        }
+
+        /* Make labels larger and clearer */
+        .jQBracket .round .label {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* Increase spacing */
+        .jQBracket .round {
+            margin-right: 40px;
+        }
+
+        /* Better mobile support */
+        @@media (max-width: 768px) {
+            .jQBracket .team {
+                max-width: 140px;
+            }
+        }
+    </style>
+
+    <script>
+        // Test if jQuery and jQuery Bracket are loaded properly
+        document.addEventListener('DOMContentLoaded', function () {
+            // Check if jQuery is loaded
+            if (typeof $ === 'undefined') {
+                console.error("jQuery is not loaded properly");
+                document.getElementById('tournament-bracket').innerHTML =
+                    '<p class="text-center text-red-600 py-8">Error: jQuery library not loaded.</p>';
+                return;
+            } else {
+                console.log("jQuery loaded successfully", $.fn.jquery);
+            }
+
+            // Check if jQuery Bracket is loaded
+            if (typeof $.fn.bracket === 'undefined') {
+                console.error("jQuery Bracket is not loaded properly");
+                document.getElementById('tournament-bracket').innerHTML =
+                    '<p class="text-center text-red-600 py-8">Error: jQuery Bracket library not loaded.</p>';
+                return;
+            } else {
+                console.log("jQuery Bracket loaded successfully");
+            }
+        });
+
+        $(document).ready(function () {
+            // Initialize jQuery Bracket if tournament is active
+            if (document.getElementById('tournament-bracket')) {
+                setTimeout(initializeTournamentBracket, 100); // Small delay to ensure everything is loaded
+            }
+
+            // Submit Result Modal functions
+            window.openSubmitResultModal = function (matchId) {
+                const modal = document.getElementById('submit-result-modal');
+                if (!modal) return;
+
+                // Get match data
+                const matchesData = JSON.parse(document.getElementById('matches-data').textContent);
+                const match = matchesData.find(m => m.id === matchId);
+                if (!match) return;
+
+                // Get player details from tournament data
+                const tournamentData = JSON.parse(document.getElementById('tournament-data').textContent);
+                const playerDetails = JSON.parse(document.getElementById('player-details').textContent);
+
+                const playerMap = {};
+                playerDetails.forEach(player => {
+                    playerMap[player.id] = player.name;
+                });
+
+                // Set match ID
+                document.getElementById('match-id-input').value = matchId;
+
+                // Set player names and values
+                const player1Radio = document.querySelector('.player1-radio');
+                const player2Radio = document.querySelector('.player2-radio');
+                const player1Name = document.querySelector('.player1-name');
+                const player2Name = document.querySelector('.player2-name');
+
+                if (match.player1) {
+                    player1Radio.value = match.player1;
+                    player1Name.textContent = playerMap[match.player1] || 'Player 1';
+                }
+
+                if (match.player2) {
+                    player2Radio.value = match.player2;
+                    player2Name.textContent = playerMap[match.player2] || 'Player 2';
+                }
+
+                modal.classList.remove('hidden');
+            };
+
+            window.closeSubmitResultModal = function () {
+                const modal = document.getElementById('submit-result-modal');
+                if (modal) modal.classList.add('hidden');
+            };
+
+            // Resolve Dispute Modal functions
+            window.openResolveDisputeModal = function (matchId) {
+                const modal = document.getElementById('resolve-dispute-modal');
+                if (!modal) return;
+
+                document.getElementById('dispute-match-id').value = matchId;
+                modal.classList.remove('hidden');
+            };
+
+            window.closeResolveDisputeModal = function () {
+                const modal = document.getElementById('resolve-dispute-modal');
+                if (modal) modal.classList.add('hidden');
+            };
+
+            // Add Score Set function
+            window.addScoreSet = function () {
+                const container = document.getElementById('score-sets');
+                const setCount = container.children.length;
+
+                const newSet = document.createElement('div');
+                newSet.className = 'flex items-center gap-3';
+                newSet.innerHTML = `
+                            <input type="number" name="Scores[${setCount}].Player1" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                            <span>-</span>
+                            <input type="number" name="Scores[${setCount}].Player2" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                            <button type="button" onclick="removeScoreSet(this)" class="text-sm text-red-600 hover:text-red-800">
+                                <i class="fas fa-times-circle"></i>
+                            </button>
+                        `;
+
+                container.appendChild(newSet);
+            };
+
+            window.removeScoreSet = function (button) {
+                const setItem = button.parentElement;
+                setItem.parentElement.removeChild(setItem);
+
+                // Rename the remaining inputs to maintain sequence
+                const container = document.getElementById('score-sets');
+                const setItems = container.children;
+
+                for (let i = 0; i < setItems.length; i++) {
+                    const inputs = setItems[i].querySelectorAll('input');
+                    inputs[0].name = `Scores[${i}].Player1`;
+                    inputs[1].name = `Scores[${i}].Player2`;
+                }
+            };
+        });
+
+        function initializeTournamentBracket() {
+            try {
+                // Get the tournament data with better error handling
+                let tournamentData, matchesData, playerDetails;
+
+                try {
+                    tournamentData = JSON.parse(document.getElementById('tournament-data').textContent);
+                    console.log("Successfully parsed tournament data:", tournamentData);
+                } catch (e) {
+                    console.error("Error parsing tournament data:", e);
+                    $('#tournament-bracket').html('<p class="text-center text-red-600 py-8">Error parsing tournament data</p>');
+                    return;
+                }
+
+                try {
+                    matchesData = JSON.parse(document.getElementById('matches-data').textContent);
+                    console.log("Successfully parsed matches data:", matchesData);
+                } catch (e) {
+                    console.error("Error parsing matches data:", e);
+                    $('#tournament-bracket').html('<p class="text-center text-red-600 py-8">Error parsing matches data</p>');
+                    return;
+                }
+
+                try {
+                    playerDetails = JSON.parse(document.getElementById('player-details').textContent);
+                    console.log("Successfully parsed player details:", playerDetails);
+                } catch (e) {
+                    console.error("Error parsing player details:", e);
+                    $('#tournament-bracket').html('<p class="text-center text-red-600 py-8">Error parsing player details</p>');
+                    return;
+                }
+
+                // Create player lookup
+                const playerMap = {};
+                playerDetails.forEach(player => {
+                    playerMap[player.id] = player.name;
+                });
+
+                // Check if we have valid bracket data
+                if (!tournamentData.bracket || !tournamentData.bracket.rounds || tournamentData.bracket.rounds.length === 0) {
+                    console.error("Missing or invalid bracket data in tournament data");
+                    $('#tournament-bracket').html('<p class="text-center text-gray-600 py-8">Tournament bracket data is not available.</p>');
+                    return;
+                }
+
+                // Convert bracket data to jQuery Bracket format
+                console.log("Converting bracket data to jQuery Bracket format...");
+                const bracketData = convertToBracketFormat(tournamentData, matchesData, playerMap);
+                console.log("Bracket data converted:", bracketData);
+
+                // Make sure we have valid teams and results
+                if (!bracketData.teams || bracketData.teams.length === 0 || !bracketData.results || bracketData.results.length === 0) {
+                    console.error("Missing teams or results in converted bracket data");
+                    $('#tournament-bracket').html('<p class="text-center text-gray-600 py-8">Could not generate tournament bracket from available data.</p>');
+                    return;
+                }
+
+                // Create a fresh container for the bracket
+                $('#tournament-bracket').empty().html('<div id="tournament-bracket-container" style="width:100%;min-height:400px;"></div>');
+
+                console.log("Initializing jQuery Bracket with data:", bracketData);
+
+                // Initialize jQuery Bracket
+                $('#tournament-bracket-container').bracket({
+                    skipConsolationRound: true,
+                    init: bracketData,
+                    teamWidth: 120,
+                    scoreWidth: 30,
+                    matchMargin: 20,
+                    roundMargin: 50
+                });
+
+                console.log("jQuery Bracket initialized successfully");
+
+                // Apply custom styling after initialization
+                customizeBracketStyling();
+            } catch (error) {
+                console.error("Error initializing tournament bracket:", error);
+                $('#tournament-bracket').html(`<p class="text-center text-red-600 py-8">Error loading tournament bracket: ${error.message}</p>`);
+            }
+        }
+
+        function convertToBracketFormat(tournamentData, matchesData, playerMap) {
+            if (!tournamentData.bracket || !tournamentData.bracket.rounds) {
+                console.error("Invalid tournament data structure");
+                return { teams: [], results: [[]] };
+            }
+
+            const rounds = tournamentData.bracket.rounds;
+            const numRounds = rounds.length;
+            console.log(`Processing ${numRounds} rounds`);
+
+            // Create the teams array from the first round
+            const teams = [];
+            const firstRound = rounds[0].matches;
+            console.log(`First round has ${firstRound.length} matches`);
+
+            firstRound.forEach((match, i) => {
+                console.log(`Processing first round match ${i + 1}:`, match);
+
+                // Handle potential null values in player1/player2
+                if (!match.player1 && !match.player2) {
+                    teams.push(['TBD', 'TBD']);
+                    return;
+                }
+
+                const player1Name = match.player1 && match.player1.id ? playerMap[match.player1.id] || 'Unknown' : 'BYE';
+                const player2Name = match.player2 && match.player2.id ? playerMap[match.player2.id] || 'Unknown' : 'BYE';
+
+                teams.push([player1Name, player2Name]);
+            });
+
+            console.log("Teams array created:", teams);
+
+            // Create the results array for all rounds
+            const results = [];
+
+            // Process each round
+            for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
+                const roundMatches = rounds[roundIndex].matches;
+                const roundResults = [];
+                console.log(`Processing round ${roundIndex + 1} with ${roundMatches.length} matches`);
+
+                // Process each match in this round
+                for (let matchIndex = 0; matchIndex < roundMatches.length; matchIndex++) {
+                    const match = roundMatches[matchIndex];
+                    const matchData = matchesData.find(m => m.matchNumber === match.matchNumber);
+
+                    console.log(`Round ${roundIndex + 1}, Match ${matchIndex + 1}:`, match);
+                    console.log("Corresponding match data:", matchData);
+
+                    // Default score is null for both teams
+                    let score = [null, null];
+
+                    // If match exists and is completed, find the winner and set score
+                    if (matchData && matchData.status === 'completed') {
+                        console.log("Match is completed, winner:", matchData.winner);
+
+                        // For simplicity, just use the first set's score if available
+                        if (matchData.scores && matchData.scores.length > 0) {
+                            score = [matchData.scores[0].player1 || 0, matchData.scores[0].player2 || 0];
+                        }
+
+                        // jQuery Bracket needs a winner to be indicated by a higher score
+                        if (matchData.winner === matchData.player1) {
+                            if (score[0] <= score[1]) score = [1, 0];
+                        } else if (matchData.winner === matchData.player2) {
+                            if (score[1] <= score[0]) score = [0, 1];
+                        }
+                    }
+
+                    console.log(`Final score for match: [${score[0]}, ${score[1]}]`);
+                    roundResults.push(score);
+                }
+
+                results.push(roundResults);
+            }
+
+            console.log("Results array created:", results);
+
+            return {
+                teams: teams,
+                results: results
+            };
+        }
+
+        function customizeBracketStyling() {
+            // Apply additional custom styling to the bracket
+            setTimeout(() => {
+                console.log("Applying custom styling to bracket");
+
+                // Update specific elements if needed
+                $('.jQBracket .team').each(function () {
+                    // Check if this team is a BYE
+                    if ($(this).find('.label').text() === 'BYE') {
+                        $(this).css('opacity', '0.6').css('font-style', 'italic');
+                        console.log("Styled BYE team");
+                    }
+                });
+
+                // Add custom round labels
+                $('.jQBracket .round .label').each(function (i, el) {
+                    if (i === $('.jQBracket .round').length - 1) {
+                        $(el).text('Final');
+                        console.log("Changed last round label to 'Final'");
+                    }
+                });
+
+                // Force repaint
+                $('.jQBracket').hide().show(0);
+            }, 300);
+        }
+    </script>
+}

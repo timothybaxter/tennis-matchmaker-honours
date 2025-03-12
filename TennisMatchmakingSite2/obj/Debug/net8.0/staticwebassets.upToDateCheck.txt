@@ -12,6 +12,7 @@ wwwroot\js\match-functions.js
 wwwroot\js\signalr-connection.js
 wwwroot\js\site.js
 wwwroot\js\theme-handler.js
+wwwroot\js\tournament-scripts.js
 wwwroot\lib\bootstrap\css\bootstrap.css
 wwwroot\lib\bootstrap\css\bootstrap.css.map
 wwwroot\lib\bootstrap\css\bootstrap.min.css

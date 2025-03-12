@@ -7,7 +7,6 @@ using TennisMatchmakingSite2.Hubs; // Add this to import your hub namespace
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
@@ -32,7 +31,26 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 });
 
 // Set the correct web root path for both development and production
-builder.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+if (!Directory.Exists(builder.Environment.WebRootPath))
+{
+    // Development environment (running from bin/Debug)
+    var projectPath = Directory.GetParent(Directory.GetCurrentDirectory())?.Parent?.Parent?.FullName;
+    if (projectPath != null && Directory.Exists(Path.Combine(projectPath, "wwwroot")))
+    {
+        builder.Environment.WebRootPath = Path.Combine(projectPath, "wwwroot");
+        Console.WriteLine($"Using development wwwroot path: {builder.Environment.WebRootPath}");
+    }
+    else
+    {
+        // Fallback to current directory
+        builder.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        Console.WriteLine($"Using fallback wwwroot path: {builder.Environment.WebRootPath}");
+    }
+}
+else
+{
+    Console.WriteLine($"Using default wwwroot path: {builder.Environment.WebRootPath}");
+}
 
 var app = builder.Build();
 

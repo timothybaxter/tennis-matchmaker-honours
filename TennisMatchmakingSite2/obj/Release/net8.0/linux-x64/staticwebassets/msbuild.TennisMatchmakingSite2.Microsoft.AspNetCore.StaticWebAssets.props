@@ -210,8 +210,8 @@
       <RelatedAsset></RelatedAsset>
       <AssetTraitName></AssetTraitName>
       <AssetTraitValue></AssetTraitValue>
-      <Fingerprint>9fc7i2tfl8</Fingerprint>
-      <Integrity>pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8=</Integrity>
+      <Fingerprint>at93m86w07</Fingerprint>
+      <Integrity>klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=</Integrity>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <OriginalItemSpec>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\js\signalr-connection.js'))</OriginalItemSpec>

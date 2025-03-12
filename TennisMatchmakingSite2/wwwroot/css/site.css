@@ -535,3 +535,180 @@ body {
         display: none;
         opacity: 0;
     }
+
+.tournament-container {
+    display: flex;
+    justify-content: center;
+    min-width: max-content;
+    gap: 40px;
+    padding-bottom: 20px;
+}
+
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    position: relative;
+}
+
+.matches-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+.bracket-match {
+    margin: 10px 0;
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* First round positioning */
+.bracket-round:first-child .matches-container {
+    justify-content: space-around;
+}
+
+/* Position matches in subsequent rounds */
+.bracket-round:not(:first-child) .matches-container {
+    justify-content: space-evenly;
+}
+
+.match-content {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: #f9fafb;
+    padding: 8px;
+    width: 100%;
+    z-index: 2;
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.match-details-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 12px;
+}
+
+    .match-details-link:hover {
+        text-decoration: underline;
+    }
+
+.player {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.player-seed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #f3f4f6;
+    color: #4b5563;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.player.winner {
+    color: #059669;
+    font-weight: 600;
+}
+
+    .player.winner .player-seed {
+        background-color: #d1fae5;
+        color: #059669;
+    }
+
+.player.bye {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+    .player.bye .player-seed {
+        background-color: #f3f4f6;
+        color: #9ca3af;
+    }
+
+.match-score {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 14px;
+    color: #059669;
+    font-weight: 500;
+}
+
+/* Connecting lines */
+.bracket-round:not(:last-child) .bracket-match::after {
+    content: '';
+    position: absolute;
+    right: -40px;
+    top: 50%;
+    width: 40px;
+    height: 2px;
+    background-color: #e5e7eb;
+    z-index: 1;
+}
+
+/* Vertical connecting lines for matches in the same round */
+.bracket-round:not(:first-child) .bracket-match::before {
+    content: '';
+    position: absolute;
+    left: -40px;
+    width: 40px;
+    height: calc(100% + 20px);
+    border-right: 2px solid #e5e7eb;
+    border-top: 2px solid #e5e7eb;
+    border-bottom: 2px solid #e5e7eb;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    top: -10px;
+    z-index: 1;
+}
+
+/* Special styling for bye matches */
+.bye-match .match-content {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+/* Handle odd number of players - auto-advance with bye */
+.bye-match::after {
+    border-color: #10b981;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+    .tournament-container {
+        gap: 20px;
+    }
+
+    .bracket-round {
+        min-width: 180px;
+    }
+
+        .bracket-round:not(:last-child) .bracket-match::after {
+            right: -20px;
+            width: 20px;
+        }
+
+        .bracket-round:not(:first-child) .bracket-match::before {
+            left: -20px;
+            width: 20px;
+        }
+}

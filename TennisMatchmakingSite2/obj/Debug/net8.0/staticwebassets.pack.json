@@ -61,6 +61,10 @@
       "PackagePath": "staticwebassets\\js\\theme-handler.js"
     },
     {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\tournament-scripts.js",
+      "PackagePath": "staticwebassets\\js\\tournament-scripts.js"
+    },
+    {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\lib\\bootstrap\\LICENSE",
       "PackagePath": "staticwebassets\\lib\\bootstrap"
     },

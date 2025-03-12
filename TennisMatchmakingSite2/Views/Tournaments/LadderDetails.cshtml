@@ -1,0 +1,621 @@
+@model TennisMatchmakingSite2.Models.LadderDetailData
+@{
+    ViewData["Title"] = Model.Name;
+    string currentUserId = Context.Session.GetString("UserId") ?? string.Empty;
+    Model.IsCreator = Model.CreatorId == currentUserId;
+    Model.IsParticipant = Model.Positions.Any(p => p.PlayerId == currentUserId);
+
+    var userPosition = Model.Positions.FirstOrDefault(p => p.PlayerId == currentUserId);
+    Model.CurrentUserRank = userPosition?.Rank;
+
+    // Map of status to color classes
+    Dictionary<string, string> statusColors = new Dictionary<string, string>
+    {
+        { "active", "green" },
+        { "inactive", "gray" }
+    };
+    string statusColor = statusColors.ContainsKey(Model.Status) ? statusColors[Model.Status] : "gray";
+}
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4">
+        <!-- Ladder Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">@Model.Name</h1>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-@(statusColor)-100 text-@(statusColor)-800">
+                        @Model.Status.ToUpper()
+                    </span>
+                    <span class="inline-flex items-center text-sm text-gray-600">
+                        <i class="fas fa-users mr-1"></i>
+                        @Model.Positions.Count Players
+                    </span>
+                    <span class="inline-flex items-center text-sm text-gray-600">
+                        <i class="fas fa-clock mr-1"></i>
+                        @Model.ChallengeWindow hour window
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                @if (!Model.IsParticipant && Model.Status == "active")
+                {
+                <form asp-action="JoinLadder" asp-route-id="@Model.Id" method="post" class="inline">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Join Ladder
+                    </button>
+                </form>
+                }
+
+                <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to List
+                </a>
+            </div>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
+            @TempData["SuccessMessage"]
+        </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
+            @TempData["ErrorMessage"]
+        </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Ladder Info -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-semibold mb-4">Ladder Information</h2>
+
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Created by</p>
+                        <p>@Model.CreatorDetails.Name</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Created on</p>
+                        <p>@Model.CreatedAt.ToString("MMMM d, yyyy")</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Challenge Window</p>
+                        <p>@Model.ChallengeWindow hours</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Visibility</p>
+                        <p>@(Model.Visibility == "public" ? "Public" : "Private")</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Skill Level</p>
+                        <p>@Model.SkillLevel</p>
+                    </div>
+
+                    @if (Model.IsParticipant && Model.CurrentUserRank.HasValue)
+                    {
+                    <div class="pt-3 border-t border-gray-200">
+                        <p class="text-sm font-medium text-gray-700">Your Current Rank</p>
+                        <p class="font-semibold text-purple-600">#@Model.CurrentUserRank</p>
+                    </div>
+                    }
+                </div>
+
+                @if (Model.IsParticipant && Model.Status == "active")
+                {
+                <div class="mt-6 pt-4 border-t border-gray-200">
+                    <h3 class="font-medium text-gray-800 mb-3">Ladder Rules:</h3>
+                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        <li>You can challenge players up to 2 ranks above you</li>
+                        <li>If you win, you swap positions with your opponent</li>
+                        <li>Challenges must be completed within @Model.ChallengeWindow hours</li>
+                        <li>Both players must submit the match result</li>
+                    </ul>
+                </div>
+                }
+            </div>
+
+            <!-- Ladder Rankings & Matches -->
+            <div class="md:col-span-2 space-y-6">
+                <!-- Ladder Rankings -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">Ladder Rankings</h2>
+
+                    @if (!Model.Positions.Any())
+                    {
+                    <p class="text-gray-600">No players in this ladder yet.</p>
+                    }
+                    else
+                    {
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Rank</th>
+                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Player</th>
+                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Skill Level</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-600">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var position in Model.Positions.OrderBy(p => p.Rank))
+                                    {
+                                        bool isCurrentUser = position.PlayerId == currentUserId;
+                                        bool isChallengeable = Model.IsParticipant &&
+                                                               Model.Status == "active" &&
+                                                               !Model.UserHasActiveChallenge &&
+                                                               Model.ChallengeablePositions != null &&
+                                                               Model.ChallengeablePositions.Any(p => p.PlayerId == position.PlayerId);
+
+                                <tr class="border-b border-gray-200 @(isCurrentUser ? "bg-purple-50" : "")">
+                                    <td class="py-3 px-3">
+                                        <span class="font-semibold">@position.Rank</span>
+                                    </td>
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center">
+                                            <span class="@(isCurrentUser ? "font-medium" : "")">
+                                                @position.PlayerDetails.Name
+                                            </span>
+                                            @if (position.PlayerId == Model.CreatorId)
+                                                    {
+                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                Creator
+                                            </span>
+                                                    }
+                                            @if (isCurrentUser)
+                                                    {
+                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                You
+                                            </span>
+                                                    }
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3">
+                                        <span>@position.PlayerDetails.PlayerLevel</span>
+                                    </td>
+                                    <td class="py-3 px-3 text-right">
+                                        <div class="flex justify-end gap-2">
+                                            <a href="@Url.Action("ViewProfile", "Profile", new { id = position.PlayerId })"
+                                               class="inline-flex items-center px-3 py-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
+                                                <i class="fas fa-user mr-1"></i>
+                                                View Profile
+                                            </a>
+
+                                            @if (isChallengeable)
+                                            {
+                                            <form asp-action="IssueChallenge" asp-route-id="@Model.Id" asp-route-challengeeId="@position.PlayerId" method="post" class="inline">
+                                                <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                                                    <i class="fas fa-chess-knight mr-1"></i>
+                                                    Challenge
+                                                </button>
+                                            </form>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                                    }
+                            </tbody>
+                        </table>
+                    </div>
+                    }
+                </div>
+
+                <!-- Active Challenges -->
+                @if (Model.Matches.Any(m => m.Status == "scheduled" || m.Status == "accepted" || m.Status == "disputed"))
+{
+    var activeMatches = Model.Matches.Where(m => m.Status == "scheduled" || m.Status == "accepted" || m.Status == "disputed").ToList();
+
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">Active Challenges (@activeMatches.Count)</h2>
+
+                    <div class="space-y-4">
+                        @foreach (var match in activeMatches.OrderBy(m => m.CreatedAt))
+            {
+                bool isUserInvolved = match.ChallengerId == currentUserId || match.ChallengeeId == currentUserId;
+                bool isDisputed = match.Status == "disputed";
+
+                        <div class="border @(isDisputed ? "border-red-500" : "border-gray-200") rounded-md p-4 @(isUserInvolved ? "bg-blue-50" : "bg-white") hover:border-gray-300 transition-colors">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="font-medium">
+                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengerId })" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                            @match.Challenger.Name
+                                        </a> (#@match.ChallengerRank)
+                                        <span class="text-gray-500">challenging</span>
+                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengeeId })" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                            @match.Challengee.Name
+                                        </a> (#@match.ChallengeeRank)
+                                    </h3>
+                                    <p class="text-sm text-gray-600">
+                                        Created: @match.CreatedAt.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                  @(isDisputed ? "bg-red-100 text-red-800" :
+                                    match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
+                                    match.Status == "accepted" ? "bg-green-100 text-green-800" :
+                                    "bg-gray-100 text-gray-800")">
+                                    @match.Status.ToUpper()
+                                </span>
+                            </div>
+
+                            @if (isDisputed)
+                    {
+                            <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm mb-3">
+                                <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
+                                <p>The submitted results don't match. Please resubmit or contact the ladder organizer.</p>
+                                <p class="mt-1">You have until the deadline to resolve this issue or you may be removed from the ladder.</p>
+                            </div>
+                    }
+
+                            <div class="flex justify-between items-end">
+                                <div class="text-sm text-gray-600">
+                                    <p>
+                                        <span class="font-medium">Deadline:</span>
+                                        @match.Deadline?.ToString("MMM d, yyyy HH:mm")
+                                    </p>
+
+                                    @if (match.Status == "scheduled" && match.ChallengeeId == currentUserId)
+                            {
+                                    <div class="mt-2 flex space-x-2">
+                                        <form asp-action="RespondToChallenge" asp-route-id="@Model.Id" asp-route-matchId="@match.Id" method="post">
+                                            <input type="hidden" name="response" value="accept" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                                                <i class="fas fa-check mr-1"></i>
+                                                Accept
+                                            </button>
+                                        </form>
+
+                                        <form asp-action="RespondToChallenge" asp-route-id="@Model.Id" asp-route-matchId="@match.Id" method="post">
+                                            <input type="hidden" name="response" value="decline" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
+                                                <i class="fas fa-times mr-1"></i>
+                                                Decline
+                                            </button>
+                                        </form>
+                                    </div>
+                            }
+                                </div>
+
+                                @if (isUserInvolved && (match.Status == "accepted" || match.Status == "disputed") && match.CanSubmitResult)
+                        {
+                                <a href="#submit-result-modal" onclick="openSubmitResultModal('@match.Id')"
+                                   class="inline-flex items-center px-3 py-1.5 text-sm font-medium
+                                     @(isDisputed ? "text-white bg-red-600 hover:bg-red-700" : "text-blue-700 bg-blue-50 hover:bg-blue-100")
+                                     rounded-md transition-colors">
+                                    <i class="fas @(isDisputed ? "fa-exclamation-circle" : "fa-trophy") mr-1"></i>
+                                    @(isDisputed ? "Resubmit Result" : "Submit Result")
+                                </a>
+                        }
+                            </div>
+                        </div>
+            }
+                    </div>
+                </div>
+}
+
+                <!-- Recent Matches -->
+                @if (Model.Matches.Any(m => m.Status == "completed"))
+                {
+                    var completedMatches = Model.Matches.Where(m => m.Status == "completed").ToList();
+
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold mb-4">Recent Matches (@completedMatches.Count)</h2>
+
+                    <div class="space-y-4">
+                        @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Take(5))
+                            {
+                        <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="font-medium">
+                                        @match.Challenger.Name (#@match.ChallengerRank)
+                                        <span class="text-gray-500">vs</span>
+                                        @match.Challengee.Name (#@match.ChallengeeRank)
+                                    </h3>
+                                    <p class="text-sm text-gray-600">
+                                        Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-end">
+                                <div class="flex items-center">
+                                    <div class="flex items-center mr-2">
+                                        <span class="font-medium @(match.Winner.Id == match.ChallengerId ? "text-green-600" : "")">
+                                            @match.Challenger.Name
+                                        </span>
+                                        @if (match.Winner.Id == match.ChallengerId)
+                                                {
+                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                                }
+                                    </div>
+                                    <div class="text-gray-500 mx-2">vs</div>
+                                    <div class="flex items-center">
+                                        <span class="font-medium @(match.Winner.Id == match.ChallengeeId ? "text-green-600" : "")">
+                                            @match.Challengee.Name
+                                        </span>
+                                        @if (match.Winner.Id == match.ChallengeeId)
+                                                {
+                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                                }
+                                    </div>
+                                </div>
+
+                                @if (match.Scores.Any())
+                                        {
+                                <div class="text-sm font-medium">
+                                    @foreach (var score in match.Scores)
+                                                {
+                                    <span class="mx-1">@score.Player1-@score.Player2</span>
+                                                }
+                                </div>
+                                        }
+                            </div>
+                        </div>
+                            }
+                    </div>
+
+                    @if (completedMatches.Count > 5)
+                        {
+                    <div class="mt-4 text-center">
+                        <button type="button" onclick="toggleAllMatches()" id="showMoreButton" class="text-blue-600 hover:text-blue-800 text-sm">
+                            Show all matches
+                        </button>
+                    </div>
+
+                    <div id="allMatchesSection" class="hidden space-y-4 mt-4 pt-4 border-t border-gray-200">
+                        @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Skip(5))
+                                {
+                        <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="font-medium">
+                                        @match.Challenger.Name (#@match.ChallengerRank)
+                                        <span class="text-gray-500">vs</span>
+                                        @match.Challengee.Name (#@match.ChallengeeRank)
+                                    </h3>
+                                    <p class="text-sm text-gray-600">
+                                        Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-end">
+                                <div class="flex items-center">
+                                    <div class="flex items-center mr-2">
+                                        <span class="font-medium @(match.Winner.Id == match.ChallengerId ? "text-green-600" : "")">
+                                            @match.Challenger.Name
+                                        </span>
+                                        @if (match.Winner.Id == match.ChallengerId)
+                                                    {
+                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                                    }
+                                    </div>
+                                    <div class="text-gray-500 mx-2">vs</div>
+                                    <div class="flex items-center">
+                                        <span class="font-medium @(match.Winner.Id == match.ChallengeeId ? "text-green-600" : "")">
+                                            @match.Challengee.Name
+                                        </span>
+                                        @if (match.Winner.Id == match.ChallengeeId)
+                                                    {
+                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                                    }
+                                    </div>
+                                </div>
+
+                                @if (match.Scores.Any())
+                                            {
+                                <div class="text-sm font-medium">
+                                    @foreach (var score in match.Scores)
+                                                    {
+                                    <span class="mx-1">@score.Player1-@score.Player2</span>
+                                                    }
+                                </div>
+                                            }
+                            </div>
+                        </div>
+                                }
+                    </div>
+                        }
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Result Modal -->
+<div id="submit-result-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Submit Match Result</h3>
+            <button onclick="closeSubmitResultModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="submit-result-form" asp-action="SubmitMatchResult" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" id="match-id-input" name="matchId" value="" />
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Who won?</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="winner" value="" class="player1-radio mr-2" required />
+                            <span class="player1-name"></span>
+                        </label>
+                        <label class="flex p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400">
+                            <input type="radio" name="winner" value="" class="player2-radio mr-2" />
+                            <span class="player2-name"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Match Score</label>
+                    <p class="text-sm text-gray-600 mb-2">Enter the scores for each set played (e.g., 6-4, 7-5)</p>
+
+                    <div id="score-sets" class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <input type="number" name="Scores[0].Player1" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                            <span>-</span>
+                            <input type="number" name="Scores[0].Player2" min="0" max="99" required
+                                   class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <button type="button" onclick="addScoreSet()" class="text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-plus-circle mr-1"></i>
+                            Add another set
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200">
+                    <p class="mb-4 text-sm text-gray-600">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Both players need to submit the same result. The ladder will update automatically when both results match.
+                    </p>
+                    <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        Submit Result
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Match data store
+        const matches = @Html.Raw(Json.Serialize(Model.Matches));
+
+        // Toggle showing all matches
+        function toggleAllMatches() {
+            const allMatchesSection = document.getElementById('allMatchesSection');
+            const showMoreButton = document.getElementById('showMoreButton');
+
+            if (allMatchesSection.classList.contains('hidden')) {
+                allMatchesSection.classList.remove('hidden');
+                showMoreButton.textContent = 'Show fewer matches';
+            } else {
+                allMatchesSection.classList.add('hidden');
+                showMoreButton.textContent = 'Show all matches';
+            }
+        }
+
+        // Submit result modal functions
+        function openSubmitResultModal(matchId) {
+            const modal = document.getElementById('submit-result-modal');
+            const matchIdInput = document.getElementById('match-id-input');
+
+            // Find the match
+            const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+
+            // Set match ID
+            matchIdInput.value = matchId;
+
+            // Set player names and values
+            const player1Radios = document.querySelectorAll('.player1-radio');
+            const player2Radios = document.querySelectorAll('.player2-radio');
+            const player1Names = document.querySelectorAll('.player1-name');
+            const player2Names = document.querySelectorAll('.player2-name');
+
+            player1Radios.forEach(radio => radio.value = match.challengerId);
+            player2Radios.forEach(radio => radio.value = match.challengeeId);
+
+            player1Names.forEach(span => span.textContent = match.challenger.name);
+            player2Names.forEach(span => span.textContent = match.challengee.name);
+
+            // Show modal
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSubmitResultModal() {
+            const modal = document.getElementById('submit-result-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+
+            // Reset form
+            document.getElementById('submit-result-form').reset();
+            resetScoreSets();
+        }
+
+        // Score set functions
+        function addScoreSet() {
+            const scoreSets = document.getElementById('score-sets');
+            const setCount = scoreSets.children.length;
+
+            const newSet = document.createElement('div');
+            newSet.className = 'flex items-center gap-3';
+            newSet.innerHTML = `
+                <input type="number" name="Scores[${setCount}].Player1" min="0" max="99"
+                       class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                <span>-</span>
+                <input type="number" name="Scores[${setCount}].Player2" min="0" max="99"
+                       class="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="0" />
+                <button type="button" onclick="removeScoreSet(this)" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            `;
+
+            scoreSets.appendChild(newSet);
+        }
+
+        function removeScoreSet(button) {
+            const setDiv = button.parentElement;
+            setDiv.remove();
+
+            // Rename inputs to keep indices sequential
+            const scoreSets = document.getElementById('score-sets');
+            const setDivs = scoreSets.children;
+
+            for (let i = 0; i < setDivs.length; i++) {
+                const inputs = setDivs[i].querySelectorAll('input');
+                inputs[0].name = `Scores[${i}].Player1`;
+                inputs[1].name = `Scores[${i}].Player2`;
+            }
+        }
+
+        function resetScoreSets() {
+            const scoreSets = document.getElementById('score-sets');
+            const setDivs = Array.from(scoreSets.children);
+
+            // Keep first set, remove the rest
+            for (let i = 1; i < setDivs.length; i++) {
+                setDivs[i].remove();
+            }
+
+            // Clear values in first set
+            const firstSetInputs = scoreSets.querySelector('div').querySelectorAll('input');
+            firstSetInputs.forEach(input => input.value = '');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('submit-result-modal');
+            if (!modal) return;
+
+            if (modal.classList.contains('hidden')) return;
+
+            if (event.target === modal) {
+                closeSubmitResultModal();
+            }
+        });
+    </script>
+}

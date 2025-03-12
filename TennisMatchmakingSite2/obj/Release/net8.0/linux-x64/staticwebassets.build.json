@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "87FitK54uMcTGPStWvWuyFlm0O+ZilJZpJC8Jyd2uU4=",
+  "Hash": "pbbolAte5F2fxRfyyyd33mF25JMEt4PnXEC/rqSMXAo=",
   "Source": "TennisMatchmakingSite2",
   "BasePath": "_content/TennisMatchmakingSite2",
   "Mode": "Default",
@@ -304,8 +304,8 @@
       "RelatedAsset": "",
       "AssetTraitName": "",
       "AssetTraitValue": "",
-      "Fingerprint": "9fc7i2tfl8",
-      "Integrity": "pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8=",
+      "Fingerprint": "at93m86w07",
+      "Integrity": "klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\signalr-connection.js"
@@ -8124,7 +8124,7 @@
       ]
     },
     {
-      "Route": "js/signalr-connection.9fc7i2tfl8.js",
+      "Route": "js/signalr-connection.at93m86w07.js",
       "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\signalr-connection.js",
       "Selectors": [],
       "ResponseHeaders": [
@@ -8134,7 +8134,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "10148"
+          "Value": "16215"
         },
         {
           "Name": "Content-Type",
@@ -8142,11 +8142,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8=\""
+          "Value": "\"klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Mon, 03 Mar 2025 16:41:42 GMT"
+          "Value": "Thu, 06 Mar 2025 18:42:00 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -8156,7 +8156,7 @@
       "EndpointProperties": [
         {
           "Name": "fingerprint",
-          "Value": "9fc7i2tfl8"
+          "Value": "at93m86w07"
         },
         {
           "Name": "label",
@@ -8164,7 +8164,7 @@
         },
         {
           "Name": "integrity",
-          "Value": "sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8="
+          "Value": "sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA="
         }
       ]
     },
@@ -8179,7 +8179,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "10148"
+          "Value": "16215"
         },
         {
           "Name": "Content-Type",
@@ -8187,11 +8187,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8=\""
+          "Value": "\"klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Mon, 03 Mar 2025 16:41:42 GMT"
+          "Value": "Thu, 06 Mar 2025 18:42:00 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -8201,7 +8201,7 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-pWTnbS9qVMl8WDb3cjS6HN63pZHQS+pKuxbGfTZgwp8="
+          "Value": "sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA="
         }
       ]
     },

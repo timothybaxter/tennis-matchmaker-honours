@@ -1,0 +1,87 @@
+@model TennisMatchmakingSite2.Models.CreateTournamentViewModel
+@{
+    ViewData["Title"] = "Create Tournament";
+}
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4 max-w-2xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6">Create New Tournament</h1>
+
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <form asp-action="CreateTournament" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-red-500 mb-4"></div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label asp-for="Name" class="block text-sm font-medium text-gray-700 mb-1">Tournament Name</label>
+                        <input asp-for="Name" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        <span asp-validation-for="Name" class="text-sm text-red-500"></span>
+                    </div>
+
+                    <div>
+                        <label asp-for="Format" class="block text-sm font-medium text-gray-700 mb-1">Tournament Format</label>
+                        <select asp-for="Format" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="single">Single Elimination</option>
+                            <option value="double">Double Elimination</option>
+                        </select>
+                        <span asp-validation-for="Format" class="text-sm text-red-500"></span>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Single elimination: Players are eliminated after one loss.
+                            Double elimination: Players are eliminated after two losses.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label asp-for="Visibility" class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+                        <select asp-for="Visibility" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="public">Public (Anyone can join)</option>
+                            <option value="private">Private (Invitation only)</option>
+                        </select>
+                        <span asp-validation-for="Visibility" class="text-sm text-red-500"></span>
+                    </div>
+
+                    <div>
+                        <label asp-for="ChallengeWindow" class="block text-sm font-medium text-gray-700 mb-1">Match Window (hours)</label>
+                        <input asp-for="ChallengeWindow" type="number" min="1" max="168" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                        <span asp-validation-for="ChallengeWindow" class="text-sm text-red-500"></span>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Time players have to complete their matches.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label asp-for="SkillLevel" class="block text-sm font-medium text-gray-700 mb-1">Recommended Skill Level</label>
+                        <select asp-for="SkillLevel" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="All Levels">All Levels</option>
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                            <option value="Professional">Professional</option>
+                        </select>
+                        <span asp-validation-for="SkillLevel" class="text-sm text-red-500"></span>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-200">
+                        <p class="mb-4 text-sm text-gray-600">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            After creating the tournament, you can invite players and then start it when ready.
+                            You'll be automatically added as a participant.
+                        </p>
+                        <div class="flex justify-end space-x-4">
+                            <a href="@Url.Action("Index", "Tournaments")" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
+                                Cancel
+                            </a>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                Create Tournament
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

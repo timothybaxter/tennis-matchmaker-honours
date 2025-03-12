@@ -1,0 +1,230 @@
+@model TennisMatchmakingSite2.Models.CompetitionViewModel
+@{
+    ViewData["Title"] = Model.IsPersonal ? "My Competitions" : "Tournaments & Ladders";
+}
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4">
+        <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">@ViewData["Title"]</h1>
+    <div class="flex gap-4">
+        <a href="@Url.Action("Index", "MyMatches")"
+           class="inline-flex items-center px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-50 rounded-md border border-yellow-200 hover:bg-yellow-100 transition-colors">
+            <i class="fas fa-table-tennis mr-2"></i>
+            My Matches
+        </a>
+        <a href="@(Model.IsPersonal ? @Url.Action("Index", "Tournaments") : @Url.Action("Index", "Tournaments", new { personal = true }))"
+           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
+             @(Model.IsPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
+            <i class="fas @(Model.IsPersonal ? "fa-globe" : "fa-user") mr-2"></i>
+            @(Model.IsPersonal ? "View All Competitions" : "My Competitions")
+        </a>
+        <button onclick="openCreateModal()"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+            <i class="fas fa-plus mr-2"></i>
+            Create New
+        </button>
+    </div>
+</div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
+                @TempData["SuccessMessage"]
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
+                @TempData["ErrorMessage"]
+            </div>
+        }
+
+        <!-- Tournaments Section -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Tournaments</h2>
+            
+            @if (!Model.Tournaments.Any())
+            {
+                <div class="bg-gray-50 text-gray-700 p-6 rounded-md text-center">
+                    <p class="mb-4">@(Model.IsPersonal ? "You're not participating in any tournaments yet." : "No tournaments available.")</p>
+                    <div class="flex justify-center">
+                        <a href="@Url.Action("CreateTournament", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                            <i class="fas fa-trophy mr-2"></i>
+                            Create Tournament
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach (var tournament in Model.Tournaments)
+                    {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                            <div class="p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-semibold">@tournament.Name</h3>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                          @(tournament.Status == "pending" ? "bg-yellow-100 text-yellow-800" : 
+                                            tournament.Status == "active" ? "bg-green-100 text-green-800" : 
+                                            "bg-gray-100 text-gray-800")">
+                                        @tournament.Status.ToUpper()
+                                    </span>
+                                </div>
+                                
+                                <div class="mt-2 space-y-1 text-gray-600">
+                                    <p><span class="font-medium">Format:</span> @(tournament.Format == "single" ? "Single Elimination" : "Double Elimination")</p>
+                                    <p><span class="font-medium">Created by:</span> @tournament.CreatorDetails.Name</p>
+                                    <p><span class="font-medium">Players:</span> @tournament.Players.Count</p>
+                                    <p><span class="font-medium">Skill Level:</span> @tournament.SkillLevel</p>
+                                    <p><span class="font-medium">Match Window:</span> @tournament.ChallengeWindow hours</p>
+                                </div>
+                                
+                                <div class="mt-4 flex justify-between items-center">
+                                    <span class="text-sm text-gray-500">
+                                        @(tournament.Status == "pending" ? "Created" : tournament.Status == "active" ? "Started" : "Completed") 
+                                        @(tournament.Status == "pending" ? tournament.CreatedAt.ToString("MMM d, yyyy") : 
+                                          tournament.Status == "active" ? tournament.StartedAt?.ToString("MMM d, yyyy") : 
+                                          tournament.CompletedAt?.ToString("MMM d, yyyy"))
+                                    </span>
+                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = tournament.Id })" 
+                                       class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                                        View Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Ladders Section -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4">Ladders</h2>
+            
+            @if (!Model.Ladders.Any())
+            {
+                <div class="bg-gray-50 text-gray-700 p-6 rounded-md text-center">
+                    <p class="mb-4">@(Model.IsPersonal ? "You're not participating in any ladders yet." : "No ladders available.")</p>
+                    <div class="flex justify-center">
+                        <a href="@Url.Action("CreateLadder", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                            <i class="fas fa-list-ol mr-2"></i>
+                            Create Ladder
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach (var ladder in Model.Ladders)
+                    {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                            <div class="p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-semibold">@ladder.Name</h3>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                          @(ladder.Status == "active" ? "bg-green-100 text-green-800" : 
+                                            "bg-gray-100 text-gray-800")">
+                                        @ladder.Status.ToUpper()
+                                    </span>
+                                </div>
+                                
+                                <div class="mt-2 space-y-1 text-gray-600">
+                                    <p><span class="font-medium">Created by:</span> @ladder.CreatorDetails.Name</p>
+                                    <p><span class="font-medium">Players:</span> @ladder.Positions.Count</p>
+                                    <p><span class="font-medium">Skill Level:</span> @ladder.SkillLevel</p>
+                                    <p><span class="font-medium">Challenge Window:</span> @ladder.ChallengeWindow hours</p>
+                                </div>
+                                
+                                @if (ladder.Positions.Count > 0)
+                                {
+                                    <div class="mt-3 border-t border-gray-100 pt-3">
+                                        <p class="font-medium text-sm mb-2">Top 3 Players:</p>
+                                        <ol class="list-decimal list-inside">
+                                            @foreach (var position in ladder.Positions.OrderBy(p => p.Rank).Take(3))
+                                            {
+                                                <li class="text-gray-600">@position.PlayerDetails.Name</li>
+                                            }
+                                        </ol>
+                                    </div>
+                                }
+                                
+                                <div class="mt-4 flex justify-between items-center">
+                                    <span class="text-sm text-gray-500">
+                                        Created @ladder.CreatedAt.ToString("MMM d, yyyy")
+                                    </span>
+                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = ladder.Id })" 
+                                       class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                                        View Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Competition Modal -->
+<div id="createCompetitionModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Create New Competition</h3>
+            <button onclick="closeCreateModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <p class="text-gray-600">Choose which type of competition you want to create:</p>
+            
+            <a href="@Url.Action("CreateTournament", "Tournaments")" class="block w-full text-center py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                <i class="fas fa-trophy text-yellow-600 mr-2"></i>
+                Tournament
+            </a>
+            
+            <a href="@Url.Action("CreateLadder", "Tournaments")" class="block w-full text-center py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                <i class="fas fa-list-ol text-blue-600 mr-2"></i>
+                Ladder
+            </a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openCreateModal() {
+            const modal = document.getElementById('createCompetitionModal');
+            if (!modal) return;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCreateModal() {
+            const modal = document.getElementById('createCompetitionModal');
+            if (!modal) return;
+
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('createCompetitionModal');
+            if (!modal) return;
+            
+            if (modal.classList.contains('hidden')) return;
+            
+            if (event.target === modal) {
+                closeCreateModal();
+            }
+        });
+    </script>
+}
