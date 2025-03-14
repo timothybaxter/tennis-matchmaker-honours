@@ -429,9 +429,21 @@ export async function joinTournament(event) {
 }
 
 // Start tournament
-async function startTournament(event) {
+// Start tournament
+export async function startTournament(event) {
     try {
-        // [existing token verification code]
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const tournamentId = event.pathParameters?.id;
+
+        if (!tournamentId) {
+            return createResponse(400, { message: 'Tournament ID is required' });
+        }
 
         // Connect to tournaments database
         const db = await connectToDatabase();
@@ -439,9 +451,31 @@ async function startTournament(event) {
         const matches = db.collection('competitiveMatches');
 
         // Get tournament
-        const tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        let tournament;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid tournament ID format' });
+        }
 
-        // [existing validation code]
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        // Check if user is the creator
+        if (tournament.creatorId !== userId) {
+            return createResponse(403, { message: 'Only the tournament creator can start the tournament' });
+        }
+
+        // Check if tournament is in pending status
+        if (tournament.status !== 'pending') {
+            return createResponse(400, { message: 'Tournament has already started or is completed' });
+        }
+
+        // Check if there are enough players
+        if (!tournament.players || tournament.players.length < 2) {
+            return createResponse(400, { message: 'Tournament needs at least 2 players to start' });
+        }
 
         // Generate bracket
         const bracket = generateBracket(tournament.players, tournament.format);
@@ -534,6 +568,14 @@ async function startTournament(event) {
             }
         }
 
+        // Notify all players
+        try {
+            const usersDb = await connectToSpecificDatabase('users-db');
+            const users = usersDb.collection('users');
+
+            // Get creator details
+            const creator = await users.findOne({ _id: new ObjectId(userId) });
+
             // Notify each player except the creator
             for (const playerId of tournament.players) {
                 if (playerId !== userId) {
@@ -564,14 +606,17 @@ async function startTournament(event) {
             // Continue without failing
         }
 
-    return createResponse(200, {
-        message: 'Tournament started successfully',
-        bracket: bracket.bracketStructure,
-        matches: createdMatches,
-        autoAdvanced: bracket.playersWithByes.length
-    });
-} catch (error) {
-    console.error('Start tournament error:', error);
+        return createResponse(200, {
+            message: 'Tournament started successfully',
+            bracket: bracket.bracketStructure,
+            matches: createdMatches,
+            autoAdvanced: bracket.playersWithByes.length
+        });
+    } catch (error) {
+        console.error('Start tournament error:', error);
+        return createResponse(500, { message: 'Error starting tournament', error: error.message });
+    }
+}    console.error('Start tournament error:', error);
     return createResponse(500, { message: 'Error starting tournament', error: error.message });
 }
 }
