@@ -429,7 +429,6 @@ export async function joinTournament(event) {
 }
 
 // Start tournament
-// Start tournament
 export async function startTournament(event) {
     try {
         // Extract and verify token
@@ -616,13 +615,9 @@ export async function startTournament(event) {
         console.error('Start tournament error:', error);
         return createResponse(500, { message: 'Error starting tournament', error: error.message });
     }
-}    console.error('Start tournament error:', error);
-    return createResponse(500, { message: 'Error starting tournament', error: error.message });
-}
 }
 
 // Submit match result
-// Submit match result for Tournament
 export async function submitMatchResult(event) {
     try {
         // Extract and verify token
@@ -983,7 +978,7 @@ export async function resolveDisputedMatch(event) {
                 break;
             case 'no_contest':
                 // Both players are removed from tournament
-                return await removePlayersFromTournament(tournamentId, [match.player1, match.player2], tournaments, matches);
+                return await removePlayersFromTournament(tournamentId, matchId, [match.player1, match.player2], tournaments, matches);
         }
 
         // Update match as resolved
@@ -1294,6 +1289,7 @@ function generateBracket(players, format) {
         advancementMap
     };
 }
+
 // Helper function to compare match submissions
 function compareSubmissions(scores1, scores2, winner1, winner2) {
     // Check if winners match
@@ -1353,11 +1349,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
         }
 
         // Find the next match to advance to
-        let nextMatch = null;
-        let playerPosition = null; // 'player1' or 'player2'
-
-        // Look through the next round matches to find where this match feeds into
-        const nextRoundMatches = bracket.rounds[nextRound - 1].matches;
         let nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1;
 
         if (currentRound > 1) {
@@ -1370,10 +1361,11 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
         }
 
         // Determine if this match feeds into player1 or player2 slot
-        playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
+        const playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
 
         // Find the next match in the bracket
-        nextMatch = nextRoundMatches.find(m => m.matchNumber === nextMatchNumber);
+        const nextRoundMatches = bracket.rounds[nextRound - 1].matches;
+        const nextMatch = nextRoundMatches.find(m => m.matchNumber === nextMatchNumber);
 
         if (!nextMatch) {
             console.error(`Could not find next match ${nextMatchNumber} for advancing from match ${match.matchNumber}`);
@@ -1476,9 +1468,39 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             const player2 = updatedNextMatch.player2.id;
 
             try {
-                // [existing notification code]
+                const usersDb = await connectToSpecificDatabase('users-db');
+                const users = usersDb.collection('users');
+
+                for (const playerId of [player1, player2]) {
+                    const opponent = playerId === player1 ? player2 : player1;
+                    const opponentData = await users.findOne({ _id: new ObjectId(opponent) });
+
+                    const notificationRequest = {
+                        recipientId: playerId,
+                        senderId: tournament.creatorId,
+                        senderName: 'Tournament System',
+                        tournamentId: tournamentId,
+                        tournamentName: tournament.name,
+                        matchId: newMatch._id.toString(),
+                        type: 'new_tournament_match',
+                        opponentName: opponentData?.name || 'Unknown Opponent'
+                    };
+
+                    // Make request to your notification API
+                    if (process.env.NOTIFICATION_API_URL) {
+                        await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/tournaments', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${process.env.API_KEY || token}`
+                            },
+                            body: JSON.stringify(notificationRequest)
+                        });
+                    }
+                }
             } catch (notificationError) {
                 console.error('Error sending new match notifications:', notificationError);
+                // Continue without failing
             }
         }
     } catch (error) {
@@ -1487,7 +1509,7 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
 }
 
 // Helper function to remove players from tournament
-async function removePlayersFromTournament(tournamentId, playerIds, tournaments, matches) {
+async function removePlayersFromTournament(tournamentId, matchId, playerIds, tournaments, matches) {
     try {
         // Update the match as "no contest"
         await matches.updateOne(
@@ -1613,6 +1635,7 @@ async function auditMatchState(match, operation, userId, db) {
         return { hasIssues: false }; // Don't block operation on audit failure
     }
 }
+
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
@@ -1648,4 +1671,3 @@ function extractAndVerifyToken(event) {
         };
     }
 }
-
