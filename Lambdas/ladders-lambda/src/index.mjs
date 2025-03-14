@@ -9,7 +9,6 @@ import {
     resolveDisputedMatch,
     leaveLadder,
     resetMatchSubmission,
-    // New invitation functions
     inviteToLadder,
     getPendingLadderInvitations,
     getSentLadderInvitations,

@@ -1636,7 +1636,6 @@ async function auditMatchState(match, operation, userId, db) {
     }
 }
 
-// src/handlers/tournaments.mjs - Add these new functions
 
 // Invite a user to a tournament
 export async function inviteToTournament(event) {
@@ -2079,7 +2078,103 @@ export async function getSentInvitations(event) {
         return createResponse(500, { message: 'Error retrieving sent invitations', error: error.message });
     }
 }
+// Cancel tournament invitation (for tournament creators to cancel a pending invitation)
+export async function cancelTournamentInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
 
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('tournamentInvitations');
+        const tournaments = db.collection('tournaments');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if tournament exists
+        let tournament;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(invitation.tournamentId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid tournament ID format' });
+        }
+
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        // Check if user is the tournament creator
+        if (tournament.creatorId !== userId) {
+            return createResponse(403, { message: 'Only the tournament creator can cancel invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'cancelled', updatedAt: new Date() } }
+        );
+
+        // Send notification to invitee
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviteeId,
+                    senderId: userId,
+                    senderName: invitation.inviterName,
+                    tournamentId: invitation.tournamentId,
+                    tournamentName: invitation.tournamentName,
+                    type: 'tournament_invitation_cancelled',
+                    content: `Your invitation to join ${invitation.tournamentName} has been cancelled`,
+                    relatedItemId: invitation.tournamentId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation cancellation notification:', notificationError);
+            // Continue without failing
+        }
+
+        return createResponse(200, {
+            message: 'Tournament invitation cancelled successfully'
+        });
+    } catch (error) {
+        console.error('Cancel tournament invitation error:', error);
+        return createResponse(500, { message: 'Error cancelling tournament invitation', error: error.message });
+    }
+}
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
