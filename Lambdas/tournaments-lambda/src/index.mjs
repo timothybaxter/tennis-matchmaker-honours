@@ -1,4 +1,19 @@
-import { getTournaments, getTournamentById, createTournament, joinTournament, startTournament, submitMatchResult, resolveDisputedMatch, resetMatchSubmission } from './handlers/tournaments.mjs';
+import {
+    getTournaments,
+    getTournamentById,
+    createTournament,
+    joinTournament,
+    startTournament,
+    submitMatchResult,
+    resolveDisputedMatch,
+    resetMatchSubmission,
+    inviteToTournament,
+    getPendingInvitations,
+    getSentInvitations,
+    acceptTournamentInvitation,
+    rejectTournamentInvitation,
+    cancelTournamentInvitation
+} from './handlers/tournaments.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -53,6 +68,36 @@ export const handler = async (event) => {
         // POST /tournaments/{id}/matches/{matchId}/resolve
         else if (method === 'POST' && resource === '/tournaments/{id}/matches/{matchId}/resolve') {
             return await resolveDisputedMatch(event);
+        }
+
+        // POST /tournaments/{id}/invite - Send invitation to a user
+        else if (method === 'POST' && resource === '/tournaments/{id}/invite') {
+            return await inviteToTournament(event);
+        }
+
+        // GET /tournaments/invitations - Get all pending invitations for current user
+        else if (method === 'GET' && resource === '/tournaments/invitations') {
+            return await getPendingInvitations(event);
+        }
+
+        // GET /tournaments/{id}/invitations - Get sent invitations for a tournament
+        else if (method === 'GET' && resource === '/tournaments/{id}/invitations') {
+            return await getSentInvitations(event);
+        }
+
+        // POST /tournaments/invitations/{invitationId}/accept - Accept an invitation
+        else if (method === 'POST' && resource === '/tournaments/invitations/{invitationId}/accept') {
+            return await acceptTournamentInvitation(event);
+        }
+
+        // POST /tournaments/invitations/{invitationId}/reject - Reject an invitation
+        else if (method === 'POST' && resource === '/tournaments/invitations/{invitationId}/reject') {
+            return await rejectTournamentInvitation(event);
+        }
+
+        // POST /tournaments/invitations/{invitationId}/cancel - Cancel an invitation (creator only)
+        else if (method === 'POST' && resource === '/tournaments/invitations/{invitationId}/cancel') {
+            return await cancelTournamentInvitation(event);
         }
 
         // No route match

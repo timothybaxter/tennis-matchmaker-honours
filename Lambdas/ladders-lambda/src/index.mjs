@@ -1,4 +1,22 @@
-import { getLadders, getLadderById, createLadder, joinLadder, issueChallenge, respondToChallenge, submitMatchResult, resolveDisputedMatch, leaveLadder, resetMatchSubmission } from './handlers/ladders.mjs';
+import {
+    getLadders,
+    getLadderById,
+    createLadder,
+    joinLadder,
+    issueChallenge,
+    respondToChallenge,
+    submitMatchResult,
+    resolveDisputedMatch,
+    leaveLadder,
+    resetMatchSubmission,
+    // New invitation functions
+    inviteToLadder,
+    getPendingLadderInvitations,
+    getSentLadderInvitations,
+    acceptLadderInvitation,
+    rejectLadderInvitation,
+    cancelLadderInvitation
+} from './handlers/ladders.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -63,6 +81,36 @@ export const handler = async (event) => {
         // POST /ladders/{id}/leave
         else if (method === 'POST' && resource === '/ladders/{id}/leave') {
             return await leaveLadder(event);
+        }
+
+        // POST /ladders/{id}/invite - Send invitation to a user
+        else if (method === 'POST' && resource === '/ladders/{id}/invite') {
+            return await inviteToLadder(event);
+        }
+
+        // GET /ladders/invitations - Get all pending ladder invitations for current user
+        else if (method === 'GET' && resource === '/ladders/invitations') {
+            return await getPendingLadderInvitations(event);
+        }
+
+        // GET /ladders/{id}/invitations - Get sent invitations for a ladder
+        else if (method === 'GET' && resource === '/ladders/{id}/invitations') {
+            return await getSentLadderInvitations(event);
+        }
+
+        // POST /ladders/invitations/{invitationId}/accept - Accept a ladder invitation
+        else if (method === 'POST' && resource === '/ladders/invitations/{invitationId}/accept') {
+            return await acceptLadderInvitation(event);
+        }
+
+        // POST /ladders/invitations/{invitationId}/reject - Reject a ladder invitation
+        else if (method === 'POST' && resource === '/ladders/invitations/{invitationId}/reject') {
+            return await rejectLadderInvitation(event);
+        }
+
+        // POST /ladders/invitations/{invitationId}/cancel - Cancel a ladder invitation (creator only)
+        else if (method === 'POST' && resource === '/ladders/invitations/{invitationId}/cancel') {
+            return await cancelLadderInvitation(event);
         }
 
         // No route match

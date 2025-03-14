@@ -1636,6 +1636,450 @@ async function auditMatchState(match, operation, userId, db) {
     }
 }
 
+// src/handlers/tournaments.mjs - Add these new functions
+
+// Invite a user to a tournament
+export async function inviteToTournament(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const inviterId = token.decoded.userId;
+        const tournamentId = event.pathParameters?.id;
+
+        if (!tournamentId) {
+            return createResponse(400, { message: 'Tournament ID is required' });
+        }
+
+        // Parse request body
+        if (!event.body) {
+            return createResponse(400, { message: 'Request body is required' });
+        }
+
+        let parsedBody;
+        try {
+            parsedBody = JSON.parse(event.body);
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid JSON format', details: error.message });
+        }
+
+        // Validate required fields
+        const { inviteeId } = parsedBody;
+
+        if (!inviteeId) {
+            return createResponse(400, { message: 'Invitee ID is required' });
+        }
+
+        // Connect to databases
+        const db = await connectToDatabase();
+        const tournaments = db.collection('tournaments');
+        const invitations = db.collection('tournamentInvitations');
+
+        // Check if tournament exists and is valid to invite to
+        let tournament;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid tournament ID format' });
+        }
+
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        // Check if user is the creator or has permission to invite
+        if (tournament.creatorId !== inviterId) {
+            return createResponse(403, { message: 'Only the tournament creator can send invitations' });
+        }
+
+        // Check if tournament has already started
+        if (tournament.status !== 'pending') {
+            return createResponse(400, { message: 'Cannot invite to a tournament that has already started' });
+        }
+
+        // Check if invitee exists
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        let invitee;
+        try {
+            invitee = await users.findOne({ _id: new ObjectId(inviteeId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitee ID format' });
+        }
+
+        if (!invitee) {
+            return createResponse(404, { message: 'Invitee not found' });
+        }
+
+        // Check if user is already in the tournament
+        if (tournament.players.includes(inviteeId)) {
+            return createResponse(400, { message: 'User is already participating in this tournament' });
+        }
+
+        // Check if invitation already exists
+        const existingInvitation = await invitations.findOne({
+            tournamentId: tournamentId,
+            inviteeId: inviteeId,
+            status: 'pending'
+        });
+
+        if (existingInvitation) {
+            return createResponse(400, { message: 'Invitation already sent to this user' });
+        }
+
+        // Create invitation
+        const invitation = {
+            tournamentId: tournamentId,
+            tournamentName: tournament.name,
+            inviterId: inviterId,
+            inviterName: (await users.findOne({ _id: new ObjectId(inviterId) }))?.name || 'Unknown',
+            inviteeId: inviteeId,
+            inviteeName: invitee.name,
+            status: 'pending',
+            createdAt: new Date()
+        };
+
+        const result = await invitations.insertOne(invitation);
+        const invitationId = result.insertedId.toString();
+
+        // Send notification
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: inviteeId,
+                    senderId: inviterId,
+                    senderName: invitation.inviterName,
+                    tournamentId: tournamentId,
+                    tournamentName: tournament.name,
+                    type: 'tournament_invitation',
+                    content: `You have been invited to join the tournament: ${tournament.name}`,
+                    relatedItemId: invitationId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation notification:', notificationError);
+            // Continue without failing the invitation creation
+        }
+
+        return createResponse(201, {
+            message: 'Invitation sent successfully',
+            invitationId: invitationId,
+            invitation: {
+                ...invitation,
+                id: invitationId
+            }
+        });
+    } catch (error) {
+        console.error('Invite to tournament error:', error);
+        return createResponse(500, { message: 'Error sending tournament invitation', error: error.message });
+    }
+}
+
+// Accept tournament invitation
+export async function acceptTournamentInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to databases
+        const db = await connectToDatabase();
+        const tournaments = db.collection('tournaments');
+        const invitations = db.collection('tournamentInvitations');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if the user is the invitee
+        if (invitation.inviteeId !== userId) {
+            return createResponse(403, { message: 'You can only accept your own invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Check if tournament exists and is still pending
+        let tournament;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(invitation.tournamentId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid tournament ID format' });
+        }
+
+        if (!tournament) {
+            await invitations.updateOne(
+                { _id: new ObjectId(invitationId) },
+                { $set: { status: 'cancelled', updatedAt: new Date() } }
+            );
+            return createResponse(404, { message: 'Tournament no longer exists' });
+        }
+
+        // Check if tournament has already started
+        if (tournament.status !== 'pending') {
+            await invitations.updateOne(
+                { _id: new ObjectId(invitationId) },
+                { $set: { status: 'expired', updatedAt: new Date() } }
+            );
+            return createResponse(400, { message: 'Tournament has already started' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'accepted', updatedAt: new Date() } }
+        );
+
+        // Add user to tournament
+        await tournaments.updateOne(
+            { _id: new ObjectId(invitation.tournamentId) },
+            { $push: { players: userId } }
+        );
+
+        // Send notification to tournament creator
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviterId,
+                    senderId: userId,
+                    senderName: invitation.inviteeName,
+                    tournamentId: invitation.tournamentId,
+                    tournamentName: invitation.tournamentName,
+                    type: 'tournament_invitation_accepted',
+                    content: `${invitation.inviteeName} has accepted your invitation to join ${invitation.tournamentName}`,
+                    relatedItemId: invitation.tournamentId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation acceptance notification:', notificationError);
+            // Continue without failing
+        }
+
+        return createResponse(200, {
+            message: 'Tournament invitation accepted successfully',
+            tournamentId: invitation.tournamentId,
+            tournamentName: invitation.tournamentName
+        });
+    } catch (error) {
+        console.error('Accept tournament invitation error:', error);
+        return createResponse(500, { message: 'Error accepting tournament invitation', error: error.message });
+    }
+}
+
+// Reject tournament invitation
+export async function rejectTournamentInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('tournamentInvitations');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if the user is the invitee
+        if (invitation.inviteeId !== userId) {
+            return createResponse(403, { message: 'You can only reject your own invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'rejected', updatedAt: new Date() } }
+        );
+
+        // Send notification to tournament creator
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviterId,
+                    senderId: userId,
+                    senderName: invitation.inviteeName,
+                    tournamentId: invitation.tournamentId,
+                    tournamentName: invitation.tournamentName,
+                    type: 'tournament_invitation_rejected',
+                    content: `${invitation.inviteeName} has declined your invitation to join ${invitation.tournamentName}`,
+                    relatedItemId: invitation.tournamentId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation rejection notification:', notificationError);
+            // Continue without failing
+        }
+
+        return createResponse(200, {
+            message: 'Tournament invitation rejected successfully'
+        });
+    } catch (error) {
+        console.error('Reject tournament invitation error:', error);
+        return createResponse(500, { message: 'Error rejecting tournament invitation', error: error.message });
+    }
+}
+
+// Get pending invitations for a user
+export async function getPendingInvitations(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('tournamentInvitations');
+
+        // Get pending invitations for the user
+        const pendingInvitations = await invitations.find({
+            inviteeId: userId,
+            status: 'pending'
+        }).sort({ createdAt: -1 }).toArray();
+
+        return createResponse(200, {
+            invitations: pendingInvitations.map(invitation => ({
+                ...invitation,
+                id: invitation._id.toString()
+            }))
+        });
+    } catch (error) {
+        console.error('Get pending invitations error:', error);
+        return createResponse(500, { message: 'Error retrieving pending invitations', error: error.message });
+    }
+}
+
+// Get sent invitations for a tournament
+export async function getSentInvitations(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const tournamentId = event.pathParameters?.id;
+
+        if (!tournamentId) {
+            return createResponse(400, { message: 'Tournament ID is required' });
+        }
+
+        // Connect to databases
+        const db = await connectToDatabase();
+        const tournaments = db.collection('tournaments');
+        const invitations = db.collection('tournamentInvitations');
+
+        // Check if tournament exists
+        let tournament;
+        try {
+            tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid tournament ID format' });
+        }
+
+        if (!tournament) {
+            return createResponse(404, { message: 'Tournament not found' });
+        }
+
+        // Check if user is the creator or has permission to view invitations
+        if (tournament.creatorId !== userId) {
+            return createResponse(403, { message: 'Only the tournament creator can view sent invitations' });
+        }
+
+        // Get all invitations for this tournament
+        const tournamentInvitations = await invitations.find({
+            tournamentId: tournamentId
+        }).sort({ createdAt: -1 }).toArray();
+
+        return createResponse(200, {
+            invitations: tournamentInvitations.map(invitation => ({
+                ...invitation,
+                id: invitation._id.toString()
+            }))
+        });
+    } catch (error) {
+        console.error('Get sent invitations error:', error);
+        return createResponse(500, { message: 'Error retrieving sent invitations', error: error.message });
+    }
+}
+
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||

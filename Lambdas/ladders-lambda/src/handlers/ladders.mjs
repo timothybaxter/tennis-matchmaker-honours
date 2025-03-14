@@ -1575,6 +1575,434 @@ async function auditMatchState(match, operation, userId, db) {
         return { hasIssues: false }; // Don't block operation on audit failure
     }
 }
+
+// Complete implementation for ladder invitations in ladders.mjs
+
+// Accept ladder invitation
+export async function acceptLadderInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to databases
+        const db = await connectToDatabase();
+        const ladders = db.collection('ladders');
+        const invitations = db.collection('ladderInvitations');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if the user is the invitee
+        if (invitation.inviteeId !== userId) {
+            return createResponse(403, { message: 'You can only accept your own invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Check if ladder exists and is active
+        let ladder;
+        try {
+            ladder = await ladders.findOne({ _id: new ObjectId(invitation.ladderId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid ladder ID format' });
+        }
+
+        if (!ladder) {
+            await invitations.updateOne(
+                { _id: new ObjectId(invitationId) },
+                { $set: { status: 'cancelled', updatedAt: new Date() } }
+            );
+            return createResponse(404, { message: 'Ladder no longer exists' });
+        }
+
+        // Check if ladder is active
+        if (ladder.status !== 'active') {
+            await invitations.updateOne(
+                { _id: new ObjectId(invitationId) },
+                { $set: { status: 'expired', updatedAt: new Date() } }
+            );
+            return createResponse(400, { message: 'Ladder is no longer active' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'accepted', updatedAt: new Date() } }
+        );
+
+        // Add user to ladder by calling the join ladder function internally
+        const newRank = ladder.positions.length + 1;
+        await ladders.updateOne(
+            { _id: new ObjectId(invitation.ladderId) },
+            { $push: { positions: { rank: newRank, playerId: userId } } }
+        );
+
+        // Get user details
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+        const user = await users.findOne({ _id: new ObjectId(userId) });
+
+        // Send notification to ladder creator
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviterId,
+                    senderId: userId,
+                    senderName: invitation.inviteeName,
+                    ladderId: invitation.ladderId,
+                    ladderName: invitation.ladderName,
+                    type: 'ladder_invitation_accepted',
+                    content: `${invitation.inviteeName} has accepted your invitation to join ${invitation.ladderName}`,
+                    relatedItemId: invitation.ladderId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation acceptance notification:', notificationError);
+        }
+
+        return createResponse(200, {
+            message: 'Ladder invitation accepted successfully',
+            ladderId: invitation.ladderId,
+            ladderName: invitation.ladderName,
+            userRank: newRank
+        });
+    } catch (error) {
+        console.error('Accept ladder invitation error:', error);
+        return createResponse(500, { message: 'Error accepting ladder invitation', error: error.message });
+    }
+}
+
+// Reject ladder invitation
+export async function rejectLadderInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('ladderInvitations');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if the user is the invitee
+        if (invitation.inviteeId !== userId) {
+            return createResponse(403, { message: 'You can only reject your own invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'rejected', updatedAt: new Date() } }
+        );
+
+        // Send notification to ladder creator
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviterId,
+                    senderId: userId,
+                    senderName: invitation.inviteeName,
+                    ladderId: invitation.ladderId,
+                    ladderName: invitation.ladderName,
+                    type: 'ladder_invitation_rejected',
+                    content: `${invitation.inviteeName} has declined your invitation to join ${invitation.ladderName}`,
+                    relatedItemId: invitation.ladderId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation rejection notification:', notificationError);
+        }
+
+        return createResponse(200, {
+            message: 'Ladder invitation rejected successfully'
+        });
+    } catch (error) {
+        console.error('Reject ladder invitation error:', error);
+        return createResponse(500, { message: 'Error rejecting ladder invitation', error: error.message });
+    }
+}
+
+// Cancel ladder invitation (for ladder creators to cancel a pending invitation)
+export async function cancelLadderInvitation(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const invitationId = event.pathParameters?.invitationId;
+
+        if (!invitationId) {
+            return createResponse(400, { message: 'Invitation ID is required' });
+        }
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('ladderInvitations');
+        const ladders = db.collection('ladders');
+
+        // Get invitation
+        let invitation;
+        try {
+            invitation = await invitations.findOne({ _id: new ObjectId(invitationId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid invitation ID format' });
+        }
+
+        if (!invitation) {
+            return createResponse(404, { message: 'Invitation not found' });
+        }
+
+        // Check if ladder exists
+        let ladder;
+        try {
+            ladder = await ladders.findOne({ _id: new ObjectId(invitation.ladderId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid ladder ID format' });
+        }
+
+        if (!ladder) {
+            return createResponse(404, { message: 'Ladder not found' });
+        }
+
+        // Check if user is the ladder creator
+        if (ladder.creatorId !== userId) {
+            return createResponse(403, { message: 'Only the ladder creator can cancel invitations' });
+        }
+
+        // Check if invitation is pending
+        if (invitation.status !== 'pending') {
+            return createResponse(400, { message: 'This invitation has already been processed' });
+        }
+
+        // Update invitation status
+        await invitations.updateOne(
+            { _id: new ObjectId(invitationId) },
+            { $set: { status: 'cancelled', updatedAt: new Date() } }
+        );
+
+        // Send notification to invitee
+        try {
+            if (process.env.NOTIFICATION_API_URL) {
+                const notificationRequest = {
+                    recipientId: invitation.inviteeId,
+                    senderId: userId,
+                    senderName: invitation.inviterName,
+                    ladderId: invitation.ladderId,
+                    ladderName: invitation.ladderName,
+                    type: 'ladder_invitation_cancelled',
+                    content: `Your invitation to join ${invitation.ladderName} has been cancelled`,
+                    relatedItemId: invitation.ladderId
+                };
+
+                await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(notificationRequest)
+                });
+            }
+        } catch (notificationError) {
+            console.error('Error sending invitation cancellation notification:', notificationError);
+        }
+
+        return createResponse(200, {
+            message: 'Ladder invitation cancelled successfully'
+        });
+    } catch (error) {
+        console.error('Cancel ladder invitation error:', error);
+        return createResponse(500, { message: 'Error cancelling ladder invitation', error: error.message });
+    }
+}
+
+// Get pending ladder invitations for a user
+export async function getPendingLadderInvitations(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('ladderInvitations');
+
+        // Get pending invitations for the user
+        const pendingInvitations = await invitations.find({
+            inviteeId: userId,
+            status: 'pending'
+        }).sort({ createdAt: -1 }).toArray();
+
+        return createResponse(200, {
+            invitations: pendingInvitations.map(invitation => ({
+                ...invitation,
+                id: invitation._id.toString()
+            }))
+        });
+    } catch (error) {
+        console.error('Get pending ladder invitations error:', error);
+        return createResponse(500, { message: 'Error retrieving pending ladder invitations', error: error.message });
+    }
+}
+
+// Get sent ladder invitations for a specific ladder
+export async function getSentLadderInvitations(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const ladderId = event.pathParameters?.id;
+
+        if (!ladderId) {
+            return createResponse(400, { message: 'Ladder ID is required' });
+        }
+
+        // Connect to databases
+        const db = await connectToDatabase();
+        const ladders = db.collection('ladders');
+        const invitations = db.collection('ladderInvitations');
+
+        // Check if ladder exists
+        let ladder;
+        try {
+            ladder = await ladders.findOne({ _id: new ObjectId(ladderId) });
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid ladder ID format' });
+        }
+
+        if (!ladder) {
+            return createResponse(404, { message: 'Ladder not found' });
+        }
+
+        // Check if user is the creator or has permission to view invitations
+        if (ladder.creatorId !== userId) {
+            return createResponse(403, { message: 'Only the ladder creator can view sent invitations' });
+        }
+
+        // Get all invitations for this ladder
+        const ladderInvitations = await invitations.find({
+            ladderId: ladderId
+        }).sort({ createdAt: -1 }).toArray();
+
+        return createResponse(200, {
+            invitations: ladderInvitations.map(invitation => ({
+                ...invitation,
+                id: invitation._id.toString()
+            }))
+        });
+    } catch (error) {
+        console.error('Get sent ladder invitations error:', error);
+        return createResponse(500, { message: 'Error retrieving sent ladder invitations', error: error.message });
+    }
+}
+
+// Get all ladder invitations for the current user
+export async function getAllLadderInvitations(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+
+        // Connect to database
+        const db = await connectToDatabase();
+        const invitations = db.collection('ladderInvitations');
+
+        // Get all invitations for the user (as invitee)
+        const allInvitations = await invitations.find({
+            inviteeId: userId
+        }).sort({ createdAt: -1 }).toArray();
+
+        return createResponse(200, {
+            invitations: allInvitations.map(invitation => ({
+                ...invitation,
+                id: invitation._id.toString()
+            }))
+        });
+    } catch (error) {
+        console.error('Get all ladder invitations error:', error);
+        return createResponse(500, { message: 'Error retrieving ladder invitations', error: error.message });
+    }
+}
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
