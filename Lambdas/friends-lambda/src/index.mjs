@@ -1,4 +1,4 @@
-import { getFriends, getFriendRequests, sendFriendRequest, respondToFriendRequest, searchUsers } from './handlers/friends.mjs';
+import { getFriends, getFriendRequests, sendFriendRequest, respondToFriendRequest, searchUsers, searchAllUsers } from './handlers/friends.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -31,6 +31,7 @@ export const handler = async (event) => {
             case 'POST /friends/respond':
                 console.log('Routing to respondToFriendRequest');
                 return await respondToFriendRequest(event);
+
             case 'GET /friends/check/{id}':
                 console.log('Routing to checkFriendshipStatus');
                 return await checkFriendshipStatus(event);
@@ -38,6 +39,10 @@ export const handler = async (event) => {
             case 'GET /friends/search':
                 console.log('Routing to searchUsers with query:', event.queryStringParameters);
                 return await searchUsers(event);
+
+            case 'GET /users/search-all':
+                console.log('Routing to searchAllUsers with query:', event.queryStringParameters);
+                return await searchAllUsers(event);
 
             default:
                 console.log('Route not found:', routeKey);

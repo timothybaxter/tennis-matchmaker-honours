@@ -114,6 +114,74 @@ export async function searchUsers(event) {
     }
 }
 
+// Add this function to your friends.mjs file
+
+// Search for users without filtering by friendship status
+export async function searchAllUsers(event) {
+    console.log('searchAllUsers called with query:', event.queryStringParameters?.query);
+    try {
+        // Extract and verify token
+        const authHeader = event.headers.Authorization ||
+            event.headers.authorization;
+        if (!authHeader) {
+            return createResponse(401, { message: 'No authorization token provided' });
+        }
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return createResponse(401, { message: 'Invalid authorization format' });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+
+        // Get query parameter
+        const query = event.queryStringParameters?.query;
+        if (!query || query.length < 2) {
+            return createResponse(400, { message: 'Search query must be at least 2 characters' });
+        }
+
+        // Connect to users database to search users
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Build search query - don't filter out friends, only exclude the current user
+        const searchQuery = {
+            $and: [
+                // Only exclude current user
+                { _id: { $ne: new ObjectId(userId) } },
+                // Match name or email
+                {
+                    $or: [
+                        { name: { $regex: query, $options: 'i' } },
+                        { email: { $regex: query, $options: 'i' } }
+                    ]
+                }
+            ]
+        };
+
+        // Execute search
+        const searchResults = await users.find(searchQuery)
+            .project({
+                _id: 1,
+                name: 1,
+                email: 1,
+                playerLevel: 1
+            })
+            .limit(10)
+            .toArray();
+
+        console.log(`Found ${searchResults.length} users matching query "${query}"`);
+        return createResponse(200, { users: searchResults });
+    } catch (error) {
+        console.error('Error in searchAllUsers:', error);
+        // Special handling for JWT errors
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return createResponse(401, { message: 'Invalid token', error: error.message });
+        }
+        return createResponse(500, { message: 'Internal server error' });
+    }
+}
 // Get all friends for a user
 export async function getFriends(event) {
     try {
