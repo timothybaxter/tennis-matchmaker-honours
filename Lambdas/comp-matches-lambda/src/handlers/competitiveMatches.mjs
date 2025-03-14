@@ -608,21 +608,155 @@ export async function getUserStats(event) {
             return token.response;
         }
 
-        // For now, return a simple response
-        return createResponse(200, {
-            message: "Stats functionality coming soon",
-            stats: {
-                totalMatches: 0,
-                wins: 0,
-                losses: 0
-            }
+        // Get the requested user's ID from query parameters
+        const queryParams = event.queryStringParameters || {};
+        const userId = queryParams.userId || token.decoded.userId;
+
+        console.log(`Calculating stats for user: ${userId}`);
+
+        // Connect to the database
+        const db = await connectToDatabase();
+        const matches = db.collection('competitiveMatches');
+
+        // Query for all completed matches for this user
+        const userMatchesQuery = {
+            $or: [
+                { challengerId: userId },
+                { challengeeId: userId },
+                { player1: userId },
+                { player2: userId }
+            ],
+            status: 'completed'
+        };
+
+        const userMatches = await matches.find(userMatchesQuery).toArray();
+        console.log(`Found ${userMatches.length} total matches for user ${userId}`);
+
+        // Calculate basic stats
+        const totalMatches = userMatches.length;
+
+        // Count wins (where this user is the winner)
+        const wins = userMatches.filter(match => match.winner === userId).length;
+
+        // Calculate losses
+        const losses = totalMatches - wins;
+
+        // Calculate win rate (protect against division by zero)
+        const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+
+        // Separate tournament and ladder matches
+        const tournamentMatches = userMatches.filter(match => match.tournamentId);
+        const ladderMatches = userMatches.filter(match => match.ladderId);
+
+        console.log(`Tournament matches: ${tournamentMatches.length}, Ladder matches: ${ladderMatches.length}`);
+
+        // Get unique tournaments and ladders participated in
+        const uniqueTournaments = new Set(tournamentMatches.map(match => match.tournamentId));
+        const uniqueLadders = new Set(ladderMatches.map(match => match.ladderId));
+
+        // Tournament stats
+        const tournamentWins = tournamentMatches.filter(match => match.winner === userId).length;
+        const tournamentWinRate = tournamentMatches.length > 0
+            ? Math.round((tournamentWins / tournamentMatches.length) * 100)
+            : 0;
+
+        // Ladder stats
+        const ladderWins = ladderMatches.filter(match => match.winner === userId).length;
+
+        // Calculate ladder rank improvements
+        // A win as a challenger counts as a rank improvement
+        const ladderRankImprovements = ladderMatches.filter(
+            match => match.winner === userId && match.challengerId === userId
+        ).length;
+
+        // Get some recent matches for display (limit to 5)
+        const recentMatches = userMatches
+            .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+            .slice(0, 5);
+
+        // Create a lookup for opponent names
+        const opponentIds = new Set();
+        recentMatches.forEach(match => {
+            if (match.player1 && match.player1 !== userId) opponentIds.add(match.player1);
+            if (match.player2 && match.player2 !== userId) opponentIds.add(match.player2);
+            if (match.challengerId && match.challengerId !== userId) opponentIds.add(match.challengerId);
+            if (match.challengeeId && match.challengeeId !== userId) opponentIds.add(match.challengeeId);
         });
+
+        // Connect to users database to get names
+        const usersDb = await connectToSpecificDatabase('users-db');
+        const users = usersDb.collection('users');
+
+        // Convert to ObjectIds
+        const opponentObjectIds = Array.from(opponentIds)
+            .map(id => {
+                try { return new ObjectId(id); }
+                catch (e) { return null; }
+            })
+            .filter(id => id !== null);
+
+        // Get opponent details
+        const opponentDetails = await users.find({
+            _id: { $in: opponentObjectIds }
+        }).project({
+            _id: 1,
+            name: 1
+        }).toArray();
+
+        // Create lookup map
+        const opponentLookup = {};
+        opponentDetails.forEach(opponent => {
+            opponentLookup[opponent._id.toString()] = opponent.name;
+        });
+
+        // Format recent matches for display
+        const recentPerformance = recentMatches.map(match => {
+            // Determine opponent
+            let opponentId = null;
+            if (match.player1 && match.player1 !== userId) opponentId = match.player1;
+            else if (match.player2 && match.player2 !== userId) opponentId = match.player2;
+            else if (match.challengerId && match.challengerId !== userId) opponentId = match.challengerId;
+            else if (match.challengeeId && match.challengeeId !== userId) opponentId = match.challengeeId;
+
+            // Match type (tournament or ladder)
+            const type = match.tournamentId ? 'tournament' : 'ladder';
+
+            return {
+                type: type,
+                date: match.completedAt || match.createdAt,
+                isWin: match.winner === userId,
+                opponent: opponentLookup[opponentId] || 'Unknown Player'
+            };
+        });
+
+        // Compile all stats
+        const stats = {
+            totalMatches,
+            wins,
+            losses,
+            winRate,
+
+            tournamentsParticipated: uniqueTournaments.size,
+            tournamentMatches: tournamentMatches.length,
+            tournamentWins,
+            tournamentWinRate,
+
+            laddersParticipated: uniqueLadders.size,
+            ladderMatches: ladderMatches.length,
+            ladderWins,
+            ladderRankImprovements,
+
+            recentPerformance
+        };
+
+        console.log(`Stats compiled for user ${userId}`);
+
+        return createResponse(200, { stats });
     } catch (error) {
         console.error('Get user stats error:', error);
         return createResponse(500, { message: 'Error retrieving user stats', error: error.message });
     }
 }
-
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
