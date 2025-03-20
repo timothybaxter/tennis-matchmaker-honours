@@ -616,8 +616,8 @@ export async function getUserStats(event) {
 
         // First, get tournament matches
         const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
-        const tournamentMatches = tournamentsDb.collection('competitiveMatches');
-        const tournamentMatchesResults = await tournamentMatches.find({
+        const tournamentMatchesCollection = tournamentsDb.collection('competitiveMatches');
+        const tournamentMatchesResults = await tournamentMatchesCollection.find({
             $or: [
                 { challengerId: userId },
                 { challengeeId: userId },
@@ -629,8 +629,8 @@ export async function getUserStats(event) {
 
         // Then, get ladder matches
         const laddersDb = await connectToSpecificDatabase('ladders-db');
-        const ladderMatches = laddersDb.collection('competitiveMatches');
-        const ladderMatchesResults = await ladderMatches.find({
+        const ladderMatchesCollection = laddersDb.collection('competitiveMatches');
+        const ladderMatchesResults = await ladderMatchesCollection.find({
             $or: [
                 { challengerId: userId },
                 { challengeeId: userId },
@@ -658,27 +658,27 @@ export async function getUserStats(event) {
         const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
         // Separate tournament and ladder matches
-        const tournamentMatches = tournamentMatchesResults;
-        const ladderMatches = ladderMatchesResults;
+        const tournamentMatchesSet = tournamentMatchesResults;
+        const ladderMatchesSet = ladderMatchesResults;
 
-        console.log(`Tournament matches: ${tournamentMatches.length}, Ladder matches: ${ladderMatches.length}`);
+        console.log(`Tournament matches: ${tournamentMatchesSet.length}, Ladder matches: ${ladderMatchesSet.length}`);
 
         // Get unique tournaments and ladders participated in
-        const uniqueTournaments = new Set(tournamentMatches.map(match => match.tournamentId));
-        const uniqueLadders = new Set(ladderMatches.map(match => match.ladderId));
+        const uniqueTournaments = new Set(tournamentMatchesSet.map(match => match.tournamentId));
+        const uniqueLadders = new Set(ladderMatchesSet.map(match => match.ladderId));
 
         // Tournament stats
-        const tournamentWins = tournamentMatches.filter(match => match.winner === userId).length;
-        const tournamentWinRate = tournamentMatches.length > 0
-            ? Math.round((tournamentWins / tournamentMatches.length) * 100)
+        const tournamentWins = tournamentMatchesSet.filter(match => match.winner === userId).length;
+        const tournamentWinRate = tournamentMatchesSet.length > 0
+            ? Math.round((tournamentWins / tournamentMatchesSet.length) * 100)
             : 0;
 
         // Ladder stats
-        const ladderWins = ladderMatches.filter(match => match.winner === userId).length;
+        const ladderWins = ladderMatchesSet.filter(match => match.winner === userId).length;
 
         // Calculate ladder rank improvements
         // A win as a challenger counts as a rank improvement
-        const ladderRankImprovements = ladderMatches.filter(
+        const ladderRankImprovements = ladderMatchesSet.filter(
             match => match.winner === userId && match.challengerId === userId
         ).length;
 
@@ -750,12 +750,12 @@ export async function getUserStats(event) {
             winRate,
 
             tournamentsParticipated: uniqueTournaments.size,
-            tournamentMatches: tournamentMatches.length,
+            tournamentMatches: tournamentMatchesSet.length,
             tournamentWins,
             tournamentWinRate,
 
             laddersParticipated: uniqueLadders.size,
-            ladderMatches: ladderMatches.length,
+            ladderMatches: ladderMatchesSet.length,
             ladderWins,
             ladderRankImprovements,
 
@@ -770,6 +770,7 @@ export async function getUserStats(event) {
         return createResponse(500, { message: 'Error retrieving user stats', error: error.message });
     }
 }
+
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
