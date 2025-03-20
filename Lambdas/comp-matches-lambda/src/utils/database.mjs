@@ -19,6 +19,7 @@ export async function connectToDatabase() {
         let dbName = 'compMatches-db'; // Default database
 
         // Set database name based on function name
+        // Set database name based on function name
         if (functionName.includes('friends')) {
             dbName = 'friends-db';
         } else if (functionName.includes('messages')) {
@@ -27,6 +28,8 @@ export async function connectToDatabase() {
             dbName = 'notifications-db';
         } else if (functionName.includes('settings')) {
             dbName = 'settings-db';
+        } else if (functionName.includes('comp-matches')) {
+            dbName = 'compMatches-db';  
         } else if (functionName.includes('match')) {
             dbName = 'matches-db';
         } else if (functionName.includes('auth')) {

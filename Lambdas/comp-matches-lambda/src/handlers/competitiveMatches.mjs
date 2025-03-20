@@ -613,10 +613,34 @@ export async function getUserStats(event) {
         const userId = queryParams.userId || token.decoded.userId;
 
         console.log(`Calculating stats for user: ${userId}`);
+        // First, get tournament matches
+        const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
+        const tournamentMatches = tournamentsDb.collection('competitiveMatches');
+        const tournamentMatchesResults = await tournamentMatches.find({
+            $or: [
+                { challengerId: userId },
+                { challengeeId: userId },
+                { player1: userId },
+                { player2: userId }
+            ],
+            status: 'completed'
+        }).toArray();
 
-        // Connect to the database
-        const db = await connectToDatabase();
-        const matches = db.collection('competitiveMatches');
+        // Then, get ladder matches
+        const laddersDb = await connectToSpecificDatabase('ladders-db');
+        const ladderMatches = laddersDb.collection('competitiveMatches');
+        const ladderMatchesResults = await ladderMatches.find({
+            $or: [
+                { challengerId: userId },
+                { challengeeId: userId },
+                { player1: userId },
+                { player2: userId }
+            ],
+            status: 'completed'
+        }).toArray();
+
+        // Combine the results
+        const userMatches = [...tournamentMatchesResults, ...ladderMatchesResults];
 
         // Query for all completed matches for this user
         const userMatchesQuery = {
