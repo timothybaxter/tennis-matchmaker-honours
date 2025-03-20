@@ -613,6 +613,7 @@ export async function getUserStats(event) {
         const userId = queryParams.userId || token.decoded.userId;
 
         console.log(`Calculating stats for user: ${userId}`);
+
         // First, get tournament matches
         const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
         const tournamentMatches = tournamentsDb.collection('competitiveMatches');
@@ -642,18 +643,6 @@ export async function getUserStats(event) {
         // Combine the results
         const userMatches = [...tournamentMatchesResults, ...ladderMatchesResults];
 
-        // Query for all completed matches for this user
-        const userMatchesQuery = {
-            $or: [
-                { challengerId: userId },
-                { challengeeId: userId },
-                { player1: userId },
-                { player2: userId }
-            ],
-            status: 'completed'
-        };
-
-        const userMatches = await matches.find(userMatchesQuery).toArray();
         console.log(`Found ${userMatches.length} total matches for user ${userId}`);
 
         // Calculate basic stats
@@ -669,8 +658,8 @@ export async function getUserStats(event) {
         const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
         // Separate tournament and ladder matches
-        const tournamentMatches = userMatches.filter(match => match.tournamentId);
-        const ladderMatches = userMatches.filter(match => match.ladderId);
+        const tournamentMatches = tournamentMatchesResults;
+        const ladderMatches = ladderMatchesResults;
 
         console.log(`Tournament matches: ${tournamentMatches.length}, Ladder matches: ${ladderMatches.length}`);
 
