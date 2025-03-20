@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import fetch from 'node-fetch';
 
 // Get match history for user
+// Get match history for user
 export async function getMatchHistory(event) {
     try {
         // Extract and verify token
@@ -17,53 +18,72 @@ export async function getMatchHistory(event) {
         const userId = token.decoded.userId;
         const queryParams = event.queryStringParameters || {};
 
-        // Connect to matches database
-        const db = await connectToDatabase();
-        const matches = db.collection('competitiveMatches');
-
-        // Build query
-        const query = {
-            $or: [
-                { challengerId: userId },
-                { challengeeId: userId },
-                { player1: userId },
-                { player2: userId }
-            ],
-            status: 'completed'
-        };
-
-        // Filter by type if provided
-        if (queryParams.type) {
-            if (queryParams.type === 'tournament') {
-                query.tournamentId = { $exists: true };
-            } else if (queryParams.type === 'ladder') {
-                query.ladderId = { $exists: true };
-            }
-        }
-
-        // Filter by context ID if provided
-        if (queryParams.contextId) {
-            if (queryParams.type === 'tournament') {
-                query.tournamentId = queryParams.contextId;
-            } else if (queryParams.type === 'ladder') {
-                query.ladderId = queryParams.contextId;
-            }
-        }
+        // If userId is empty in queryParams, use token's userId
+        const targetUserId = queryParams.userId || userId;
 
         // Get matches with pagination
         const limit = parseInt(queryParams.limit) || 10;
         const skip = parseInt(queryParams.skip) || 0;
 
-        const matchHistory = await matches.find(query)
+        // Build base query
+        const baseQuery = {
+            $or: [
+                { challengerId: targetUserId },
+                { challengeeId: targetUserId },
+                { player1: targetUserId },
+                { player2: targetUserId }
+            ],
+            status: 'completed'
+        };
+
+        // Apply filters if provided
+        if (queryParams.type) {
+            if (queryParams.type === 'tournament') {
+                baseQuery.tournamentId = { $exists: true };
+            } else if (queryParams.type === 'ladder') {
+                baseQuery.ladderId = { $exists: true };
+            }
+        }
+
+        // Apply context ID filter if provided
+        if (queryParams.contextId) {
+            if (queryParams.type === 'tournament') {
+                baseQuery.tournamentId = queryParams.contextId;
+            } else if (queryParams.type === 'ladder') {
+                baseQuery.ladderId = queryParams.contextId;
+            }
+        }
+
+        // First, get tournament matches
+        const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
+        const tournamentMatchesCollection = tournamentsDb.collection('competitiveMatches');
+        const tournamentMatchesResults = await tournamentMatchesCollection.find(baseQuery)
             .sort({ completedAt: -1 })
-            .skip(skip)
-            .limit(limit)
             .toArray();
 
-        console.log(`Found ${matchHistory.length} matches in history`);
+        // Then, get ladder matches
+        const laddersDb = await connectToSpecificDatabase('ladders-db');
+        const ladderMatchesCollection = laddersDb.collection('competitiveMatches');
+        const ladderMatchesResults = await ladderMatchesCollection.find(baseQuery)
+            .toArray();
+
+        // Combine all matches
+        const combinedMatches = [...tournamentMatchesResults, ...ladderMatchesResults];
+
+        // Sort by completedAt date
+        const sortedMatches = combinedMatches.sort((a, b) => {
+            const dateA = a.completedAt ? new Date(a.completedAt) : new Date(0);
+            const dateB = b.completedAt ? new Date(b.completedAt) : new Date(0);
+            return dateB - dateA; // Descending order
+        });
+
+        // Apply pagination
+        const matchHistory = sortedMatches.slice(skip, skip + limit);
 
         // Get total count for pagination
-        const totalMatches = await matches.countDocuments(query);
+        const totalMatches = combinedMatches.length;
+
+        console.log(`Found ${matchHistory.length} matches in history`);
 
         // Get user details for all participants
         const usersDb = await connectToSpecificDatabase('users-db');
@@ -118,7 +138,6 @@ export async function getMatchHistory(event) {
         });
 
         // Get tournament details
-        const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
         const tournaments = tournamentsDb.collection('tournaments');
 
         const tournamentObjectIds = Array.from(contextIds.tournaments)
@@ -146,7 +165,6 @@ export async function getMatchHistory(event) {
         });
 
         // Get ladder details
-        const laddersDb = await connectToSpecificDatabase('ladders-db');
         const ladders = laddersDb.collection('ladders');
 
         const ladderObjectIds = Array.from(contextIds.ladders)
@@ -176,7 +194,7 @@ export async function getMatchHistory(event) {
             const enhancedMatch = {
                 ...match,
                 id: match._id.toString(),
-                isWinner: match.winner === userId
+                isWinner: match.winner === targetUserId
             };
 
             // Add tournament details if applicable
@@ -210,11 +228,11 @@ export async function getMatchHistory(event) {
 
             // Determine opponent
             if (match.challenger && match.challengee) {
-                enhancedMatch.opponent = match.challengerId === userId
+                enhancedMatch.opponent = match.challengerId === targetUserId
                     ? enhancedMatch.challengee
                     : enhancedMatch.challenger;
             } else if (match.player1Details && match.player2Details) {
-                enhancedMatch.opponent = match.player1 === userId
+                enhancedMatch.opponent = match.player1 === targetUserId
                     ? enhancedMatch.player2Details
                     : enhancedMatch.player1Details;
             }
@@ -235,7 +253,6 @@ export async function getMatchHistory(event) {
         return createResponse(500, { message: 'Error retrieving match history', error: error.message });
     }
 }
-
 // Get match by ID
 export async function getMatchById(event) {
     try {
