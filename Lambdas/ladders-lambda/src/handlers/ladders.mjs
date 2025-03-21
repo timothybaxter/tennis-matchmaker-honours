@@ -573,7 +573,7 @@ export async function issueChallenge(event) {
             challengeeId: challengeeId,
             challengerRank: challengerPosition.rank,
             challengeeRank: challengeePosition.rank,
-            status: 'scheduled',
+            status: 'accepted', 
             createdAt: new Date(),
             deadline: deadline,
             completedAt: null,
@@ -628,125 +628,6 @@ export async function issueChallenge(event) {
     }
 }
 
-// Respond to challenge
-export async function respondToChallenge(event) {
-    try {
-        // Extract and verify token
-        const token = extractAndVerifyToken(event);
-        if (!token.isValid) {
-            return token.response;
-        }
-
-        const userId = token.decoded.userId;
-        const ladderId = event.pathParameters?.id;
-        const matchId = event.pathParameters?.matchId;
-
-        if (!ladderId || !matchId) {
-            return createResponse(400, { message: 'Ladder ID and Match ID are required' });
-        }
-
-        // Parse request body
-        if (!event.body) {
-            return createResponse(400, { message: 'Request body is required' });
-        }
-
-        let parsedBody;
-        try {
-            parsedBody = JSON.parse(event.body);
-        } catch (error) {
-            return createResponse(400, { message: 'Invalid JSON format', details: error.message });
-        }
-
-        // Validate required fields
-        const { response } = parsedBody;
-
-        if (!response || !['accept', 'decline'].includes(response)) {
-            return createResponse(400, { message: 'Valid response (accept/decline) is required' });
-        }
-
-        // Connect to ladders database
-        const db = await connectToDatabase();
-        const matches = db.collection('competitiveMatches');
-
-        // Get match
-        let match;
-        try {
-            match = await matches.findOne({
-                _id: new ObjectId(matchId),
-                ladderId: ladderId
-            });
-        } catch (error) {
-            return createResponse(400, { message: 'Invalid match ID format' });
-        }
-
-        if (!match) {
-            return createResponse(404, { message: 'Match not found in this ladder' });
-        }
-
-        // Check if user is the challengee
-        if (match.challengeeId !== userId) {
-            return createResponse(403, { message: 'Only the challengee can respond to this challenge' });
-        }
-
-        // Check if the match is in scheduled status
-        if (match.status !== 'scheduled') {
-            return createResponse(400, { message: 'This challenge has already been responded to' });
-        }
-
-        // Update match status based on response
-        const newStatus = response === 'accept' ? 'accepted' : 'declined';
-
-        await matches.updateOne(
-            { _id: new ObjectId(matchId) },
-            {
-                $set: {
-                    status: newStatus,
-                    respondedAt: new Date(),
-                    ...(newStatus === 'declined' ? { completedAt: new Date() } : {})
-                }
-            }
-        );
-
-        // Notify challenger
-        try {
-            const usersDb = await connectToSpecificDatabase('users-db');
-            const users = usersDb.collection('users');
-            const challengee = await users.findOne({ _id: new ObjectId(userId) });
-
-            const notificationRequest = {
-                recipientId: match.challengerId,
-                senderId: userId,
-                senderName: challengee?.name || 'Unknown User',
-                ladderId: ladderId,
-                matchId: matchId,
-                type: 'challenge_response',
-                response: response
-            };
-
-            // Make request to your notification API
-            if (process.env.NOTIFICATION_API_URL) {
-                await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/ladders', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(notificationRequest)
-                });
-            }
-        } catch (notificationError) {
-            console.error('Error sending response notification:', notificationError);
-            // Continue without failing
-        }
-
-        return createResponse(200, {
-            message: `Challenge ${response === 'accept' ? 'accepted' : 'declined'} successfully`
-        });
-    } catch (error) {
-        console.error('Respond to challenge error:', error);
-        return createResponse(500, { message: 'Error responding to challenge', error: error.message });
-    }
-}
 
 // Submit match result for Ladder
 export async function submitMatchResult(event) {

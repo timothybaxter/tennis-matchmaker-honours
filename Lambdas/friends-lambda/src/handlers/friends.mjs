@@ -134,7 +134,7 @@ export async function searchAllUsers(event) {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
-
+        
         // Get query parameter
         const query = event.queryStringParameters?.query;
         if (!query || query.length < 2) {
@@ -707,7 +707,7 @@ export async function checkFriendship(event) {
         const userId = decoded.userId;
 
         // Get query parameter
-        const otherId = event.queryStringParameters?.userId;
+        const otherId = event.pathParameters?.id;
 
         if (!otherId) {
             return createResponse(400, { message: 'userId query parameter is required' });
@@ -737,7 +737,19 @@ export async function checkFriendship(event) {
             }
         }
 
-        return createResponse(200, { status: friendship.status });
+        if (!friendship) {
+            return createResponse(200, { isFriend: false, hasPendingRequest: false });
+        }
+
+        if (friendship.status === 'pending') {
+            if (friendship.userId1 === userId) {
+                return createResponse(200, { isFriend: false, hasPendingRequest: true });
+            } else {
+                return createResponse(200, { isFriend: false, hasPendingRequest: true });
+            }
+        }
+
+        return createResponse(200, { isFriend: true, hasPendingRequest: false });
     } catch (error) {
         console.error('Error in checkFriendship:', error);
 
