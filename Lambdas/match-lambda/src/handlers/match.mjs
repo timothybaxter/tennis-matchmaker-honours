@@ -228,7 +228,7 @@ export async function requestMatch(event) {
     }
 }
 
-// Get requests for a match (for match owner)
+// Make sure this function is in your match.mjs file
 export async function getMatchRequests(event) {
     try {
         // Extract and verify token
@@ -261,9 +261,10 @@ export async function getMatchRequests(event) {
             return createResponse(200, { requests: [] });
         }
 
-        // Get user details for each requester
-        const usersDb = await connectToSpecificDatabase('users-db');
-        const users = usersDb.collection('users');
+        // Get user details for each requester from the same database
+        // Instead of using connectToSpecificDatabase, we'll use the existing db connection
+        // and assume users are in the same database
+        const users = db.collection('users');
 
         const requesterIds = match.requestedBy.map(id => {
             try {
@@ -303,7 +304,6 @@ export async function getMatchRequests(event) {
         return createResponse(500, { message: 'Error retrieving match requests', error: error.message });
     }
 }
-
 // Respond to a match request (accept/reject)
 export async function respondToMatchRequest(event) {
     try {
