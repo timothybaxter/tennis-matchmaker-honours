@@ -304,7 +304,7 @@ export async function getMatchRequests(event) {
         return createResponse(500, { message: 'Error retrieving match requests', error: error.message });
     }
 }
-// Respond to a match request (accept/reject)
+// Updated respondToMatchRequest function for match.mjs in Lambda
 export async function respondToMatchRequest(event) {
     try {
         // Extract and verify token
@@ -343,30 +343,44 @@ export async function respondToMatchRequest(event) {
             return createResponse(400, { message: 'No request found from this user' });
         }
 
+        // Set up the update
+        const updateOperation = {
+            $pull: { requestedBy: requesterId }
+        };
+
+        // If accepting, add to participants
         if (accept) {
-            await matches.updateOne(
-                { _id: new ObjectId(matchId) },
-                {
-                    $addToSet: { participants: requesterId },
-                    $pull: { requestedBy: requesterId }
-                }
-            );
-        } else {
-            await matches.updateOne(
-                { _id: new ObjectId(matchId) },
-                {
-                    $pull: { requestedBy: requesterId },
-                    $addToSet: { rejectedRequests: requesterId }
-                }
-            );
+            updateOperation.$addToSet = { participants: requesterId };
+
+            // Check if this makes the match full
+            const matchType = match.matchType.toLowerCase();
+            const currentParticipantCount = (match.participants || []).length;
+
+            // Calculate new participant count
+            const newParticipantCount = currentParticipantCount + 1;
+
+            // Check if match would be full
+            const maxParticipants = (matchType === 'singles') ? 2 :
+                ((matchType === 'doubles' || matchType === 'mixed') ? 4 : 2);
+
+            // If match is now full, update status to closed
+            if (newParticipantCount >= maxParticipants) {
+                updateOperation.$set = { status: 'closed' };
+                console.log(`Match ${matchId} is now full. Setting status to closed.`);
+            }
         }
+
+        // Update the match
+        await matches.updateOne(
+            { _id: new ObjectId(matchId) },
+            updateOperation
+        );
 
         // Create a notification for the requester
         try {
             // Get user info for creator
-            const usersDb = await connectToSpecificDatabase('users-db');
-            const users = usersDb.collection('users');
-            const creator = await users.findOne({ _id: new ObjectId(userId) });
+            const usersDb = db.collection('users');
+            const creator = await usersDb.findOne({ _id: new ObjectId(userId) });
 
             // Send notification if notification API is available
             if (process.env.NOTIFICATION_API_URL) {
@@ -401,14 +415,15 @@ export async function respondToMatchRequest(event) {
             message: accept ? 'Request accepted successfully' : 'Request rejected successfully',
             matchId: matchId,
             requesterId: requesterId,
-            accepted: accept
+            accepted: accept,
+            matchStatus: updateOperation.$set?.status || match.status
         });
     } catch (error) {
         console.error('Respond to match request error:', error);
         return createResponse(500, { message: 'Error responding to match request', error: error.message });
     }
 }
-// Cancel a match request
+
 export async function cancelMatchRequest(event) {
     try {
         const token = event.headers.Authorization.split(' ')[1];
