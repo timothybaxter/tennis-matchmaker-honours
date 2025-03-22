@@ -40,6 +40,8 @@ export const handler = async (event) => {
             return await cancelMatchRequest(event);
         case 'POST /matches/{id}/dismiss-rejected':
             return await dismissRejectedRequest(event);
+        case 'POST /matches/{id}/dismiss-accepted':
+            return await dismissAcceptedRequest(event);
         case 'POST /matches':
             return await createMatch(event);
         case 'GET /matches':
@@ -48,8 +50,6 @@ export const handler = async (event) => {
             return await deleteMatch(event);
         case 'POST /matches/{id}':
             return await updateMatch(event);
-        case 'POST /matches/{id}/dismiss-accepted':
-            return await dismissAcceptedRequest(event);
 
         default:
             console.error('Unknown route:', routeKey);
