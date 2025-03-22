@@ -9,7 +9,8 @@ import {
     respondToMatchRequest,
     cancelMatchRequest,
     getRequestedMatches,
-    dismissRejectedRequest
+    dismissRejectedRequest,
+    dismissAcceptedRequest
 } from './handlers/match.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
