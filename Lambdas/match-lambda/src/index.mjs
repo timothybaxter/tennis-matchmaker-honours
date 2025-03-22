@@ -4,8 +4,6 @@ import {
     getMatch,
     deleteMatch,
     updateMatch,
-    getActiveMatches,
-    // New match request functions
     requestMatch,
     getMatchRequests,
     respondToMatchRequest,
@@ -29,10 +27,6 @@ export const handler = async (event) => {
         // Check specific routes first
         case 'GET /matches/user/requests':
             return await getRequestedMatches(event);
-        case 'GET /matches/active':
-            return await getActiveMatches(event);
-
-        // Then check parameterized routes
         case 'GET /matches/{id}':
             return await getMatch(event);
         case 'POST /matches/{id}/request':
@@ -45,8 +39,6 @@ export const handler = async (event) => {
             return await cancelMatchRequest(event);
         case 'POST /matches/{id}/dismiss-rejected':
             return await dismissRejectedRequest(event);
-
-        // Most generic routes last
         case 'POST /matches':
             return await createMatch(event);
         case 'GET /matches':
