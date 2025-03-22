@@ -45,7 +45,7 @@ export const handler = async (event) => {
             return await getMatches(event);
         case 'DELETE /matches/{id}':
             return await deleteMatch(event);
-        case 'PUT /matches/{id}':
+        case 'POST /matches/{id}':
             return await updateMatch(event);
 
         default:

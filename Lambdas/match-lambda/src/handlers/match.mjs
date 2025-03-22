@@ -584,46 +584,78 @@ export async function dismissRejectedRequest(event) {
     }
 }
 
-// Update the updateMatch function to use path parameters
+// Updated updateMatch function optimized for POST requests
 export async function updateMatch(event) {
     try {
         const db = await connectToDatabase();
         const matches = db.collection('matches');
-        const matchId = event.pathParameters?.id;
 
+        // Extract match ID from path parameters
+        const matchId = event.pathParameters?.id;
         if (!matchId) {
             return createResponse(400, { message: 'Match ID is required' });
         }
 
-        const updateData = JSON.parse(event.body);
-        const token = event.headers.Authorization.split(' ')[1];
+        // Parse the request body for update data
+        let updateData;
+        try {
+            updateData = JSON.parse(event.body);
+        } catch (error) {
+            return createResponse(400, { message: 'Invalid request body format', details: error.message });
+        }
+
+        // Extract and verify JWT token to get userId
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
+            return createResponse(401, { message: 'Authorization header is required' });
+        }
+
+        const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
 
+        // Find the match to ensure it exists and user is authorized
         const match = await matches.findOne({
             _id: new ObjectId(matchId),
             creatorId: userId
         });
 
         if (!match) {
-            return createResponse(404, { message: 'Match not found or unauthorized' });
+            return createResponse(404, { message: 'Match not found or you are not authorized to update it' });
         }
 
+        // Process date fields
         if (updateData.matchTime) {
             updateData.matchTime = new Date(updateData.matchTime);
         }
 
-        const result = await matches.updateOne(
+        // Perform the update
+        await matches.updateOne(
             { _id: new ObjectId(matchId) },
             { $set: updateData }
         );
 
+        // Return success response
         return createResponse(200, {
             message: 'Match updated successfully',
-            matchId: matchId
+            matchId: matchId,
+            updatedFields: Object.keys(updateData)
         });
     } catch (error) {
         console.error('Update match error:', error);
-        return createResponse(500, { message: 'Error updating match' });
+
+        // Handle specific errors more gracefully
+        if (error.name === 'JsonWebTokenError') {
+            return createResponse(401, { message: 'Invalid authentication token' });
+        }
+
+        if (error.name === 'TokenExpiredError') {
+            return createResponse(401, { message: 'Authentication token expired' });
+        }
+
+        return createResponse(500, {
+            message: 'Error updating match',
+            error: error.message
+        });
     }
 }
