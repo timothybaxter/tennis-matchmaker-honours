@@ -503,25 +503,32 @@ export async function getRequestedMatches(event) {
         console.log("Database connection successful");
         const matches = db.collection('matches');
 
-        // Logging query
-        console.log(`Querying for matches with requestedBy: ${userId}`);
-
-        // Find matches where user is in the requestedBy array
+        // Find matches where user is in the requestedBy array (pending requests)
         const pendingMatches = await matches.find({
             requestedBy: userId
         }).sort({ matchTime: 1 }).toArray();
         console.log(`Found ${pendingMatches.length} pending matches`);
 
-        // Find matches where user is a participant but not the creator
+        // Find matches where user is a participant but not the creator 
+        // AND not in dismissedAcceptedRequests (accepted requests)
         const acceptedMatches = await matches.find({
             participants: userId,
-            creatorId: { $ne: userId }
+            creatorId: { $ne: userId },
+            $or: [
+                { dismissedAcceptedRequests: { $exists: false } },
+                { dismissedAcceptedRequests: { $nin: [userId] } }
+            ]
         }).sort({ matchTime: 1 }).toArray();
         console.log(`Found ${acceptedMatches.length} accepted matches`);
 
         // Find matches where user is in the rejectedRequests array
+        // AND not in dismissedRejectedRequests (rejected requests)
         const rejectedMatches = await matches.find({
-            rejectedRequests: userId
+            rejectedRequests: userId,
+            $or: [
+                { dismissedRejectedRequests: { $exists: false } },
+                { dismissedRejectedRequests: { $nin: [userId] } }
+            ]
         }).sort({ matchTime: 1 }).toArray();
         console.log(`Found ${rejectedMatches.length} rejected matches`);
 
@@ -541,7 +548,6 @@ export async function getRequestedMatches(event) {
         return createResponse(500, { message: 'Error retrieving requested matches', error: error.message });
     }
 }
-
 // Dismiss a rejected match request notification
 export async function dismissRejectedRequest(event) {
     try {
