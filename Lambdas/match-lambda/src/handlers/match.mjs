@@ -450,31 +450,39 @@ export async function cancelMatchRequest(event) {
     }
 }
 
-// Get matches the current user has requested to join
 export async function getRequestedMatches(event) {
+    console.log("Starting getRequestedMatches function");
     try {
         const token = event.headers.Authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
+        console.log(`Processing request for user: ${userId}`);
 
         const db = await connectToDatabase();
+        console.log("Database connection successful");
         const matches = db.collection('matches');
 
-        // Find matches where user is in the requestedBy array (pending)
+        // Logging query
+        console.log(`Querying for matches with requestedBy: ${userId}`);
+
+        // Find matches where user is in the requestedBy array
         const pendingMatches = await matches.find({
             requestedBy: userId
         }).sort({ matchTime: 1 }).toArray();
+        console.log(`Found ${pendingMatches.length} pending matches`);
 
-        // Find matches where user is a participant but not the creator (accepted)
+        // Find matches where user is a participant but not the creator
         const acceptedMatches = await matches.find({
             participants: userId,
             creatorId: { $ne: userId }
         }).sort({ matchTime: 1 }).toArray();
+        console.log(`Found ${acceptedMatches.length} accepted matches`);
 
-        // Find matches where user is in the rejectedRequests array (rejected)
+        // Find matches where user is in the rejectedRequests array
         const rejectedMatches = await matches.find({
             rejectedRequests: userId
         }).sort({ matchTime: 1 }).toArray();
+        console.log(`Found ${rejectedMatches.length} rejected matches`);
 
         // Create an enhanced response with request status
         const enhancedMatches = [
@@ -483,9 +491,12 @@ export async function getRequestedMatches(event) {
             ...rejectedMatches.map(match => ({ ...match, requestStatus: 'rejected' }))
         ];
 
+        console.log(`Returning ${enhancedMatches.length} total matches`);
+
         return createResponse(200, { matches: enhancedMatches });
     } catch (error) {
         console.error('Get requested matches error:', error);
+        console.error('Error stack:', error.stack);
         return createResponse(500, { message: 'Error retrieving requested matches', error: error.message });
     }
 }

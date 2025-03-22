@@ -26,18 +26,15 @@ export const handler = async (event) => {
     console.log('Route key:', routeKey);
 
     switch (routeKey) {
-        case 'POST /matches':
-            return await createMatch(event);
-        case 'GET /matches':
-            return await getMatches(event);
-        case 'GET /matches/{id}':
-            return await getMatch(event);
-        case 'DELETE /matches/{id}':
-            return await deleteMatch(event);
-        case 'PUT /matches/{id}':
-            return await updateMatch(event);
+        // Check specific routes first
+        case 'GET /matches/user/requests':
+            return await getRequestedMatches(event);
         case 'GET /matches/active':
             return await getActiveMatches(event);
+
+        // Then check parameterized routes
+        case 'GET /matches/{id}':
+            return await getMatch(event);
         case 'POST /matches/{id}/request':
             return await requestMatch(event);
         case 'GET /matches/{id}/requests':
@@ -46,10 +43,18 @@ export const handler = async (event) => {
             return await respondToMatchRequest(event);
         case 'POST /matches/{id}/cancel-request':
             return await cancelMatchRequest(event);
-        case 'GET /matches/user/requests':
-            return await getRequestedMatches(event);
         case 'POST /matches/{id}/dismiss-rejected':
             return await dismissRejectedRequest(event);
+
+        // Most generic routes last
+        case 'POST /matches':
+            return await createMatch(event);
+        case 'GET /matches':
+            return await getMatches(event);
+        case 'DELETE /matches/{id}':
+            return await deleteMatch(event);
+        case 'PUT /matches/{id}':
+            return await updateMatch(event);
 
         default:
             console.error('Unknown route:', routeKey);
