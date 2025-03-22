@@ -568,11 +568,19 @@ export async function dismissRejectedRequest(event) {
             return createResponse(400, { message: 'No rejected request found for this match' });
         }
 
-        // Remove user from rejectedRequests array
-        await matches.updateOne(
-            { _id: new ObjectId(matchId) },
-            { $pull: { rejectedRequests: userId } }
-        );
+        // Add user to the dismissedRejectedRequests array if it doesn't exist
+        if (!match.dismissedRejectedRequests) {
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                { $set: { dismissedRejectedRequests: [userId] } }
+            );
+        } else {
+            // Add to existing array if not already there
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                { $addToSet: { dismissedRejectedRequests: userId } }
+            );
+        }
 
         return createResponse(200, {
             message: 'Rejected request dismissed successfully',
@@ -583,7 +591,6 @@ export async function dismissRejectedRequest(event) {
         return createResponse(500, { message: 'Error dismissing rejected request', error: error.message });
     }
 }
-
 export async function dismissAcceptedRequest(event) {
     try {
         const token = event.headers.Authorization.split(' ')[1];
@@ -609,21 +616,17 @@ export async function dismissAcceptedRequest(event) {
             return createResponse(400, { message: 'You are not an accepted participant in this match' });
         }
 
-        // Remove user from participants array
-        await matches.updateOne(
-            { _id: new ObjectId(matchId) },
-            { $pull: { participants: userId } }
-        );
-
-        // If match was closed because it was full, reopen it
-        const matchType = match.matchType?.toLowerCase();
-        const maxParticipants = (matchType === 'singles') ? 2 :
-            ((matchType === 'doubles' || matchType === 'mixed') ? 4 : 2);
-
-        if (match.status === 'closed' && match.participants.length <= maxParticipants) {
+        // Add user to the dismissedAcceptedRequests array if it doesn't exist
+        if (!match.dismissedAcceptedRequests) {
             await matches.updateOne(
                 { _id: new ObjectId(matchId) },
-                { $set: { status: 'open' } }
+                { $set: { dismissedAcceptedRequests: [userId] } }
+            );
+        } else {
+            // Add to existing array if not already there
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                { $addToSet: { dismissedAcceptedRequests: userId } }
             );
         }
 
@@ -636,7 +639,6 @@ export async function dismissAcceptedRequest(event) {
         return createResponse(500, { message: 'Error dismissing accepted request', error: error.message });
     }
 }
-
 export async function updateMatch(event) {
     try {
         const db = await connectToDatabase();
