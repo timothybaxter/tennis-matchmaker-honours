@@ -62,23 +62,49 @@ export async function getMatches(event) {
         if (status) query.status = status;
         if (skillLevel) query.skillLevel = skillLevel;
 
-        // If personal flag is true, only return matches created by the user
+        // If personal flag is true, get matches created by the user OR matches where the user is a participant
         if (personal === 'true') {
-            query.creatorId = userId;
+            query.$or = [
+                { creatorId: userId },
+                { participants: userId }
+            ];
         }
+
+        console.log('Query:', JSON.stringify(query));
 
         const matchList = await matches.find(query)
             .sort({ matchTime: 1 })
             .limit(100)
             .toArray();
 
+        console.log(`Found ${matchList.length} matches`);
+
+        // After fetching matches, make sure to update status for any that are full
+        matchList.forEach(match => {
+            // Check if match is full based on participants and type
+            const matchType = match.matchType?.toLowerCase();
+            const participants = match.participants || [];
+            const maxParticipants = (matchType === 'singles') ? 2 :
+                ((matchType === 'doubles' || matchType === 'mixed') ? 4 : 2);
+
+            if (match.status === 'open' && participants.length >= maxParticipants) {
+                console.log(`Match ${match._id} is full but marked as open. Updating status to closed.`);
+                match.status = 'closed';
+
+                // Also update in database for future queries
+                matches.updateOne(
+                    { _id: match._id },
+                    { $set: { status: 'closed' } }
+                ).catch(err => console.error(`Error updating match status: ${err}`));
+            }
+        });
+
         return createResponse(200, { matches: matchList });
     } catch (error) {
         console.error('Get matches error:', error);
-        return createResponse(500, { message: 'Error retrieving matches' });
+        return createResponse(500, { message: 'Error retrieving matches', error: error.message });
     }
 }
-
 // Add this new function to get a single match
 export async function getMatch(event) {
     try {
