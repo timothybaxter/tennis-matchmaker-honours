@@ -584,7 +584,59 @@ export async function dismissRejectedRequest(event) {
     }
 }
 
-// Updated updateMatch function optimized for POST requests
+export async function dismissAcceptedRequest(event) {
+    try {
+        const token = event.headers.Authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+
+        const matchId = event.pathParameters?.id;
+        if (!matchId) {
+            return createResponse(400, { message: 'Match ID is required' });
+        }
+
+        const db = await connectToDatabase();
+        const matches = db.collection('matches');
+
+        // Find the match
+        const match = await matches.findOne({ _id: new ObjectId(matchId) });
+        if (!match) {
+            return createResponse(404, { message: 'Match not found' });
+        }
+
+        // Check if user is a participant but not the creator (meaning they were accepted)
+        if (!match.participants.includes(userId) || match.creatorId === userId) {
+            return createResponse(400, { message: 'You are not an accepted participant in this match' });
+        }
+
+        // Remove user from participants array
+        await matches.updateOne(
+            { _id: new ObjectId(matchId) },
+            { $pull: { participants: userId } }
+        );
+
+        // If match was closed because it was full, reopen it
+        const matchType = match.matchType?.toLowerCase();
+        const maxParticipants = (matchType === 'singles') ? 2 :
+            ((matchType === 'doubles' || matchType === 'mixed') ? 4 : 2);
+
+        if (match.status === 'closed' && match.participants.length <= maxParticipants) {
+            await matches.updateOne(
+                { _id: new ObjectId(matchId) },
+                { $set: { status: 'open' } }
+            );
+        }
+
+        return createResponse(200, {
+            message: 'Accepted request dismissed successfully',
+            matchId: matchId
+        });
+    } catch (error) {
+        console.error('Dismiss accepted request error:', error);
+        return createResponse(500, { message: 'Error dismissing accepted request', error: error.message });
+    }
+}
+
 export async function updateMatch(event) {
     try {
         const db = await connectToDatabase();
