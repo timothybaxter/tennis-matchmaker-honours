@@ -888,7 +888,6 @@ export async function submitMatchResult(event) {
         return createResponse(500, { message: 'Error submitting match result', error: error.message });
     }
 }
-// Resolve disputed match (tournament creator only)
 export async function resolveDisputedMatch(event) {
     try {
         // Extract and verify token

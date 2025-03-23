@@ -991,8 +991,9 @@ export async function resetMatchSubmission(event) {
 }
 
 
-// Resolve disputed match (ladder creator only)
-export async function resolveDisputedMatch(event) {
+// Add to ladders.mjs
+
+export async function resolveDispute(event) {
     try {
         // Extract and verify token
         const token = extractAndVerifyToken(event);
@@ -1008,170 +1009,266 @@ export async function resolveDisputedMatch(event) {
             return createResponse(400, { message: 'Ladder ID and Match ID are required' });
         }
 
-        // Parse request body
-        if (!event.body) {
-            return createResponse(400, { message: 'Request body is required' });
-        }
-
+        // Parse request body for resolution
         let parsedBody;
         try {
             parsedBody = JSON.parse(event.body);
         } catch (error) {
-            return createResponse(400, { message: 'Invalid JSON format', details: error.message });
+            return createResponse(400, { message: 'Invalid JSON format' });
         }
 
-        // Validate required fields
-        const { resolution, scores, winner } = parsedBody;
+        const { resolution, winnerId } = parsedBody;
 
-        if (!resolution || !['accept_challenger', 'accept_challengee', 'custom', 'no_contest'].includes(resolution)) {
+        if (!resolution || !['winner', 'remove_challenger', 'remove_challengee', 'remove_both', 'void_match'].includes(resolution)) {
             return createResponse(400, { message: 'Valid resolution type is required' });
         }
 
-        if (resolution === 'custom' && (!scores || !winner)) {
-            return createResponse(400, { message: 'Scores and winner are required for custom resolution' });
-        }
-
-        // Connect to ladders database
+        // Verify user is ladder admin
         const db = await connectToDatabase();
         const ladders = db.collection('ladders');
         const matches = db.collection('competitiveMatches');
 
-        // Get ladder and match
-        let ladder, match;
-        try {
-            ladder = await ladders.findOne({ _id: new ObjectId(ladderId) });
-            match = await matches.findOne({
-                _id: new ObjectId(matchId),
-                ladderId: ladderId
-            });
-        } catch (error) {
-            return createResponse(400, { message: 'Invalid ID format' });
-        }
-
+        const ladder = await ladders.findOne({ _id: new ObjectId(ladderId) });
         if (!ladder) {
             return createResponse(404, { message: 'Ladder not found' });
         }
 
-        if (!match) {
-            return createResponse(404, { message: 'Match not found in this ladder' });
-        }
-
-        // Check if user is ladder creator
         if (ladder.creatorId !== userId) {
-            return createResponse(403, { message: 'Only the ladder creator can resolve disputed matches' });
+            return createResponse(403, { message: 'Only ladder creator can resolve disputes' });
         }
 
-        // Check if match is disputed
+        // Get the match
+        const match = await matches.findOne({
+            _id: new ObjectId(matchId),
+            ladderId: ladderId
+        });
+
+        if (!match) {
+            return createResponse(404, { message: 'Match not found' });
+        }
+
         if (match.status !== 'disputed') {
-            return createResponse(400, { message: 'This match is not in a disputed state' });
+            return createResponse(400, { message: 'Match is not in disputed state' });
         }
 
-        // Determine final result
-        let finalScores, finalWinner;
-
+        // Handle resolution
         switch (resolution) {
-            case 'accept_challenger':
-                finalScores = match.challengerSubmittedScores;
-                finalWinner = match.challengerSubmittedWinner;
-                break;
-            case 'accept_challengee':
-                finalScores = match.challengeeSubmittedScores;
-                finalWinner = match.challengeeSubmittedWinner;
-                break;
-            case 'custom':
-                finalScores = scores;
-                finalWinner = winner;
-                break;
-            case 'no_contest':
-                // Mark match as void and notify players
+            case 'winner':
+                if (!winnerId) {
+                    return createResponse(400, { message: 'Winner ID required for this resolution' });
+                }
+
+                if (winnerId !== match.challengerId && winnerId !== match.challengeeId) {
+                    return createResponse(400, { message: 'Winner must be one of the match participants' });
+                }
+
+                // Update match
                 await matches.updateOne(
-                    { _id: new ObjectId(matchId) },
+                    { _id: match._id },
                     {
                         $set: {
-                            status: 'cancelled',
+                            status: 'completed',
                             completedAt: new Date(),
-                            resolution: 'no_contest',
-                            resolutionNote: 'Match cancelled by ladder administrator'
+                            winner: winnerId,
+                            resolution: 'admin_decision'
                         }
                     }
                 );
 
-                // Notify both players
-                try {
-                    const usersDb = await connectToSpecificDatabase('users-db');
-                    const users = usersDb.collection('users');
-                    const creator = await users.findOne({ _id: new ObjectId(userId) });
+                // If challenger won, update ladder positions
+                if (winnerId === match.challengerId) {
+                    await updateLadderPositions(ladder, match.challengerId, match.challengeeId, ladders);
+                }
 
-                    for (const playerId of [match.challengerId, match.challengeeId]) {
-                        const notificationRequest = {
-                            recipientId: playerId,
-                            senderId: userId,
-                            senderName: creator?.name || 'Ladder Administrator',
-                            ladderId: ladderId,
-                            ladderName: ladder.name,
-                            matchId: matchId,
-                            type: 'match_cancelled'
-                        };
+                // Notify players about the resolution
+                await notifyDisputeResolution(match, 'winner', winnerId);
 
-                        // Make request to your notification API
-                        if (process.env.NOTIFICATION_API_URL) {
-                            await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/ladders', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify(notificationRequest)
-                            });
+                return createResponse(200, { message: 'Dispute resolved, winner declared' });
+
+            case 'remove_challenger':
+                // Remove challenger from ladder
+                await removeLadderPlayer(ladderId, match.challengerId, ladders);
+
+                // Update match as cancelled
+                await matches.updateOne(
+                    { _id: match._id },
+                    {
+                        $set: {
+                            status: 'cancelled',
+                            completedAt: new Date(),
+                            resolution: 'challenger_removed'
                         }
                     }
-                } catch (notificationError) {
-                    console.error('Error sending cancellation notifications:', notificationError);
-                    // Continue without failing
-                }
+                );
 
-                return createResponse(200, {
-                    message: 'Match has been cancelled',
-                    resolution: 'no_contest'
-                });
+                // Notify players
+                await notifyDisputeResolution(match, 'remove_challenger');
+
+                return createResponse(200, { message: 'Challenger removed from ladder' });
+
+            case 'remove_challengee':
+                // Remove challengee from ladder
+                await removeLadderPlayer(ladderId, match.challengeeId, ladders);
+
+                // Update match as cancelled
+                await matches.updateOne(
+                    { _id: match._id },
+                    {
+                        $set: {
+                            status: 'cancelled',
+                            completedAt: new Date(),
+                            resolution: 'challengee_removed'
+                        }
+                    }
+                );
+
+                // Notify players
+                await notifyDisputeResolution(match, 'remove_challengee');
+
+                return createResponse(200, { message: 'Challengee removed from ladder' });
+
+            case 'remove_both':
+                // Remove both players
+                await removeLadderPlayer(ladderId, match.challengerId, ladders);
+                await removeLadderPlayer(ladderId, match.challengeeId, ladders);
+
+                // Update match as cancelled
+                await matches.updateOne(
+                    { _id: match._id },
+                    {
+                        $set: {
+                            status: 'cancelled',
+                            completedAt: new Date(),
+                            resolution: 'both_players_removed'
+                        }
+                    }
+                );
+
+                // Notify players
+                await notifyDisputeResolution(match, 'remove_both');
+
+                return createResponse(200, { message: 'Both players removed from ladder' });
+
+            case 'void_match':
+                // Just mark the match as void without further action
+                await matches.updateOne(
+                    { _id: match._id },
+                    {
+                        $set: {
+                            status: 'cancelled',
+                            completedAt: new Date(),
+                            resolution: 'admin_voided'
+                        }
+                    }
+                );
+
+                // Notify players
+                await notifyDisputeResolution(match, 'void_match');
+
+                return createResponse(200, { message: 'Match voided' });
+
+            default:
+                return createResponse(400, { message: 'Invalid resolution type' });
         }
+    } catch (error) {
+        console.error('Error resolving dispute:', error);
+        return createResponse(500, { message: 'Error resolving dispute', error: error.message });
+    }
+}
 
-        // Ensure winner is a participant
-        if (finalWinner !== match.challengerId && finalWinner !== match.challengeeId) {
-            return createResponse(400, { message: 'Winner must be a match participant' });
-        }
+// Helper function to remove a player from a ladder
+async function removeLadderPlayer(ladderId, playerId, laddersCollection) {
+    try {
+        // Get the ladder
+        const ladder = await laddersCollection.findOne({ _id: new ObjectId(ladderId) });
+        if (!ladder) return false;
 
-        // Update match with resolution
-        await matches.updateOne(
-            { _id: new ObjectId(matchId) },
+        // Find the player's position
+        const playerPosition = ladder.positions.find(pos => pos.playerId === playerId);
+        if (!playerPosition) return false;
+
+        const playerRank = playerPosition.rank;
+
+        // Remove player
+        await laddersCollection.updateOne(
+            { _id: new ObjectId(ladderId) },
+            { $pull: { positions: { playerId: playerId } } }
+        );
+
+        // Update all players below this one to move up one rank
+        await laddersCollection.updateMany(
             {
-                $set: {
-                    status: 'completed',
-                    completedAt: new Date(),
-                    scores: finalScores,
-                    winner: finalWinner,
-                    resolution: resolution,
-                    resolvedBy: userId
-                }
+                _id: new ObjectId(ladderId),
+                "positions.rank": { $gt: playerRank }
+            },
+            { $inc: { "positions.$[elem].rank": -1 } },
+            {
+                arrayFilters: [{ "elem.rank": { $gt: playerRank } }]
             }
         );
 
-        // Update ladder positions if challenger won
-        if (finalWinner === match.challengerId) {
-            await updateLadderPositions(ladder, match.challengerId, match.challengeeId, ladders);
-        }
-
-        // Notify both players
-        await notifyMatchCompletion(ladder, match, finalWinner, token);
-
-        return createResponse(200, {
-            message: 'Disputed match has been resolved',
-            resolution: resolution,
-            winner: finalWinner
-        });
+        return true;
     } catch (error) {
-        console.error('Resolve disputed match error:', error);
-        return createResponse(500, { message: 'Error resolving disputed match', error: error.message });
+        console.error('Error removing player from ladder:', error);
+        return false;
+    }
+}
+
+// Helper function to notify players of dispute resolution
+async function notifyDisputeResolution(match, resolution, winnerId = null) {
+    try {
+        if (!process.env.NOTIFICATION_API_URL) return;
+
+        const recipients = [match.challengerId, match.challengeeId];
+
+        for (const recipientId of recipients) {
+            let message = '';
+
+            switch (resolution) {
+                case 'winner':
+                    message = recipientId === winnerId
+                        ? 'You have been declared the winner of your disputed match by the ladder administrator.'
+                        : 'Your opponent has been declared the winner of your disputed match by the ladder administrator.';
+                    break;
+                case 'remove_challenger':
+                    message = recipientId === match.challengerId
+                        ? 'You have been removed from the ladder by the administrator due to the disputed match.'
+                        : 'Your opponent has been removed from the ladder by the administrator due to the disputed match.';
+                    break;
+                case 'remove_challengee':
+                    message = recipientId === match.challengeeId
+                        ? 'You have been removed from the ladder by the administrator due to the disputed match.'
+                        : 'Your opponent has been removed from the ladder by the administrator due to the disputed match.';
+                    break;
+                case 'remove_both':
+                    message = 'Both you and your opponent have been removed from the ladder by the administrator due to the disputed match.';
+                    break;
+                case 'void_match':
+                    message = 'Your disputed match has been voided by the ladder administrator. No action has been taken.';
+                    break;
+            }
+
+            const notificationRequest = {
+                recipientId,
+                senderId: 'system',
+                senderName: 'Ladder Administrator',
+                ladderId: match.ladderId,
+                matchId: match._id.toString(),
+                type: 'dispute_resolved',
+                content: message
+            };
+
+            await fetch(process.env.NOTIFICATION_API_URL + '/notifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.API_KEY || ''}`
+                },
+                body: JSON.stringify(notificationRequest)
+            });
+        }
+    } catch (error) {
+        console.error('Error sending dispute resolution notifications:', error);
     }
 }
 

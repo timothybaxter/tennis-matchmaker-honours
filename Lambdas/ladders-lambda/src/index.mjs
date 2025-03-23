@@ -5,7 +5,7 @@ import {
     joinLadder,
     issueChallenge,
     submitMatchResult,
-    resolveDisputedMatch,
+    resolveDispute,
     leaveLadder,
     resetMatchSubmission,
     inviteToLadder,
@@ -68,7 +68,7 @@ export const handler = async (event) => {
 
         // POST /ladders/{id}/matches/{matchId}/resolve
         else if (method === 'POST' && resource === '/ladders/{id}/matches/{matchId}/resolve') {
-            return await resolveDisputedMatch(event);
+            return await resolveDispute(event);
         }
 
         // POST /ladders/{id}/leave
