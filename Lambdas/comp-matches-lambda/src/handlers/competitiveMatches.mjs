@@ -7,6 +7,7 @@ import fetch from 'node-fetch';
 
 // Get match history for user
 // Get match history for user
+// Get match history for user
 export async function getMatchHistory(event) {
     try {
         // Extract and verify token
@@ -20,6 +21,13 @@ export async function getMatchHistory(event) {
 
         // If userId is empty in queryParams, use token's userId
         const targetUserId = queryParams.userId || userId;
+
+        // Validate that we have a user ID to query
+        if (!targetUserId) {
+            return createResponse(400, { message: 'User ID is required for match history' });
+        }
+
+        console.log(`Getting match history for user: ${targetUserId}`);
 
         // Get matches with pagination
         const limit = parseInt(queryParams.limit) || 10;
@@ -54,6 +62,8 @@ export async function getMatchHistory(event) {
             }
         }
 
+        console.log(`Base query for match history: ${JSON.stringify(baseQuery)}`);
+
         // First, get tournament matches
         const tournamentsDb = await connectToSpecificDatabase('tournaments-db');
         const tournamentMatchesCollection = tournamentsDb.collection('competitiveMatches');
@@ -61,11 +71,15 @@ export async function getMatchHistory(event) {
             .sort({ completedAt: -1 })
             .toArray();
 
+        console.log(`Found ${tournamentMatchesResults.length} tournament matches`);
+
         // Then, get ladder matches
         const laddersDb = await connectToSpecificDatabase('ladders-db');
         const ladderMatchesCollection = laddersDb.collection('competitiveMatches');
         const ladderMatchesResults = await ladderMatchesCollection.find(baseQuery)
             .toArray();
+
+        console.log(`Found ${ladderMatchesResults.length} ladder matches`);
 
         // Combine all matches
         const combinedMatches = [...tournamentMatchesResults, ...ladderMatchesResults];
@@ -83,7 +97,7 @@ export async function getMatchHistory(event) {
         // Get total count for pagination
         const totalMatches = combinedMatches.length;
 
-        console.log(`Found ${matchHistory.length} matches in history`);
+        console.log(`Found ${matchHistory.length} matches in history (${totalMatches} total)`);
 
         // Get user details for all participants
         const usersDb = await connectToSpecificDatabase('users-db');
