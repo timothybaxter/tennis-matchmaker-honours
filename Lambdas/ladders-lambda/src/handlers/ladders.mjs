@@ -991,7 +991,6 @@ export async function resetMatchSubmission(event) {
 }
 
 
-// Add to ladders.mjs
 
 export async function resolveDispute(event) {
     try {
@@ -1096,7 +1095,8 @@ export async function resolveDispute(event) {
                         $set: {
                             status: 'cancelled',
                             completedAt: new Date(),
-                            resolution: 'challenger_removed'
+                            resolution: 'challenger_removed',
+                            winner: 'void' // Set winner to 'void' for proper handling in UI
                         }
                     }
                 );
@@ -1117,7 +1117,8 @@ export async function resolveDispute(event) {
                         $set: {
                             status: 'cancelled',
                             completedAt: new Date(),
-                            resolution: 'challengee_removed'
+                            resolution: 'challengee_removed',
+                            winner: 'void' // Set winner to 'void' for proper handling in UI
                         }
                     }
                 );
@@ -1139,7 +1140,8 @@ export async function resolveDispute(event) {
                         $set: {
                             status: 'cancelled',
                             completedAt: new Date(),
-                            resolution: 'both_players_removed'
+                            resolution: 'both_players_removed',
+                            winner: 'void' // Set winner to 'void' for proper handling in UI
                         }
                     }
                 );
@@ -1150,14 +1152,15 @@ export async function resolveDispute(event) {
                 return createResponse(200, { message: 'Both players removed from ladder' });
 
             case 'void_match':
-                // Just mark the match as void without further action
+                // Mark the match as void with a special winner value
                 await matches.updateOne(
                     { _id: match._id },
                     {
                         $set: {
                             status: 'cancelled',
                             completedAt: new Date(),
-                            resolution: 'admin_voided'
+                            resolution: 'admin_voided',
+                            winner: 'void' // Set winner to 'void' for proper handling in UI
                         }
                     }
                 );
@@ -1175,7 +1178,6 @@ export async function resolveDispute(event) {
         return createResponse(500, { message: 'Error resolving dispute', error: error.message });
     }
 }
-
 // Helper function to remove a player from a ladder
 async function removeLadderPlayer(ladderId, playerId, laddersCollection) {
     try {
