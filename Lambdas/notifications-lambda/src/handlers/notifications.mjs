@@ -212,6 +212,50 @@ export async function markNotificationRead(event) {
     }
 }
 
+// Delete notification
+export async function deleteNotification(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
+
+        const userId = token.decoded.userId;
+        const { notificationId } = JSON.parse(event.body);
+
+        if (!notificationId) {
+            return createResponse(400, { message: 'notificationId is required' });
+        }
+
+        // Connect to notifications database
+        const notificationsDb = await connectToDatabase();
+        const notifications = notificationsDb.collection('notifications');
+
+        // Ensure the user only deletes their own notifications
+        try {
+            const notificationObjectId = new ObjectId(notificationId);
+
+            const result = await notifications.deleteOne(
+                { _id: notificationObjectId, userId: userId }
+            );
+
+            if (result.deletedCount === 0) {
+                return createResponse(404, { message: 'Notification not found or not authorized' });
+            }
+
+            return createResponse(200, { message: 'Notification deleted successfully' });
+        } catch (error) {
+            console.error('Error parsing notification ID:', error);
+            return createResponse(400, { message: 'Invalid notification ID format' });
+        }
+    } catch (error) {
+        console.error('Delete notification error:', error);
+        console.error('Error stack:', error.stack);
+        return createResponse(500, { message: 'Error deleting notification', error: error.message });
+    }
+}
+
 // Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
