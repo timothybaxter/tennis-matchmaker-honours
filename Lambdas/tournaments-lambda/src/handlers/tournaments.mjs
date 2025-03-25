@@ -1316,21 +1316,23 @@ function compareSubmissions(scores1, scores2, winner1, winner2) {
 // Helper function to advance winner to next round
 async function advanceWinner(tournamentId, match, winnerId, tournaments, matches) {
     try {
-        // Get tournament details
+        // Get tournament
         const tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
         if (!tournament || tournament.status !== 'active') {
             return;
         }
 
+        // Get the bracket structure
         const bracket = tournament.bracket;
         if (!bracket || !bracket.rounds) {
             return;
         }
 
+        // Find the current match in the bracket
         const currentRound = match.round;
         const nextRound = currentRound + 1;
 
-        // If this is the final round, mark the tournament as completed
+        // If this is the final round, update tournament as completed
         if (nextRound > bracket.numRounds) {
             await tournaments.updateOne(
                 { _id: new ObjectId(tournamentId) },
@@ -1349,14 +1351,18 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
         let nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1;
 
         if (currentRound > 1) {
+            // For rounds beyond the first, calculate based on the previous round's match count
             const matchesInPreviousRound = Math.pow(2, bracket.numRounds - currentRound + 1);
             nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + matchesInPreviousRound / 2;
         } else {
+            // For first round matches, simpler calculation
             nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + Math.pow(2, bracket.numRounds - 2);
         }
 
+        // Determine if this match feeds into player1 or player2 slot
         const playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
 
+        // Find the next match in the bracket
         const nextRoundMatches = bracket.rounds[nextRound - 1].matches;
         let nextMatch = nextRoundMatches.find(m => m.matchNumber === nextMatchNumber);
 
@@ -1407,7 +1413,7 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
                 player1: nextMatch.player1.id,
                 player2: nextMatch.player2.id,
                 winner,
-                scores: [],
+                scores: match.scores || [], // Ensure scores are carried over
                 status,
                 createdAt: new Date(),
                 deadline: matchDeadline,
