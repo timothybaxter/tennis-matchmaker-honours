@@ -212,7 +212,6 @@ export async function markNotificationRead(event) {
     }
 }
 
-// Delete notification
 export async function deleteNotification(event) {
     try {
         // Extract and verify token
@@ -222,17 +221,26 @@ export async function deleteNotification(event) {
         }
 
         const userId = token.decoded.userId;
-        const { notificationId } = JSON.parse(event.body);
+
+        let notificationId;
+
+        if (event.httpMethod === 'DELETE' && event.pathParameters && event.pathParameters.id) {
+            notificationId = event.pathParameters.id;
+            console.log('Deleting notification via DELETE request, ID from path:', notificationId);
+        }
+        else if (event.body) {
+            const bodyData = JSON.parse(event.body);
+            notificationId = bodyData.notificationId;
+            console.log('Deleting notification via POST request, ID from body:', notificationId);
+        }
 
         if (!notificationId) {
             return createResponse(400, { message: 'notificationId is required' });
         }
 
-        // Connect to notifications database
         const notificationsDb = await connectToDatabase();
         const notifications = notificationsDb.collection('notifications');
 
-        // Ensure the user only deletes their own notifications
         try {
             const notificationObjectId = new ObjectId(notificationId);
 
@@ -246,8 +254,8 @@ export async function deleteNotification(event) {
 
             return createResponse(200, { message: 'Notification deleted successfully' });
         } catch (error) {
-            console.error('Error parsing notification ID:', error);
-            return createResponse(400, { message: 'Invalid notification ID format' });
+            console.error('Error processing notification deletion:', error);
+            return createResponse(400, { message: 'Invalid notification ID format or database error', error: error.message });
         }
     } catch (error) {
         console.error('Delete notification error:', error);
@@ -255,8 +263,6 @@ export async function deleteNotification(event) {
         return createResponse(500, { message: 'Error deleting notification', error: error.message });
     }
 }
-
-// Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
         event.headers.authorization ||
