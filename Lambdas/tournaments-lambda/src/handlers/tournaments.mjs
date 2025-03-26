@@ -1324,7 +1324,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             return;
         }
 
-        // Find the current match in the bracket
         const currentRound = match.round;
         const nextRound = currentRound + 1;
 
@@ -1338,21 +1337,48 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             return;
         }
 
-        // Calculate next match number - match numbers from round 1 feed into round 2
-        // For matchNumber 1 and 2 -> nextMatchNumber = 1
-        // For matchNumber 3 and 4 -> nextMatchNumber = 2, etc.
-        const nextMatchNumber = Math.ceil(match.matchNumber / 2);
+        // Find next match in the proper round using fromMatch fields
+        let nextMatchNumber = null;
+        let playerPosition = null;
 
-        // Determine player position in next match - odd numbered matches feed into player1, even into player2
-        const playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
+        // Find the round in the bracket structure
+        const nextRoundData = tournament.bracket.rounds.find(r => r.roundNumber === nextRound);
+        if (!nextRoundData) {
+            console.error(`Could not find round ${nextRound} in tournament structure`);
+            return;
+        }
+
+        // Find the next match that this match feeds into
+        for (const nextMatch of nextRoundData.matches) {
+            if (nextMatch.fromMatch1 === match.matchNumber) {
+                nextMatchNumber = nextMatch.matchNumber;
+                playerPosition = 'player1';
+                break;
+            }
+            if (nextMatch.fromMatch2 === match.matchNumber) {
+                nextMatchNumber = nextMatch.matchNumber;
+                playerPosition = 'player2';
+                break;
+            }
+        }
+
+        // If we can't find explicit fromMatch fields, use position-based logic
+        if (!nextMatchNumber) {
+            // Use the old method as fallback, but adjusted for sequential numbering
+            const matchesInCurrentRound = Math.pow(2, tournament.bracket.numRounds - currentRound);
+            const firstMatchInNextRound = matchesInCurrentRound + 1;
+            nextMatchNumber = firstMatchInNextRound + Math.floor((match.matchNumber - 1) / 2);
+
+            // Determine player position based on match number
+            playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
+        }
 
         console.log(`Winner goes to ${playerPosition} in match ${nextMatchNumber} of round ${nextRound}`);
 
-        // Find roundIndex and matchIndex in bracket structure
+        // Find round indices
         let currentRoundIndex = -1;
         let nextRoundIndex = -1;
 
-        // Find indexes in bracket data structure
         for (let i = 0; i < tournament.bracket.rounds.length; i++) {
             if (tournament.bracket.rounds[i].roundNumber === currentRound) {
                 currentRoundIndex = i;
@@ -1367,7 +1393,7 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             return;
         }
 
-        // First update current match winner
+        // Update current match winner
         let currentMatchIndex = -1;
         for (let i = 0; i < tournament.bracket.rounds[currentRoundIndex].matches.length; i++) {
             if (tournament.bracket.rounds[currentRoundIndex].matches[i].matchNumber === match.matchNumber) {
@@ -1387,7 +1413,7 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             { $set: { [`bracket.rounds.${currentRoundIndex}.matches.${currentMatchIndex}.winner`]: { id: winnerId } } }
         );
 
-        // Now find next match and update player slot
+        // Find next match index
         let nextMatchIndex = -1;
         for (let i = 0; i < tournament.bracket.rounds[nextRoundIndex].matches.length; i++) {
             if (tournament.bracket.rounds[nextRoundIndex].matches[i].matchNumber === nextMatchNumber) {
@@ -1407,7 +1433,7 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             { $set: { [`bracket.rounds.${nextRoundIndex}.matches.${nextMatchIndex}.${playerPosition}`]: { id: winnerId } } }
         );
 
-        // Get updated tournament data
+        // Get updated tournament and create next match if needed
         const updatedTournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
         const nextMatchData = updatedTournament.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
 
@@ -1420,7 +1446,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
 
         // Create the match if it doesn't exist
         if (!existingMatch) {
-            // Get player details
             const player1 = nextMatchData.player1 ? nextMatchData.player1.id : null;
             const player2 = nextMatchData.player2 ? nextMatchData.player2.id : null;
 
@@ -1481,6 +1506,20 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             }
         } else {
             console.log(`Match ${nextMatchNumber} in round ${nextRound} already exists`);
+
+            // Update existing match with winner information if it's a bye match
+            if ((player1 && !player2) || (!player1 && player2)) {
+                const winningPlayer = player1 || player2;
+                await matches.updateOne(
+                    { _id: existingMatch._id },
+                    {
+                        $set: {
+                            player1: player1,
+                            player2: player2
+                        }
+                    }
+                );
+            }
         }
     } catch (error) {
         console.error('Error in advanceWinner:', error);
