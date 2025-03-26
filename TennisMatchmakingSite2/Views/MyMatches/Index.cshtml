@@ -4,36 +4,46 @@
     var tournamentMatches = ViewBag.TournamentMatches as List<TennisMatchmakingSite2.Models.CompMatchData> ?? new List<TennisMatchmakingSite2.Models.CompMatchData>();
     var ladderMatches = ViewBag.LadderMatches as List<TennisMatchmakingSite2.Models.CompMatchData> ?? new List<TennisMatchmakingSite2.Models.CompMatchData>();
     var userId = Context.Session.GetString("UserId");
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
     }
+
+    <div id="theme-data" data-theme="@currentTheme" class="hidden"></div>
 
     <div class="container mx-auto px-4 pb-20">
         <div class="mt-4">
-            <h1 class="text-2xl font-bold mb-6">My Active Matches</h1>
+            <h1 class="text-2xl font-bold mb-4">My Active Matches</h1>
 
             @if (TempData["SuccessMessage"] != null)
         {
-            <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6">
-                @TempData["SuccessMessage"]
+            <div class="bg-green-50 text-green-800 p-4 rounded-md mb-4 shadow-sm">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    @TempData["SuccessMessage"]
+                </div>
             </div>
         }
 
             @if (TempData["ErrorMessage"] != null)
         {
-            <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6">
-                @TempData["ErrorMessage"]
+            <div class="bg-red-50 text-red-800 p-4 rounded-md mb-4 shadow-sm">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    @TempData["ErrorMessage"]
+                </div>
             </div>
         }
 
             @if (!Model.Any())
         {
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+                <i class="fas fa-calendar-times text-gray-400 text-5xl mb-4"></i>
                 <p class="text-gray-600 mb-4">You don't have any active matches.</p>
-                <div class="flex justify-center gap-4">
-                    <a href="@Url.Action("Index", "Match")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-search mr-2"></i>Find Casual Matches
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
+                    <a href="@Url.Action("Index", "Match")" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-search mr-2"></i>Find Matches
                     </a>
-                    <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-purple-800 bg-purple-100 rounded-md hover:bg-purple-200 transition-colors">
-                        <i class="fas fa-trophy mr-2"></i>Browse Tournaments & Ladders
+                    <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium theme-header theme-text rounded-md transition-colors">
+                        <i class="fas fa-trophy mr-2"></i>Browse Competitions
                     </a>
                 </div>
             </div>
@@ -43,11 +53,11 @@
  <!-- Tournament Matches -->
             @if (tournamentMatches.Any())
             {
-            <div class="mb-8">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-3 flex items-center">
                     <i class="fas fa-trophy text-yellow-500 mr-2"></i>Tournament Matches
                 </h2>
-                <div class="space-y-4">
+                <div class="space-y-3">
                     <!-- For tournament matches -->
                     @foreach (var match in tournamentMatches)
                         {
@@ -62,22 +72,25 @@
                                                  (match.Player2 == userId && match.Player2Submitted);
                             var isDisputed = match.Status == "disputed";
 
-                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-500" : isExpired ? "border-red-300" : "border-gray-200") hover:shadow-md transition-shadow">
+                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-400" : isExpired ? "border-red-200" : "border-gray-200") hover:shadow-md transition-shadow">
                         <div class="p-4">
-                            <div class="flex flex-col md:flex-row justify-between items-start gap-4">
-                                <!-- Match Details -->
-                                <div>
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <h3 class="font-semibold text-lg">Tournament: @tournamentName</h3>
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            <div class="mb-3">
+                                <h3 class="font-semibold text-lg flex items-center flex-wrap">
+                                    <span class="mr-2">@tournamentName</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                                     @(isDisputed ? "bg-red-100 text-red-800" :
                                                     isExpired ? "bg-red-100 text-red-800" :
                                                     "bg-blue-100 text-blue-800")">
-                                            @match.Status.ToUpper()
-                                        </span>
-                                    </div>
-                                    <p class="text-gray-700">
-                                        <span class="font-medium">Opponent:</span>
+                                        @match.Status.ToUpper()
+                                    </span>
+                                </h3>
+                            </div>
+
+                            <div class="flex flex-col md:flex-row justify-between">
+                                <!-- Match Details -->
+                                <div>
+                                    <p class="text-gray-700 mb-1 flex flex-wrap items-center">
+                                        <span class="font-medium mr-1">Opponent:</span>
                                         <a href="@Url.Action("ViewProfile", "Profile", new { id = opponent?.Id })" class="text-blue-600 hover:underline">
                                             @(opponent?.Name ?? "Unknown")
                                         </a>
@@ -86,13 +99,13 @@
 
                                     @if (deadline.HasValue)
                                             {
-                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700")">
+                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700") mb-1">
                                         <span class="font-medium">Deadline:</span>
                                         @deadline.Value.ToString("MMM d, yyyy HH:mm")
                                         @if (!isExpired && hours >= 0)
                                                     {
                                         <span class="ml-2 text-sm font-medium">
-                                            (@hours hours @minutes minutes remaining)
+                                            (@hours hrs @minutes min remaining)
                                         </span>
                                                     }
                                                     else if (isExpired)
@@ -108,46 +121,47 @@
                                             {
                                     <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm">
                                         <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
-                                        <p>The submitted results don't match. Please resubmit or contact the tournament organizer.</p>
-                                        <p class="mt-1">You have until the deadline to resolve this issue or you may be removed from the tournament.</p>
+                                        <p>Scores don't match. Please resubmit your result.</p>
                                     </div>
                                             }
                                 </div>
 
                                 <!-- Actions -->
-                                <div class="md:text-right">
-                                    @if (match.Status == "scheduled" || match.Status == "accepted")
-                                            {
-                                                if (playerSubmitted)
+                                <div class="flex items-center justify-start md:justify-end mt-3 md:mt-0">
+                                    <div class="flex flex-nowrap space-x-2">
+                                        @if (match.Status == "scheduled" || match.Status == "accepted")
                                                 {
-                                    <span class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
-                                        <i class="fas fa-check-circle mr-2 text-green-600"></i>
-                                        Result Submitted
-                                    </span>
+                                                    if (playerSubmitted)
+                                                    {
+                                        <span class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md whitespace-nowrap">
+                                            <i class="fas fa-check-circle mr-1 text-green-600"></i>
+                                            Result Submitted
+                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                        <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', false)"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-clipboard-check mr-1"></i>
+                                            Submit Result
+                                        </button>
+                                                    }
                                                 }
-                                                else
+                                                else if (isDisputed)
                                                 {
-                                    <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', false)"
-                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-                                        <i class="fas fa-clipboard-check mr-2"></i>
-                                        Submit Result
-                                    </button>
+                                        <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', true)"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>
+                                            Resubmit
+                                        </button>
                                                 }
-                                            }
-                                            else if (isDisputed)
-                                            {
-                                    <button onclick="openSubmitResultModal('tournament', '@match.Id', '@match.TournamentId', '@opponent?.Id', '@opponent?.Name', true)"
-                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
-                                        <i class="fas fa-exclamation-circle mr-2"></i>
-                                        Resubmit Result
-                                    </button>
-                                            }
 
-                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = match.TournamentId })"
-                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors ml-2">
-                                        <i class="fas fa-eye mr-2"></i>
-                                        View Tournament
-                                    </a>
+                                        <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = match.TournamentId })"
+                                           class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-eye mr-1"></i>
+                                            View Tournament
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -160,11 +174,11 @@
  <!-- Ladder Matches -->
             @if (ladderMatches.Any())
             {
-            <div class="mb-8">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-3 flex items-center">
                     <i class="fas fa-chart-line text-purple-500 mr-2"></i>Ladder Matches
                 </h2>
-                <div class="space-y-4">
+                <div class="space-y-3">
                     @foreach (var match in ladderMatches)
                         {
                             var opponent = match.Opponent;
@@ -179,23 +193,26 @@
                                                  (match.ChallengeeId == userId && match.ChallengeeSubmitted);
                             var isDisputed = match.Status == "disputed";
 
-                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-500" : isExpired ? "border-red-300" : "border-gray-200") hover:shadow-md transition-shadow">
+                    <div class="bg-white rounded-lg shadow-sm border @(isDisputed ? "border-red-400" : isExpired ? "border-red-200" : "border-gray-200") hover:shadow-md transition-shadow">
                         <div class="p-4">
-                            <div class="flex flex-col md:flex-row justify-between items-start gap-4">
+                            <div class="mb-3">
+                                <h3 class="font-semibold text-lg flex items-center flex-wrap">
+                                    <span class="mr-2">@ladderName</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    @(isDisputed ? "bg-red-100 text-red-800" :
+                                                    match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
+                                                    match.Status == "accepted" ? "bg-green-100 text-green-800" :
+                                                    "bg-gray-100 text-gray-800")">
+                                        @match.Status.ToUpper()
+                                    </span>
+                                </h3>
+                            </div>
+
+                            <div class="flex flex-col md:flex-row justify-between space-y-3 md:space-y-0">
                                 <!-- Match Details -->
                                 <div>
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <h3 class="font-semibold text-lg">Ladder: @ladderName</h3>
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                        @(isDisputed ? "bg-red-100 text-red-800" :
-                                                        match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
-                                                        match.Status == "accepted" ? "bg-green-100 text-green-800" :
-                                                        "bg-gray-100 text-gray-800")">
-                                            @match.Status.ToUpper()
-                                        </span>
-                                    </div>
-                                    <p class="text-gray-700">
-                                        <span class="font-medium">@(isChallengee ? "Challenger:" : "Opponent:")</span>
+                                    <p class="text-gray-700 mb-1 flex flex-wrap items-center">
+                                        <span class="font-medium mr-1">@(isChallengee ? "Challenger:" : "Opponent:")</span>
                                         <a href="@Url.Action("ViewProfile", "Profile", new { id = opponent?.Id })" class="text-blue-600 hover:underline">
                                             @(opponent?.Name ?? "Unknown")
                                         </a>
@@ -204,13 +221,13 @@
 
                                     @if (deadline.HasValue)
                                             {
-                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700")">
+                                    <p class="@(isExpired ? "text-red-600 font-medium" : "text-gray-700") mb-1">
                                         <span class="font-medium">Deadline:</span>
                                         @deadline.Value.ToString("MMM d, yyyy HH:mm")
                                         @if (!isExpired && hours >= 0)
                                                     {
                                         <span class="ml-2 text-sm font-medium">
-                                            (@hours hours @minutes minutes remaining)
+                                            (@hours hrs @minutes min remaining)
                                         </span>
                                                     }
                                                     else if (isExpired)
@@ -226,67 +243,68 @@
                                             {
                                     <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm">
                                         <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
-                                        <p>The submitted results don't match. Please resubmit or contact the ladder organizer.</p>
-                                        <p class="mt-1">You have until the deadline to resolve this issue or you may lose your position in the ladder.</p>
+                                        <p>The submitted results don't match. Please resubmit your score.</p>
                                     </div>
                                             }
                                 </div>
 
                                 <!-- Actions -->
-                                <div class="md:text-right">
-                                    @if (isChallengee && match.Status == "scheduled")
-                                            {
-                                                <!-- Respond to challenge buttons (for challengee) -->
-                                    <form asp-action="RespondToChallenge" method="post" class="inline">
-                                        <input type="hidden" name="ladderId" value="@match.LadderId" />
-                                        <input type="hidden" name="matchId" value="@match.Id" />
-                                        <input type="hidden" name="response" value="accept" />
-                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-                                            <i class="fas fa-check mr-1"></i>Accept
-                                        </button>
-                                    </form>
-                                    <form asp-action="RespondToChallenge" method="post" class="inline ml-2">
-                                        <input type="hidden" name="ladderId" value="@match.LadderId" />
-                                        <input type="hidden" name="matchId" value="@match.Id" />
-                                        <input type="hidden" name="response" value="decline" />
-                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
-                                            <i class="fas fa-times mr-1"></i>Decline
-                                        </button>
-                                    </form>
-                                            }
-                                            else if (match.Status == "accepted")
-                                            {
+                                <div class="flex items-center justify-start md:justify-end mt-3 md:mt-0">
+                                    <div class="flex flex-nowrap space-x-2">
+                                        @if (isChallengee && match.Status == "scheduled")
+                                                {
+                                                    <!-- Respond to challenge buttons (for challengee) -->
+                                        <form asp-action="RespondToChallenge" method="post" class="inline">
+                                            <input type="hidden" name="ladderId" value="@match.LadderId" />
+                                            <input type="hidden" name="matchId" value="@match.Id" />
+                                            <input type="hidden" name="response" value="accept" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-check mr-1"></i>Accept
+                                            </button>
+                                        </form>
+                                        <form asp-action="RespondToChallenge" method="post" class="inline">
+                                            <input type="hidden" name="ladderId" value="@match.LadderId" />
+                                            <input type="hidden" name="matchId" value="@match.Id" />
+                                            <input type="hidden" name="response" value="decline" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-times mr-1"></i>Decline
+                                            </button>
+                                        </form>
+                                                }
+                                                else if (match.Status == "accepted")
+                                                {
  <!-- Submit result button (for both players in accepted matches) -->
-                                                if (playerSubmitted)
-                                                {
-                                    <span class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
-                                        <i class="fas fa-check-circle mr-2 text-green-600"></i>
-                                        Result Submitted
-                                    </span>
+                                                    if (playerSubmitted)
+                                                    {
+                                        <span class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md whitespace-nowrap">
+                                            <i class="fas fa-check-circle mr-1 text-green-600"></i>
+                                            Result Submitted
+                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                        <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', false)"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-clipboard-check mr-1"></i>
+                                            Submit Result
+                                        </button>
+                                                    }
                                                 }
-                                                else
+                                                else if (isDisputed)
                                                 {
-                                    <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', false)"
-                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-                                        <i class="fas fa-clipboard-check mr-2"></i>
-                                        Submit Result
-                                    </button>
+                                        <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', true)"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>
+                                            Resubmit
+                                        </button>
                                                 }
-                                            }
-                                            else if (isDisputed)
-                                            {
-                                    <button onclick="openSubmitResultModal('ladder', '@match.Id', '@match.LadderId', '@opponent?.Id', '@opponent?.Name', true)"
-                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
-                                        <i class="fas fa-exclamation-circle mr-2"></i>
-                                        Resubmit Result
-                                    </button>
-                                            }
 
-                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = match.LadderId })"
-                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors ml-2">
-                                        <i class="fas fa-eye mr-2"></i>
-                                        View Ladder
-                                    </a>
+                                        <a href="@Url.Action("LadderDetails", "Tournaments", new { id = match.LadderId })"
+                                           class="inline-flex items-center px-3 py-1.5 text-sm font-medium theme-header theme-text rounded-md transition-colors whitespace-nowrap">
+                                            <i class="fas fa-eye mr-1"></i>
+                                            View Ladder
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -301,7 +319,7 @@
 
     <!-- Submit Result Modal -->
     <div id="submitResultModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white m-4">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold" id="modalTitle">Submit Match Result</h3>
                 <button onclick="closeSubmitResultModal()" class="text-gray-500 hover:text-gray-700">
@@ -437,6 +455,33 @@
 
     @section Scripts {
         <script>
+        // Theme handling for better integration with the site's styling
+        function applyThemeToElements() {
+            // Get the current theme
+            const currentTheme = document.getElementById('theme-data').getAttribute('data-theme');
+
+            // Define theme colors directly
+            const themeColors = {
+                'Wimbledon': '#64408a',      // Purple
+                'RolandGarros': '#084e2e',   // Dark green
+                'USOpen': '#426892',         // Blue
+                'AustralianOpen': '#e9f7ff'  // Light blue
+            };
+
+            // Get colors for the current theme
+            const themeColor = themeColors[currentTheme] || themeColors['Wimbledon'];
+            const textColor = currentTheme === 'AustralianOpen' ? '#000000' : '#ffffff';
+
+            // Apply theme colors
+            document.querySelectorAll('.theme-header').forEach(element => {
+                element.style.backgroundColor = themeColor;
+            });
+
+            document.querySelectorAll('.theme-text').forEach(element => {
+                element.style.color = textColor;
+            });
+        }
+
         // Submit Result Modal Functions
         function openSubmitResultModal(type, matchId, competitionId, opponentId, opponentName, isDisputed = false) {
             // Show debug info
@@ -488,6 +533,7 @@
             } else if (type === 'ladder') {
                 // Show ladder form
                 const formContainer = document.getElementById('ladderFormContainer');
+                formContainer
                 formContainer.classList.remove('hidden');
 
                 const form = document.getElementById('ladderResultForm');

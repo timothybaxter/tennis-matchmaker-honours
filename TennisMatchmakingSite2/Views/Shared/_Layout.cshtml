@@ -68,6 +68,35 @@
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
 
+    <!-- Add this at the top of your _Layout.cshtml file -->
+    <style>
+    /* Global fix for match card content */
+    [id^="content-"] {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Make sure button containers wrap properly */
+    .button-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    @@media (max-width: 640px) {
+        /* Smaller buttons on mobile */
+        button.inline-flex {
+            padding: 0.5rem !important;
+            font-size: 0.75rem !important;
+        }
+
+        button.inline-flex i {
+            margin-right: 0.25rem !important;
+        }
+    }
+    </style>
+
     <style>
         html, body {
             height: 100%;
@@ -97,7 +126,7 @@
             right: 0;
             height: 100px;
             background-color: @navbarColor;
-            z-index: 10;
+            z-index: 50;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -105,14 +134,16 @@
         }
 
         .logo-container {
-            width: 600px;
-            height: auto;
+            width: 400px;
+            height: 100px;
+            pointer-events: none; /* Completely ignore pointer events */
         }
 
             .logo-container img {
                 width: 100%;
                 height: 100%;
                 object-fit: contain;
+                pointer-events: auto; /* Only the actual visible part of image is clickable */
             }
 
         .bottom-nav {

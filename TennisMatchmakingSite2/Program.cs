@@ -6,6 +6,7 @@ using System.IO;
 using TennisMatchmakingSite2.Hubs; // Add this to import your hub namespace
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+using TennisMatchmakingSite2.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSession();
 builder.Services.AddSignalR();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<NotificationService>();
 
 // Optional: Add CORS if needed
 builder.Services.AddCors(options =>

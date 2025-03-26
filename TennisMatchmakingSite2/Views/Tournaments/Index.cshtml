@@ -1,31 +1,139 @@
 @model TennisMatchmakingSite2.Models.CompetitionViewModel
 @{
     ViewData["Title"] = Model.IsPersonal ? "My Competitions" : "Tournaments & Ladders";
+    bool showCompleted = Context.Request.Query.ContainsKey("showCompleted") && Context.Request.Query["showCompleted"] == "true";
+    
+    // Get the current theme from session
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
+    
+    // Filter tournaments - when showCompleted is true, ONLY show completed ones
+    // when showCompleted is false, ONLY show non-completed ones
+    var filteredTournaments = Model.Tournaments;
+    if (Model.IsPersonal) {
+        if (showCompleted) {
+            // Only show completed tournaments
+            filteredTournaments = Model.Tournaments.Where(t => t.Status == "completed").ToList();
+        } else {
+            // Only show non-completed tournaments
+            filteredTournaments = Model.Tournaments.Where(t => t.Status != "completed").ToList();
+        }
+    } else {
+        // In non-personal view, always exclude completed
+        filteredTournaments = Model.Tournaments.Where(t => t.Status != "completed").ToList();
+    }
+    
+    // Similarly filter ladders to either show only completed or only active ones
+    var filteredLadders = Model.Ladders;
+    if (Model.IsPersonal) {
+        if (showCompleted) {
+            filteredLadders = Model.Ladders.Where(l => l.Status == "completed").ToList();
+        } else {
+            filteredLadders = Model.Ladders.Where(l => l.Status != "completed").ToList();
+        }
+    } else {
+        filteredLadders = Model.Ladders.Where(l => l.Status != "completed").ToList();
+    }
 }
 
-<div class="container mx-auto px-4 pb-20">
+<div id="theme-data" data-theme="@currentTheme" class="hidden"></div>
+
+<style>
+    /* Add this to your page */
+    /* Create a special clickable area that appears in front of the page content 
+       but behind the header visually */
+    .header-spacer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100px; /* Match your header height */
+        z-index: 60; /* Higher than the header's z-index */
+        pointer-events: none; /* By default, pass clicks through */
+    }
+    
+    /* Special class for the problematic buttons */
+    .click-through-button {
+        /* Force buttons to be clickable */
+        pointer-events: auto !important;
+        /* Ensure they have a solid background to be visible */
+        position: relative;
+    }
+    
+    /* Mobile optimizations for buttons */
+    .mobile-action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* Make mobile buttons more compact */
+    @@media (max-width: 640px) {
+        .mobile-action-buttons .action-button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            width: calc(50% - 4px); /* Two buttons per row with gap */
+            justify-content: center;
+            margin-bottom: 0;
+        }
+        
+        .mobile-action-buttons .primary-action {
+            width: 100%; /* Full width for primary action */
+            margin-top: 8px;
+        }
+    }
+</style>
+
+<div class="container mx-auto px-4 pb-20 shifted-content">
     <div class="mt-4">
-        <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">@ViewData["Title"]</h1>
-    <div class="flex gap-4">
-        <a href="@Url.Action("Index", "MyMatches")"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-50 rounded-md border border-yellow-200 hover:bg-yellow-100 transition-colors">
-            <i class="fas fa-table-tennis mr-2"></i>
-            My Matches
-        </a>
-        <a href="@(Model.IsPersonal ? @Url.Action("Index", "Tournaments") : @Url.Action("Index", "Tournaments", new { personal = true }))"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
-             @(Model.IsPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
-            <i class="fas @(Model.IsPersonal ? "fa-globe" : "fa-user") mr-2"></i>
-            @(Model.IsPersonal ? "View All Competitions" : "My Competitions")
-        </a>
-        <button onclick="openCreateModal()"
-                class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-            <i class="fas fa-plus mr-2"></i>
-            Create New
-        </button>
-    </div>
-</div>
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+            <h1 class="text-2xl font-bold">@ViewData["Title"]</h1>
+            
+            <!-- Improved mobile-friendly buttons -->
+            <div class="mobile-action-buttons">
+                @if (Model.IsPersonal)
+                {
+                    @if (!showCompleted)
+                    {
+                        <a href="/Tournaments/Index?personal=true&showCompleted=true"
+                           class="action-button inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                             text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100">
+                            <i class="fas fa-eye mr-2"></i>
+                            <span class="whitespace-nowrap">Show Completed</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="/Tournaments/Index?personal=true&showCompleted=false"
+                           class="action-button inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                             text-gray-700 bg-white border-gray-300 hover:bg-gray-50">
+                            <i class="fas fa-eye-slash mr-2"></i>
+                            <span class="whitespace-nowrap">Show Active</span>
+                        </a>
+                    }
+                }
+                <a href="/Tournaments/Invitations" 
+                   class="action-button inline-flex items-center px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 rounded-md border border-purple-200 hover:bg-purple-100 transition-colors">
+                    <i class="fas fa-envelope mr-2"></i>
+                    <span class="whitespace-nowrap">Invitations</span>
+                </a>
+                <a href="@Url.Action("Index", "MyMatches")"
+                   class="action-button inline-flex items-center px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-50 rounded-md border border-yellow-200 hover:bg-yellow-100 transition-colors">
+                    <i class="fas fa-table-tennis mr-2"></i>
+                    <span class="whitespace-nowrap">My Matches</span>
+                </a>
+                <a href="@(Model.IsPersonal ? @Url.Action("Index", "Tournaments") : @Url.Action("Index", "Tournaments", new { personal = true }))"
+                   class="action-button inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border transition-colors
+                     @(Model.IsPersonal ? "text-gray-700 bg-white border-gray-300 hover:bg-gray-50" : "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100")">
+                    <i class="fas @(Model.IsPersonal ? "fa-globe" : "fa-user") mr-2"></i>
+                    <span class="whitespace-nowrap">@(Model.IsPersonal ? "View All" : "My Competitions")</span>
+                </a>
+                <button onclick="openCreateModal()"
+                        class="action-button primary-action inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+                    <i class="fas fa-plus mr-2"></i>
+                    <span class="whitespace-nowrap">Create New</span>
+                </button>
+            </div>
+        </div>
 
         @if (TempData["SuccessMessage"] != null)
         {
@@ -45,10 +153,19 @@
         <div class="mb-8">
             <h2 class="text-xl font-semibold mb-4">Tournaments</h2>
             
-            @if (!Model.Tournaments.Any())
+            @if (!filteredTournaments.Any())
             {
                 <div class="bg-gray-50 text-gray-700 p-6 rounded-md text-center">
-                    <p class="mb-4">@(Model.IsPersonal ? "You're not participating in any tournaments yet." : "No tournaments available.")</p>
+                    <p class="mb-4">
+                        @if (Model.IsPersonal)
+                        {
+                            @(showCompleted ? "You don't have any completed tournaments." : "You don't have any active tournaments.")
+                        }
+                        else
+                        {
+                            <text>No tournaments available.</text>
+                        }
+                    </p>
                     <div class="flex justify-center">
                         <a href="@Url.Action("CreateTournament", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
                             <i class="fas fa-trophy mr-2"></i>
@@ -60,40 +177,44 @@
             else
             {
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    @foreach (var tournament in Model.Tournaments)
+                    @foreach (var tournament in filteredTournaments)
                     {
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow tournament-card">
+                            <!-- Colored header section with title and status -->
+                            <div class="card-header p-4 rounded-t-lg flex justify-between items-start theme-header">
+                                <h3 class="text-lg font-semibold theme-text">@tournament.Name</h3>
+                                <span class="status-pill 
+                                      @(tournament.Status == "pending" ? "pending-pill" : 
+                                        tournament.Status == "active" ? "active-pill" : 
+                                        "completed-pill") 
+                                      px-3 py-1 rounded-full text-xs">
+                                    @tournament.Status.ToUpper()
+                                </span>
+                            </div>
+                            
+                            <!-- Main card content -->
                             <div class="p-4">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h3 class="text-lg font-semibold">@tournament.Name</h3>
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                          @(tournament.Status == "pending" ? "bg-yellow-100 text-yellow-800" : 
-                                            tournament.Status == "active" ? "bg-green-100 text-green-800" : 
-                                            "bg-gray-100 text-gray-800")">
-                                        @tournament.Status.ToUpper()
-                                    </span>
-                                </div>
-                                
-                                <div class="mt-2 space-y-1 text-gray-600">
+                                <div class="space-y-1 text-gray-600">
                                     <p><span class="font-medium">Format:</span> @(tournament.Format == "single" ? "Single Elimination" : "Double Elimination")</p>
                                     <p><span class="font-medium">Created by:</span> @tournament.CreatorDetails.Name</p>
                                     <p><span class="font-medium">Players:</span> @tournament.Players.Count</p>
                                     <p><span class="font-medium">Skill Level:</span> @tournament.SkillLevel</p>
                                     <p><span class="font-medium">Match Window:</span> @tournament.ChallengeWindow hours</p>
                                 </div>
+                            </div>
                                 
-                                <div class="mt-4 flex justify-between items-center">
-                                    <span class="text-sm text-gray-500">
-                                        @(tournament.Status == "pending" ? "Created" : tournament.Status == "active" ? "Started" : "Completed") 
-                                        @(tournament.Status == "pending" ? tournament.CreatedAt.ToString("MMM d, yyyy") : 
-                                          tournament.Status == "active" ? tournament.StartedAt?.ToString("MMM d, yyyy") : 
-                                          tournament.CompletedAt?.ToString("MMM d, yyyy"))
-                                    </span>
-                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = tournament.Id })" 
-                                       class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
-                                        View Details
-                                    </a>
-                                </div>
+                            <!-- Footer with separation line -->
+                            <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+                                <span class="text-sm text-gray-500">
+                                    @(tournament.Status == "pending" ? "Created" : tournament.Status == "active" ? "Started" : "Completed") 
+                                    @(tournament.Status == "pending" ? tournament.CreatedAt.ToString("MMM d, yyyy") : 
+                                      tournament.Status == "active" ? tournament.StartedAt?.ToString("MMM d, yyyy") : 
+                                      tournament.CompletedAt?.ToString("MMM d, yyyy"))
+                                </span>
+                                <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = tournament.Id })" 
+                                  class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                                    View Details
+                                </a>
                             </div>
                         </div>
                     }
@@ -105,10 +226,19 @@
         <div>
             <h2 class="text-xl font-semibold mb-4">Ladders</h2>
             
-            @if (!Model.Ladders.Any())
+            @if (!filteredLadders.Any())
             {
                 <div class="bg-gray-50 text-gray-700 p-6 rounded-md text-center">
-                    <p class="mb-4">@(Model.IsPersonal ? "You're not participating in any ladders yet." : "No ladders available.")</p>
+                    <p class="mb-4">
+                        @if (Model.IsPersonal)
+                        {
+                            @(showCompleted ? "You don't have any completed ladders." : "You don't have any active ladders.")
+                        }
+                        else
+                        {
+                            <text>No ladders available.</text>
+                        }
+                    </p>
                     <div class="flex justify-center">
                         <a href="@Url.Action("CreateLadder", "Tournaments")" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
                             <i class="fas fa-list-ol mr-2"></i>
@@ -120,20 +250,22 @@
             else
             {
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    @foreach (var ladder in Model.Ladders)
+                    @foreach (var ladder in filteredLadders)
                     {
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ladder-card">
+                            <!-- Colored header section with title and status -->
+                            <div class="card-header p-4 rounded-t-lg flex justify-between items-start theme-header">
+                                <h3 class="text-lg font-semibold theme-text">@ladder.Name</h3>
+                                <span class="status-pill
+                                      @(ladder.Status == "active" ? "active-pill" : "completed-pill") 
+                                      px-3 py-1 rounded-full text-xs">
+                                    @ladder.Status.ToUpper()
+                                </span>
+                            </div>
+                            
+                            <!-- Main card content -->
                             <div class="p-4">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h3 class="text-lg font-semibold">@ladder.Name</h3>
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                                          @(ladder.Status == "active" ? "bg-green-100 text-green-800" : 
-                                            "bg-gray-100 text-gray-800")">
-                                        @ladder.Status.ToUpper()
-                                    </span>
-                                </div>
-                                
-                                <div class="mt-2 space-y-1 text-gray-600">
+                                <div class="space-y-1 text-gray-600">
                                     <p><span class="font-medium">Created by:</span> @ladder.CreatorDetails.Name</p>
                                     <p><span class="font-medium">Players:</span> @ladder.Positions.Count</p>
                                     <p><span class="font-medium">Skill Level:</span> @ladder.SkillLevel</p>
@@ -152,16 +284,17 @@
                                         </ol>
                                     </div>
                                 }
+                            </div>
                                 
-                                <div class="mt-4 flex justify-between items-center">
-                                    <span class="text-sm text-gray-500">
-                                        Created @ladder.CreatedAt.ToString("MMM d, yyyy")
-                                    </span>
-                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = ladder.Id })" 
-                                       class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
-                                        View Details
-                                    </a>
-                                </div>
+                            <!-- Footer with separation line -->
+                            <div class="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+                                <span class="text-sm text-gray-500">
+                                    Created @ladder.CreatedAt.ToString("MMM d, yyyy")
+                                </span>
+                                <a href="@Url.Action("LadderDetails", "Tournaments", new { id = ladder.Id })" 
+                                  class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                                    View Details
+                                </a>
                             </div>
                         </div>
                     }
@@ -171,9 +304,10 @@
     </div>
 </div>
 
+
 <!-- Create Competition Modal -->
 <div id="createCompetitionModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 sm:w-96 shadow-lg rounded-md bg-white">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold">Create New Competition</h3>
             <button onclick="closeCreateModal()" class="text-gray-500 hover:text-gray-700">
@@ -196,13 +330,69 @@
         </div>
     </div>
 </div>
+<script src="~/js/theme-handler.js"></script>
 
 @section Scripts {
     <script>
+        function applyThemeToCardHeaders() {
+            // Get the current theme from the hidden element
+            const currentTheme = document.getElementById('theme-data').getAttribute('data-theme');
+            
+            // Access theme colors directly from the themes object in theme-handler.js
+            if (window.themes && window.themes[currentTheme]) {
+                const themeColor = window.themes[currentTheme].navbarColor;
+                const textColor = currentTheme === 'AustralianOpen' ? '#000000' : '#ffffff';
+                
+                // Apply theme colors
+                document.querySelectorAll('.theme-header').forEach(header => {
+                    header.style.backgroundColor = themeColor;
+                });
+                
+                document.querySelectorAll('.theme-text').forEach(text => {
+                    text.style.color = textColor;
+                });
+            } else {
+                // Direct fallback if themes object isn't accessible
+                const themeColors = {
+                    'Wimbledon': '#64408a',
+                    'RolandGarros': '#084e2e',
+                    'USOpen': '#426892',
+                    'AustralianOpen': '#e9f7ff'
+                };
+                
+                const themeColor = themeColors[currentTheme] || themeColors['Wimbledon'];
+                const textColor = currentTheme === 'AustralianOpen' ? '#000000' : '#ffffff';
+                
+                // Apply theme colors
+                document.querySelectorAll('.theme-header').forEach(header => {
+                    header.style.backgroundColor = themeColor;
+                });
+                
+                document.querySelectorAll('.theme-text').forEach(text => {
+                    text.style.color = textColor;
+                });
+            }
+            
+            // Apply pill colors
+            document.querySelectorAll('.pending-pill').forEach(pill => {
+                pill.style.backgroundColor = '#FEF3C7';
+                pill.style.color = '#92400E';
+            });
+            
+            document.querySelectorAll('.active-pill').forEach(pill => {
+                pill.style.backgroundColor = '#D1FAE5';
+                pill.style.color = '#065F46';
+            });
+            
+            document.querySelectorAll('.completed-pill').forEach(pill => {
+                pill.style.backgroundColor = '#F3F4F6';
+                pill.style.color = '#1F2937';
+            });
+        }
+        
         function openCreateModal() {
             const modal = document.getElementById('createCompetitionModal');
             if (!modal) return;
-
             modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
@@ -210,7 +400,6 @@
         function closeCreateModal() {
             const modal = document.getElementById('createCompetitionModal');
             if (!modal) return;
-
             modal.classList.add('hidden');
             document.body.style.overflow = '';
         }
@@ -226,5 +415,22 @@
                 closeCreateModal();
             }
         });
+        
+        // Apply theme when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Apply initially
+            applyThemeToCardHeaders();
+            
+            // When theme changes
+            window.addEventListener('themeChanged', function(e) {
+                if (e.detail && e.detail.theme) {
+                    document.getElementById('theme-data').setAttribute('data-theme', e.detail.theme);
+                }
+                applyThemeToCardHeaders();
+            });
+        });
+        
+        // Also try applying immediately 
+        applyThemeToCardHeaders();
     </script>
 }

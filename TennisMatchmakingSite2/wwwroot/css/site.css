@@ -565,7 +565,37 @@ body {
     display: flex;
     flex-direction: column;
 }
+/* Add to site.css */
+.match-card-content {
+    width: 100%;
+    overflow-x: visible;
+}
 
+.match-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+    .match-actions button {
+        flex-grow: 0;
+    }
+
+@media (max-width: 768px) {
+    .match-actions {
+        justify-content: center;
+    }
+}
+.notification-card {
+    transition: all 0.3s ease;
+    transform-origin: right;
+}
+
+.notification-dismissed {
+    opacity: 0;
+    transform: translateX(100%);
+}
 /* First round positioning */
 .bracket-round:first-child .matches-container {
     justify-content: space-around;
@@ -691,7 +721,75 @@ body {
 .bye-match::after {
     border-color: #10b981;
 }
+/* Card styling */
+.tournament-card,
+.ladder-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
 
+    .tournament-card:hover,
+    .ladder-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+/* Status pills */
+.status-pill {
+    transition: background-color 0.3s ease;
+}
+
+.pending-pill {
+    background-color: #f59e0b; /* Amber/Orange */
+    color: white;
+}
+
+.active-pill {
+    background-color: #10b981; /* Green */
+    color: white;
+}
+
+.completed-pill {
+    background-color: #1f2937; /* Dark gray/black */
+    color: white;
+}
+
+/* Theme elements */
+.theme-header {
+    transition: background-color 0.3s ease;
+}
+
+.theme-text {
+    transition: color 0.3s ease;
+}
+
+/* Default theme colors (will be overridden by JavaScript) */
+.theme-header {
+    background-color: #64408a; /* Wimbledon purple default */
+}
+
+.theme-text {
+    color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+
+    .flex-col-sm {
+        flex-direction: column;
+    }
+
+    .gap-3-sm {
+        gap: 0.75rem;
+    }
+
+    /* Make buttons more touch-friendly on mobile */
+    .inline-flex {
+        padding: 0.5rem 0.75rem;
+    }
+}
 /* Media query for smaller screens */
 @media (max-width: 768px) {
     .tournament-container {

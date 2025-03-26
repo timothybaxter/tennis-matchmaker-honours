@@ -639,6 +639,12 @@ namespace TennisMatchmakingSite2.Models
         public bool CanSubmitResult { get; set; }
     }
 
-
+    public class ResolveLadderDisputeViewModel
+    {
+        public string LadderId { get; set; }
+        public string MatchId { get; set; }
+        public string Resolution { get; set; }
+        public string WinnerId { get; set; }
+    }
     #endregion
 }

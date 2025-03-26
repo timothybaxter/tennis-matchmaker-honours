@@ -110,6 +110,26 @@ window.applyTheme = function (themeName) {
     }
 };
 
+
+window.getThemeColors = function (themeName) {
+    if (!themeName) {
+        const themeElement = document.getElementById('theme-data');
+        if (themeElement) {
+            themeName = themeElement.getAttribute('data-theme');
+        }
+    }
+
+    // Default to Wimbledon if no theme found
+    const theme = themes[themeName] || themes.Wimbledon;
+
+    // Return an object with the essential theme colors
+    return {
+        primary: theme.navbarColor,
+        background: theme.backgroundImage,
+        textColor: themeName === 'AustralianOpen' ? '#000000' : '#ffffff'
+    };
+};
+
 // Listen for theme changes
 document.addEventListener('themeChanged', function (e) {
     window.applyTheme(e.detail.theme);

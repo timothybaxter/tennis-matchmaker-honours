@@ -533,6 +533,7 @@ namespace TennisMatchmakingSite2.Controllers
             {
                 var token = HttpContext.Session.GetString("JWTToken");
                 var userId = HttpContext.Session.GetString("UserId");
+                var userName = HttpContext.Session.GetString("UserName");
 
                 if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(userId))
                 {
@@ -541,14 +542,13 @@ namespace TennisMatchmakingSite2.Controllers
 
                 _logger.LogInformation($"Responding to friend request: {requestId}, Accept: {accept}, User: {userId}");
 
-                // Respond to friend request
+                // 1. Respond to friend request
                 var request = new HttpRequestMessage(HttpMethod.Post, "friends/respond");
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                request.Headers.Add("Authorization", "Bearer " + token);
                 request.Content = JsonContent.Create(new
                 {
                     friendshipId = requestId,
-                    accept,
-                    userId // Include userId explicitly
+                    accept
                 });
 
                 var response = await _httpClient.SendAsync(request);
@@ -557,6 +557,58 @@ namespace TennisMatchmakingSite2.Controllers
 
                 if (response.IsSuccessStatusCode)
                 {
+                    // 2. Find and delete the original notification
+                    // First, get all notifications to find the one related to this friendship
+                    var getNotificationsRequest = new HttpRequestMessage(HttpMethod.Get, "notifications");
+                    getNotificationsRequest.Headers.Add("Authorization", "Bearer " + token);
+
+                    var getNotificationsResponse = await _httpClient.SendAsync(getNotificationsRequest);
+
+                    if (getNotificationsResponse.IsSuccessStatusCode)
+                    {
+                        var notificationsResponse = await getNotificationsResponse.Content.ReadFromJsonAsync<NotificationsResponse>();
+
+                        if (notificationsResponse?.Notifications != null)
+                        {
+                            // Find the notification related to this friendship
+                            var relatedNotification = notificationsResponse.Notifications
+                                .FirstOrDefault(n => n.Type == "friend_request" && n.RelatedItemId == requestId);
+
+                            if (relatedNotification != null)
+                            {
+                                // Delete the original notification
+                                var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"notifications/{relatedNotification.Id}");
+                                deleteRequest.Headers.Add("Authorization", "Bearer " + token);
+
+                                await _httpClient.SendAsync(deleteRequest);
+
+                                // 3. Create a new notification about the response
+                                var createNotificationRequest = new HttpRequestMessage(HttpMethod.Post, "notifications");
+                                createNotificationRequest.Headers.Add("Authorization", "Bearer " + token);
+
+                                // Extract requester info from original notification
+                                var requesterName = relatedNotification.SourceUserName ?? "User";
+                                var requesterId = relatedNotification.SourceUserId;
+
+                                // Create appropriate content based on accept/decline
+                                var notificationContent = accept
+                                    ? $"You accepted {requesterName}'s friend request"
+                                    : $"You declined {requesterName}'s friend request";
+
+                                createNotificationRequest.Content = JsonContent.Create(new
+                                {
+                                    recipientId = userId,
+                                    type = accept ? "friend_accepted" : "friend_declined",
+                                    content = notificationContent,
+                                    relatedItemId = requestId,
+                                    sourceUserId = requesterId
+                                });
+
+                                await _httpClient.SendAsync(createNotificationRequest);
+                            }
+                        }
+                    }
+
                     TempData["SuccessMessage"] = accept ? "Friend request accepted" : "Friend request declined";
                 }
                 else
@@ -572,54 +624,6 @@ namespace TennisMatchmakingSite2.Controllers
             }
 
             return RedirectToAction("FriendRequests");
-        }
-
-        // In SocialController.cs
-        [HttpGet]
-        public async Task<IActionResult> SearchUsers(string query)
-        {
-            try
-            {
-                var token = HttpContext.Session.GetString("JWTToken");
-                if (string.IsNullOrEmpty(token))
-                {
-                    return Json(new { success = false, message = "Not authenticated" });
-                }
-
-                if (string.IsNullOrEmpty(query) || query.Length < 2)
-                {
-                    return Json(new { success = false, message = "Search query must be at least 2 characters" });
-                }
-
-                _logger.LogInformation($"Searching users with query: {query}");
-
-                // Search for users
-                var request = new HttpRequestMessage(HttpMethod.Get, $"friends/search?query={Uri.EscapeDataString(query)}");
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var response = await _httpClient.SendAsync(request);
-
-                _logger.LogInformation($"Search response status: {response.StatusCode}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var searchResponse = await response.Content.ReadFromJsonAsync<SearchUsersResponse>();
-                    return Json(new
-                    {
-                        success = true,
-                        users = searchResponse?.Users ?? new List<UserModel>()
-                    });
-                }
-
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError($"Error searching users: {response.StatusCode}, {errorContent}");
-                return Json(new { success = false, message = "Failed to search users" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in SearchUsers action");
-                return Json(new { success = false, message = "An error occurred while searching users" });
-            }
         }
 
 
@@ -657,6 +661,46 @@ namespace TennisMatchmakingSite2.Controllers
             }
 
             return RedirectToAction("Index");
+        }
+        [HttpPost]
+        public async Task<IActionResult> DeleteNotification(string notificationId)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWTToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "Not authenticated" });
+                }
+
+                _logger.LogInformation("Deleting notification: {NotificationId}", notificationId);
+
+                // Use DELETE request with ID in the URL path - RESTful approach
+                var request = new HttpRequestMessage(HttpMethod.Delete, $"notifications/{notificationId}");
+                request.Headers.Add("Authorization", "Bearer " + token);
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("Delete response: {StatusCode}, Content: {Content}",
+                    response.StatusCode, responseContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return Json(new { success = true });
+                }
+                else
+                {
+                    _logger.LogError("Error deleting notification: {StatusCode}, {Content}",
+                        response.StatusCode, responseContent);
+                    return Json(new { success = false, message = "Failed to delete notification" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in DeleteNotification action");
+                return Json(new { success = false, message = "An error occurred" });
+            }
         }
         [HttpPost]
         public async Task<IActionResult> MarkMessageAsRead(string messageId)

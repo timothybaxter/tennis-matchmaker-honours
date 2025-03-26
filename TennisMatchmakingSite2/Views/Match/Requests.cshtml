@@ -1,0 +1,207 @@
+@model List<TennisMatchmakingSite2.Models.MatchData>
+
+    <div class="container mx-auto px-4 pb-20">
+        @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-4">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+        @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-4">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+        <div class="mt-4">
+            <!-- Mobile View -->
+            <div class="sm:hidden mt-16 mb-6">
+                <h1 class="text-2xl font-bold text-center mb-4">My Match Requests</h1>
+                <div class="flex justify-between gap-2 px-2">
+                    <a href="@Url.Action("Index", "Match")"
+                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors flex-1 justify-center
+                   text-gray-700 bg-white border-gray-300 hover:bg-gray-50">
+                        <i class="fas fa-globe mr-2"></i>
+                        All Matches
+                    </a>
+                    <a href="@Url.Action("Index", "Match", new { personal = true })"
+                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors flex-1 justify-center
+                   text-gray-700 bg-white border-gray-300 hover:bg-gray-50">
+                        <i class="fas fa-user mr-2"></i>
+                        My Matches
+                    </a>
+                </div>
+            </div>
+
+            <!-- Desktop View -->
+            <div class="hidden sm:flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">My Match Requests</h1>
+                <div class="flex gap-4">
+                    <a href="@Url.Action("Index", "Match")"
+                       class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
+                   text-gray-700 bg-white border-gray-300 hover:bg-gray-50">
+                        <i class="fas fa-globe mr-2"></i>
+                        All Matches
+                    </a>
+                    <a href="@Url.Action("Index", "Match", new { personal = true })"
+                       class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border transition-colors
+                   text-gray-700 bg-white border-gray-300 hover:bg-gray-50">
+                        <i class="fas fa-user mr-2"></i>
+                        My Matches
+                    </a>
+                </div>
+            </div>
+
+            @if (!Model.Any())
+        {
+            <div class="bg-blue-50 text-blue-700 p-4 rounded-md">
+                You haven't requested to join any matches yet.
+            </div>
+        }
+        else
+        {
+            <div class="space-y-4">
+                @foreach (var match in Model)
+                {
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                    <div class="p-4">
+                        <div class="flex flex-col sm:flex-row sm:justify-between">
+                            <div class="mb-3 sm:mb-0">
+                                <h3 class="text-lg font-semibold">@match.CourtLocation</h3>
+                                <div class="mt-2 space-y-1 text-gray-600">
+                                    <p><span class="font-medium">Type:</span> @match.MatchType?.ToUpper()</p>
+                                    <p><span class="font-medium">Time:</span> @match.MatchTime.ToString("dd MMMM yyyy HH:mm")</p>
+                                    <p><span class="font-medium">Posted by:</span> @match.PosterName</p>
+                                    <div class="flex mt-2">
+                                        <span class="text-sm text-gray-700 font-medium bg-gray-100 px-2 py-0.5 rounded-full mr-2">
+                                            Skill Level: @(string.IsNullOrEmpty(match.SkillLevel) ? "Unknown" : match.SkillLevel)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end min-h-[120px] justify-between gap-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(match.Status?.ToLower() == "open" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")">
+                                    @match.Status?.ToUpper()
+                                </span>
+
+                                <div class="self-start sm:self-auto">
+                                    @if (match.RequestStatus == "pending")
+                                        {
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        REQUEST PENDING
+                                    </span>
+                                        }
+                                        else if (match.RequestStatus == "accepted")
+                                        {
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        REQUEST ACCEPTED
+                                    </span>
+                                        }
+                                        else if (match.RequestStatus == "rejected")
+                                        {
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        REQUEST DENIED
+                                    </span>
+                                        }
+                                </div>
+
+                                <div class="self-end mt-auto pt-2">
+                                    @if (match.RequestStatus == "pending")
+                                        {
+                                    <button onclick="cancelRequest('@match.Id')" class="text-sm text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md transition-colors">
+                                        <i class="fas fa-times-circle mr-1"></i> Cancel Request
+                                    </button>
+                                        }
+                                        else if (match.RequestStatus == "accepted")
+                                        {
+                                    <button onclick="dismissAcceptedRequest('@match.Id')" class="text-sm text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md transition-colors">
+                                        <i class="fas fa-times-circle mr-1"></i> Dismiss
+                                    </button>
+                                        }
+                                        else if (match.RequestStatus == "rejected")
+                                        {
+                                    <button onclick="dismissRequest('@match.Id')" class="text-sm text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md transition-colors">
+                                        <i class="fas fa-times-circle mr-1"></i> Dismiss
+                                    </button>
+                                        }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                }
+            </div>
+        }
+        </div>
+    </div>
+
+    @section Scripts {
+        <script>
+            function cancelRequest(matchId) {
+                if (confirm('Are you sure you want to cancel this request?')) {
+                    fetch(`/Match/CancelRequest?matchId=${matchId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                window.location.reload();
+                            } else {
+                                alert(data.message || 'Failed to cancel request');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while canceling the request');
+                        });
+                }
+            }
+
+            function dismissRequest(matchId) {
+                fetch(`/Match/DismissRejectedRequest?matchId=${matchId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            alert(data.message || 'Failed to dismiss notification');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while dismissing the notification');
+                    });
+            }
+
+            function dismissAcceptedRequest(matchId) {
+                fetch(`/Match/DismissAcceptedRequest?matchId=${matchId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            alert(data.message || 'Failed to dismiss notification');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while dismissing the notification');
+                    });
+            }
+        </script>
+    }

@@ -15,7 +15,19 @@
         { "inactive", "gray" }
     };
     string statusColor = statusColors.ContainsKey(Model.Status) ? statusColors[Model.Status] : "gray";
+
+    // Get the current theme from session
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
 }
+
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+<input type="hidden" name="__RequestVerificationToken" value="@token" />
+
+<!-- Add a hidden element to store the theme -->
+<div id="theme-data" data-theme="@currentTheme" class="hidden"></div>
 
 <div class="container mx-auto px-4 pb-20">
     <div class="mt-4">
@@ -39,6 +51,14 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
+                @if (Model.IsCreator)
+                {
+                <button id="openSearchModal" type="button" class="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Invite Player
+                </button>
+                }
+
                 @if (!Model.IsParticipant && Model.Status == "active")
                 {
                 <form asp-action="JoinLadder" asp-route-id="@Model.Id" method="post" class="inline">
@@ -72,361 +92,436 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Ladder Info -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 class="text-lg font-semibold mb-4">Ladder Information</h2>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="theme-header p-4 rounded-t-lg">
+                    <h2 class="text-lg font-semibold theme-text">Ladder Information</h2>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Created by</p>
+                            <p>@Model.CreatorDetails.Name</p>
+                        </div>
 
-                <div class="space-y-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Created by</p>
-                        <p>@Model.CreatorDetails.Name</p>
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Created on</p>
+                            <p>@Model.CreatedAt.ToString("MMMM d, yyyy")</p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Challenge Window</p>
+                            <p>@Model.ChallengeWindow hours</p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Visibility</p>
+                            <p>@(Model.Visibility == "public" ? "Public" : "Private")</p>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Skill Level</p>
+                            <p>@Model.SkillLevel</p>
+                        </div>
+
+                        @if (Model.IsParticipant && Model.CurrentUserRank.HasValue)
+                        {
+                        <div class="pt-3 border-t border-gray-200">
+                            <p class="text-sm font-medium text-gray-700">Your Current Rank</p>
+                            <p class="font-semibold text-purple-600">#@Model.CurrentUserRank</p>
+                        </div>
+                        }
                     </div>
 
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Created on</p>
-                        <p>@Model.CreatedAt.ToString("MMMM d, yyyy")</p>
-                    </div>
-
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Challenge Window</p>
-                        <p>@Model.ChallengeWindow hours</p>
-                    </div>
-
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Visibility</p>
-                        <p>@(Model.Visibility == "public" ? "Public" : "Private")</p>
-                    </div>
-
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">Skill Level</p>
-                        <p>@Model.SkillLevel</p>
-                    </div>
-
-                    @if (Model.IsParticipant && Model.CurrentUserRank.HasValue)
+                    @if (Model.IsParticipant && Model.Status == "active")
                     {
-                    <div class="pt-3 border-t border-gray-200">
-                        <p class="text-sm font-medium text-gray-700">Your Current Rank</p>
-                        <p class="font-semibold text-purple-600">#@Model.CurrentUserRank</p>
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <h3 class="font-medium text-gray-800 mb-3">Ladder Rules:</h3>
+                        <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                            <li>You can challenge players up to 2 ranks above you</li>
+                            <li>If you win, you swap positions with your opponent</li>
+                            <li>Challenges must be completed within @Model.ChallengeWindow hours</li>
+                            <li>All challenges are automatically accepted</li>
+                            <li>Both players must submit the match result</li>
+                            <li>If deadline expires, the match will be marked as disputed</li>
+                        </ul>
                     </div>
                     }
                 </div>
-
-                @if (Model.IsParticipant && Model.Status == "active")
-                {
-                <div class="mt-6 pt-4 border-t border-gray-200">
-                    <h3 class="font-medium text-gray-800 mb-3">Ladder Rules:</h3>
-                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                        <li>You can challenge players up to 2 ranks above you</li>
-                        <li>If you win, you swap positions with your opponent</li>
-                        <li>Challenges must be completed within @Model.ChallengeWindow hours</li>
-                        <li>Both players must submit the match result</li>
-                    </ul>
-                </div>
-                }
             </div>
 
             <!-- Ladder Rankings & Matches -->
             <div class="md:col-span-2 space-y-6">
                 <!-- Ladder Rankings -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-lg font-semibold mb-4">Ladder Rankings</h2>
-
-                    @if (!Model.Positions.Any())
-                    {
-                    <p class="text-gray-600">No players in this ladder yet.</p>
-                    }
-                    else
-                    {
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="border-b border-gray-200">
-                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Rank</th>
-                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Player</th>
-                                    <th class="text-left py-2 px-3 font-medium text-gray-600">Skill Level</th>
-                                    <th class="text-right py-2 px-3 font-medium text-gray-600">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var position in Model.Positions.OrderBy(p => p.Rank))
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="theme-header p-4 rounded-t-lg">
+                        <h2 class="text-lg font-semibold theme-text">Ladder Rankings</h2>
+                    </div>
+                    <div class="p-6">
+                        @if (!Model.Positions.Any())
+                        {
+                        <p class="text-gray-600">No players in this ladder yet.</p>
+                        }
+                        else
+                        {
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-2 px-3 font-medium text-gray-600">Rank</th>
+                                        <th class="text-left py-2 px-3 font-medium text-gray-600">Player</th>
+                                        <th class="text-left py-2 px-3 font-medium text-gray-600">Skill Level</th>
+                                        <th class="text-right py-2 px-3 font-medium text-gray-600">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var position in Model.Positions.OrderBy(p => p.Rank))
                                     {
                                         bool isCurrentUser = position.PlayerId == currentUserId;
                                         bool isChallengeable = Model.IsParticipant &&
-                                                               Model.Status == "active" &&
-                                                               !Model.UserHasActiveChallenge &&
-                                                               Model.ChallengeablePositions != null &&
-                                                               Model.ChallengeablePositions.Any(p => p.PlayerId == position.PlayerId);
+                                                            Model.Status == "active" &&
+                                                            !Model.UserHasActiveChallenge &&
+                                                            Model.ChallengeablePositions != null &&
+                                                            Model.ChallengeablePositions.Any(p => p.PlayerId == position.PlayerId);
 
-                                <tr class="border-b border-gray-200 @(isCurrentUser ? "bg-purple-50" : "")">
-                                    <td class="py-3 px-3">
-                                        <span class="font-semibold">@position.Rank</span>
-                                    </td>
-                                    <td class="py-3 px-3">
-                                        <div class="flex items-center">
-                                            <span class="@(isCurrentUser ? "font-medium" : "")">
-                                                @position.PlayerDetails.Name
-                                            </span>
-                                            @if (position.PlayerId == Model.CreatorId)
-                                                    {
-                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                Creator
-                                            </span>
-                                                    }
-                                            @if (isCurrentUser)
-                                                    {
-                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                You
-                                            </span>
-                                                    }
-                                        </div>
-                                    </td>
-                                    <td class="py-3 px-3">
-                                        <span>@position.PlayerDetails.PlayerLevel</span>
-                                    </td>
-                                    <td class="py-3 px-3 text-right">
-                                        <div class="flex justify-end gap-2">
-                                            <a href="@Url.Action("ViewProfile", "Profile", new { id = position.PlayerId })"
-                                               class="inline-flex items-center px-3 py-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
-                                                <i class="fas fa-user mr-1"></i>
-                                                View Profile
-                                            </a>
+                                        // Check if the player has any disputed matches
+                                        bool hasDisputedMatch = Model.Matches.Any(m =>
+                                            (m.ChallengerId == position.PlayerId || m.ChallengeeId == position.PlayerId) &&
+                                            m.Status == "disputed");
 
-                                            @if (isChallengeable)
-                                            {
-                                            <form asp-action="IssueChallenge" asp-route-id="@Model.Id" asp-route-challengeeId="@position.PlayerId" method="post" class="inline">
-                                                <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
-                                                    <i class="fas fa-chess-knight mr-1"></i>
-                                                    Challenge
-                                                </button>
-                                            </form>
-                                            }
-                                        </div>
-                                    </td>
-                                </tr>
+                                    <tr class="border-b border-gray-200 @(isCurrentUser ? "bg-purple-50" : "")">
+                                        <td class="py-3 px-3">
+                                            <span class="font-semibold">@position.Rank</span>
+                                        </td>
+                                        <td class="py-3 px-3">
+                                            <div class="flex items-center">
+                                                <span class="@(isCurrentUser ? "font-medium" : "")">
+                                                    @position.PlayerDetails.Name
+                                                </span>
+                                                @if (position.PlayerId == Model.CreatorId)
+                                                {
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    Creator
+                                                </span>
+                                                }
+                                                @if (isCurrentUser)
+                                                {
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    You
+                                                </span>
+                                                }
+                                                @if (hasDisputedMatch)
+                                                {
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" title="This player has a disputed match">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                                    Disputed
+                                                </span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="py-3 px-3">
+                                            <span>@position.PlayerDetails.PlayerLevel</span>
+                                        </td>
+                                        <td class="py-3 px-3 text-right">
+                                            <div class="flex justify-end gap-2">
+                                                @if (isChallengeable)
+ {
+                                                <form asp-action="IssueChallenge" asp-route-id="@Model.Id" asp-route-challengeeId="@position.PlayerId" method="post" class="inline">
+                                                    <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                                                        <i class="fas fa-chess-knight mr-1"></i>
+                                                        Challenge
+                                                    </button>
+                                                </form>
+ }
+                                                <a href="@Url.Action("ViewProfile", "Profile", new { id = position.PlayerId })"
+                                                   class="inline-flex items-center px-3 py-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
+                                                    <i class="fas fa-user mr-1"></i>
+                                                    View Profile
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
                                     }
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
+                        }
                     </div>
-                    }
                 </div>
 
                 <!-- Active Challenges -->
-                @if (Model.Matches.Any(m => m.Status == "scheduled" || m.Status == "accepted" || m.Status == "disputed"))
-{
-    var activeMatches = Model.Matches.Where(m => m.Status == "scheduled" || m.Status == "accepted" || m.Status == "disputed").ToList();
+                @if (Model.Matches.Any(m => m.Status == "accepted" || m.Status == "disputed"))
+                {
+                    var activeMatches = Model.Matches.Where(m => m.Status == "accepted" || m.Status == "disputed").ToList();
 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-lg font-semibold mb-4">Active Challenges (@activeMatches.Count)</h2>
-
-                    <div class="space-y-4">
-                        @foreach (var match in activeMatches.OrderBy(m => m.CreatedAt))
-            {
-                bool isUserInvolved = match.ChallengerId == currentUserId || match.ChallengeeId == currentUserId;
-                bool isDisputed = match.Status == "disputed";
-
-                        <div class="border @(isDisputed ? "border-red-500" : "border-gray-200") rounded-md p-4 @(isUserInvolved ? "bg-blue-50" : "bg-white") hover:border-gray-300 transition-colors">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-medium">
-                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengerId })" class="text-blue-600 hover:text-blue-800 hover:underline">
-                                            @match.Challenger.Name
-                                        </a> (#@match.ChallengerRank)
-                                        <span class="text-gray-500">challenging</span>
-                                        <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengeeId })" class="text-blue-600 hover:text-blue-800 hover:underline">
-                                            @match.Challengee.Name
-                                        </a> (#@match.ChallengeeRank)
-                                    </h3>
-                                    <p class="text-sm text-gray-600">
-                                        Created: @match.CreatedAt.ToString("MMM d, yyyy")
-                                    </p>
-                                </div>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                  @(isDisputed ? "bg-red-100 text-red-800" :
-                                    match.Status == "scheduled" ? "bg-yellow-100 text-yellow-800" :
-                                    match.Status == "accepted" ? "bg-green-100 text-green-800" :
-                                    "bg-gray-100 text-gray-800")">
-                                    @match.Status.ToUpper()
-                                </span>
-                            </div>
-
-                            @if (isDisputed)
-                    {
-                            <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm mb-3">
-                                <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
-                                <p>The submitted results don't match. Please resubmit or contact the ladder organizer.</p>
-                                <p class="mt-1">You have until the deadline to resolve this issue or you may be removed from the ladder.</p>
-                            </div>
-                    }
-
-                            <div class="flex justify-between items-end">
-                                <div class="text-sm text-gray-600">
-                                    <p>
-                                        <span class="font-medium">Deadline:</span>
-                                        @match.Deadline?.ToString("MMM d, yyyy HH:mm")
-                                    </p>
-
-                                    @if (match.Status == "scheduled" && match.ChallengeeId == currentUserId)
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="theme-header p-4 rounded-t-lg">
+                        <h2 class="text-lg font-semibold theme-text">Active Challenges (@activeMatches.Count)</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            @foreach (var match in activeMatches.OrderBy(m => m.CreatedAt))
                             {
-                                    <div class="mt-2 flex space-x-2">
-                                        <form asp-action="RespondToChallenge" asp-route-id="@Model.Id" asp-route-matchId="@match.Id" method="post">
-                                            <input type="hidden" name="response" value="accept" />
-                                            <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
-                                                <i class="fas fa-check mr-1"></i>
-                                                Accept
-                                            </button>
-                                        </form>
+                                bool isUserInvolved = match.ChallengerId == currentUserId || match.ChallengeeId == currentUserId;
+                                bool isDisputed = match.Status == "disputed";
+                                bool isPastDeadline = match.Deadline.HasValue && match.Deadline.Value < DateTime.Now;
+                                bool isCreatorView = Model.IsCreator;
 
-                                        <form asp-action="RespondToChallenge" asp-route-id="@Model.Id" asp-route-matchId="@match.Id" method="post">
-                                            <input type="hidden" name="response" value="decline" />
-                                            <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors">
-                                                <i class="fas fa-times mr-1"></i>
-                                                Decline
-                                            </button>
-                                        </form>
+                            <div class="border @(isDisputed ? "border-red-500" : "border-gray-200") rounded-md p-4 @(isUserInvolved ? "bg-blue-50" : "bg-white") hover:border-gray-300 transition-colors">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-medium">
+                                            <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengerId })" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                                @match.Challenger.Name
+                                            </a> (#@match.ChallengerRank)
+                                            <span class="text-gray-500">challenging</span>
+                                            <a href="@Url.Action("ViewProfile", "Profile", new { id = match.ChallengeeId })" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                                @match.Challengee.Name
+                                            </a> (#@match.ChallengeeRank)
+                                        </h3>
+                                        <p class="text-sm text-gray-600">
+                                            Created: @match.CreatedAt.ToString("MMM d, yyyy")
+                                        </p>
                                     </div>
-                            }
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                      @(isDisputed ? "bg-red-100 text-red-800" :
+                                        "bg-green-100 text-green-800")">
+                                        @(isDisputed ? "DISPUTED" : "ACTIVE")
+                                    </span>
                                 </div>
 
-                                @if (isUserInvolved && (match.Status == "accepted" || match.Status == "disputed") && match.CanSubmitResult)
-                        {
-                                <a href="#submit-result-modal" onclick="openSubmitResultModal('@match.Id')"
-                                   class="inline-flex items-center px-3 py-1.5 text-sm font-medium
-                                     @(isDisputed ? "text-white bg-red-600 hover:bg-red-700" : "text-blue-700 bg-blue-50 hover:bg-blue-100")
-                                     rounded-md transition-colors">
-                                    <i class="fas @(isDisputed ? "fa-exclamation-circle" : "fa-trophy") mr-1"></i>
-                                    @(isDisputed ? "Resubmit Result" : "Submit Result")
-                                </a>
-                        }
+                                @if (isDisputed)
+                                {
+                                <div class="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-sm mb-3">
+                                    <p><i class="fas fa-exclamation-triangle mr-1"></i> <strong>Match Disputed</strong></p>
+                                    <p>The submitted results don't match or the deadline has passed without both players submitting results.</p>
+                                    <p class="mt-1">
+                                        @if (isPastDeadline)
+                                        {
+                                        <span class="font-medium">The deadline has passed.</span>
+                                        @if (isCreatorView)
+                                            {
+                                        <span>As the ladder administrator, you can resolve this dispute below.</span>
+                                            }
+                                            else
+                                            {
+                                        <span>The ladder administrator will need to resolve this dispute.</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                        <span>You have until the deadline to resubmit matching results.</span>
+                                        }
+                                    </p>
+                                </div>
+                                }
+
+                                <div class="flex justify-between items-end">
+                                    <div class="text-sm text-gray-600">
+                                        <p>
+                                            <span class="font-medium">Deadline:</span>
+                                            @match.Deadline?.ToString("MMM d, yyyy HH:mm")
+                                            @if (match.Deadline.HasValue && match.Deadline.Value < DateTime.Now)
+                                            {
+                                            <span class="text-red-600 font-medium ml-2">
+                                                (Expired)
+                                            </span>
+                                            }
+                                        </p>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        @if (isUserInvolved && !isPastDeadline && (match.Status == "accepted" || match.Status == "disputed") && match.CanSubmitResult)
+                                        {
+                                        <a href="#submit-result-modal" onclick="openSubmitResultModal('@match.Id')"
+                                           class="inline-flex items-center px-3 py-1.5 text-sm font-medium
+                                             @(isDisputed ? "text-white bg-red-600 hover:bg-red-700" : "text-blue-700 bg-blue-50 hover:bg-blue-100")
+                                             rounded-md transition-colors">
+                                            <i class="fas @(isDisputed ? "fa-exclamation-circle" : "fa-trophy") mr-1"></i>
+                                            @(isDisputed ? "Resubmit Result" : "Submit Result")
+                                        </a>
+                                        }
+
+                                        @if (isCreatorView && isDisputed && isPastDeadline)
+                                        {
+                                        <button onclick="openResolveDisputeModal('@match.Id', '@match.ChallengerId', '@match.Challenger.Name', '@match.ChallengeeId', '@match.Challengee.Name')"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors">
+                                            <i class="fas fa-gavel mr-1"></i>
+                                            Resolve Dispute
+                                        </button>
+                                        }
+                                    </div>
+                                </div>
                             </div>
+                            }
                         </div>
-            }
                     </div>
                 </div>
-}
+                }
 
                 <!-- Recent Matches -->
-                @if (Model.Matches.Any(m => m.Status == "completed"))
+                @if (Model.Matches.Any(m => m.Status == "completed" || m.Status == "cancelled" || m.Status == "no_contest"))
                 {
-                    var completedMatches = Model.Matches.Where(m => m.Status == "completed").ToList();
+                    var completedMatches = Model.Matches.Where(m => m.Status == "completed" || m.Status == "cancelled" || m.Status == "no_contest").ToList();
 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-lg font-semibold mb-4">Recent Matches (@completedMatches.Count)</h2>
-
-                    <div class="space-y-4">
-                        @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Take(5))
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="theme-header p-4 rounded-t-lg">
+                        <h2 class="text-lg font-semibold theme-text">Recent Matches (@completedMatches.Count)</h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Take(5))
                             {
-                        <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-medium">
-                                        @match.Challenger.Name (#@match.ChallengerRank)
-                                        <span class="text-gray-500">vs</span>
-                                        @match.Challengee.Name (#@match.ChallengeeRank)
-                                    </h3>
-                                    <p class="text-sm text-gray-600">
-                                        Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
-                                    </p>
-                                </div>
-                            </div>
+                                bool isCancelled = match.Status == "cancelled" || match.Status == "no_contest" ||
+                                                   (match.Winner != null && match.Winner.Id == "void");
+                                string challengerResult = isCancelled ? "" :
+                                    (match.Winner != null && match.Winner.Id == match.ChallengerId ? "text-green-600" : "");
+                                string challengeeResult = isCancelled ? "" :
+                                    (match.Winner != null && match.Winner.Id == match.ChallengeeId ? "text-green-600" : "");
 
-                            <div class="flex justify-between items-end">
-                                <div class="flex items-center">
-                                    <div class="flex items-center mr-2">
-                                        <span class="font-medium @(match.Winner.Id == match.ChallengerId ? "text-green-600" : "")">
-                                            @match.Challenger.Name
-                                        </span>
-                                        @if (match.Winner.Id == match.ChallengerId)
-                                                {
-                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
-                                                }
-                                    </div>
-                                    <div class="text-gray-500 mx-2">vs</div>
-                                    <div class="flex items-center">
-                                        <span class="font-medium @(match.Winner.Id == match.ChallengeeId ? "text-green-600" : "")">
-                                            @match.Challengee.Name
-                                        </span>
-                                        @if (match.Winner.Id == match.ChallengeeId)
-                                                {
-                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
-                                                }
-                                    </div>
-                                </div>
-
-                                @if (match.Scores.Any())
-                                        {
-                                <div class="text-sm font-medium">
-                                    @foreach (var score in match.Scores)
-                                                {
-                                    <span class="mx-1">@score.Player1-@score.Player2</span>
-                                                }
-                                </div>
-                                        }
-                            </div>
-                        </div>
-                            }
-                    </div>
-
-                    @if (completedMatches.Count > 5)
-                        {
-                    <div class="mt-4 text-center">
-                        <button type="button" onclick="toggleAllMatches()" id="showMoreButton" class="text-blue-600 hover:text-blue-800 text-sm">
-                            Show all matches
-                        </button>
-                    </div>
-
-                    <div id="allMatchesSection" class="hidden space-y-4 mt-4 pt-4 border-t border-gray-200">
-                        @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Skip(5))
-                                {
-                        <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-medium">
-                                        @match.Challenger.Name (#@match.ChallengerRank)
-                                        <span class="text-gray-500">vs</span>
-                                        @match.Challengee.Name (#@match.ChallengeeRank)
-                                    </h3>
-                                    <p class="text-sm text-gray-600">
-                                        Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="flex justify-between items-end">
-                                <div class="flex items-center">
-                                    <div class="flex items-center mr-2">
-                                        <span class="font-medium @(match.Winner.Id == match.ChallengerId ? "text-green-600" : "")">
-                                            @match.Challenger.Name
-                                        </span>
-                                        @if (match.Winner.Id == match.ChallengerId)
-                                                    {
-                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
-                                                    }
-                                    </div>
-                                    <div class="text-gray-500 mx-2">vs</div>
-                                    <div class="flex items-center">
-                                        <span class="font-medium @(match.Winner.Id == match.ChallengeeId ? "text-green-600" : "")">
-                                            @match.Challengee.Name
-                                        </span>
-                                        @if (match.Winner.Id == match.ChallengeeId)
-                                                    {
-                                        <i class="fas fa-trophy text-yellow-500 ml-1"></i>
-                                                    }
-                                    </div>
-                                </div>
-
-                                @if (match.Scores.Any())
+                            <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-medium">
+                                            @match.Challenger.Name (#@match.ChallengerRank)
+                                            <span class="text-gray-500">vs</span>
+                                            @match.Challengee.Name (#@match.ChallengeeRank)
+                                        </h3>
+                                        <p class="text-sm text-gray-600">
+                                            Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
+                                            @if (match.Status == "cancelled" || match.Status == "no_contest")
                                             {
-                                <div class="text-sm font-medium">
-                                    @foreach (var score in match.Scores)
-                                                    {
-                                    <span class="mx-1">@score.Player1-@score.Player2</span>
-                                                    }
+                                            <span class="ml-2 text-gray-600">
+                                                (@GetResolutionDisplay(match.Status))
+                                            </span>
+                                                 }
+                                        </p>
+                                    </div>
+                                    @if (isCancelled)
+                                    {
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        CANCELLED
+                                    </span>
+                                    }
                                 </div>
+
+                                <div class="flex justify-between items-end">
+                                    <div class="flex items-center">
+                                        <div class="flex items-center mr-2">
+                                            <span class="font-medium @challengerResult">
+                                                @match.Challenger.Name
+                                            </span>
+                                            @if (!isCancelled && match.Winner != null && match.Winner.Id == match.ChallengerId)
+                                             {
+                                            <i class="fas fa-trophy text-yellow-500 ml-1"></i>
                                             }
+                                        </div>
+                                        <div class="text-gray-500 mx-2">vs</div>
+                                        <div class="flex items-center">
+                                            <span class="font-medium @challengeeResult">
+                                                @match.Challengee.Name
+                                            </span>
+                                            @if (!isCancelled && match.Winner != null && match.Winner.Id == match.ChallengeeId)
+                                            {
+                                            <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (match.Scores.Any() && !isCancelled)
+                                         {
+                                    <div class="text-sm font-medium">
+                                        @foreach (var score in match.Scores)
+                                          {
+                                        <span class="mx-1">@score.Player1-@score.Player2</span>
+                                            }
+                                    </div>
+                                          }
+                                </div>
                             </div>
+}
                         </div>
-                                }
-                    </div>
+
+                        @if (completedMatches.Count > 5)
+                        {
+                        <div class="mt-4 text-center">
+                            <button type="button" onclick="toggleAllMatches()" id="showMoreButton" class="text-blue-600 hover:text-blue-800 text-sm">
+                                Show all matches
+                            </button>
+                        </div>
+
+                        <div id="allMatchesSection" class="hidden space-y-4 mt-4 pt-4 border-t border-gray-200">
+                            @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Skip(5))
+                            {
+                                bool isCancelled = match.Status == "cancelled" || match.Status == "no_contest";
+                                string challengerResult = isCancelled ? "" :
+                                    (match.Winner.Id == match.ChallengerId ? "text-green-600" : "");
+                                string challengeeResult = isCancelled ? "" :
+                                    (match.Winner.Id == match.ChallengeeId ? "text-green-600" : "");
+
+                            <div class="border border-gray-200 rounded-md p-4 hover:border-gray-300 transition-colors">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="font-medium">
+                                            @match.Challenger.Name (#@match.ChallengerRank)
+                                            <span class="text-gray-500">vs</span>
+                                            @match.Challengee.Name (#@match.ChallengeeRank)
+                                        </h3>
+                                        <p class="text-sm text-gray-600">
+                                            Completed: @match.CompletedAt?.ToString("MMM d, yyyy")
+                                            @if (match.Status == "cancelled" || match.Status == "no_contest")
+                                            {
+                                            <span class="ml-2 text-gray-600">
+                                                (@GetResolutionDisplay(match.Status))
+                                            </span>
+                                            }
+                                        </p>
+                                    </div>
+                                    @if (isCancelled)
+                                    {
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        CANCELLED
+                                    </span>
+                                    }
+                                </div>
+
+                                <div class="flex justify-between items-end">
+                                    <div class="flex items-center">
+                                        <div class="flex items-center mr-2">
+                                            <span class="font-medium @challengerResult">
+                                                @match.Challenger.Name
+                                            </span>
+                                            @if (!isCancelled && match.Winner.Id == match.ChallengerId)
+                                            {
+                                            <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                            }
+                                        </div>
+                                        <div class="text-gray-500 mx-2">vs</div>
+                                        <div class="flex items-center">
+                                            <span class="font-medium @challengeeResult">
+                                                @match.Challengee.Name
+                                            </span>
+                                            @if (!isCancelled && match.Winner.Id == match.ChallengeeId)
+                                            {
+                                            <i class="fas fa-trophy text-yellow-500 ml-1"></i>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (match.Scores.Any() && !isCancelled)
+                                    {
+                                    <div class="text-sm font-medium">
+                                        @foreach (var score in match.Scores)
+                                        {
+                                        <span class="mx-1">@score.Player1-@score.Player2</span>
+                                        }
+                                    </div>
+                                    }
+                                </div>
+                            </div>
+                            }
+                        </div>
                         }
+                    </div>
                 </div>
                 }
             </div>
@@ -444,7 +539,7 @@
             </button>
         </div>
 
-        <form id="submit-result-form" asp-action="SubmitMatchResult" asp-route-id="@Model.Id" method="post">
+        <form id="submit-result-form" asp-action="SubmitLadderMatchResult" asp-route-id="@Model.Id" method="post">
             <input type="hidden" id="match-id-input" name="matchId" value="" />
 
             <div class="space-y-4">
@@ -498,8 +593,431 @@
     </div>
 </div>
 
+<!-- Resolve Dispute Modal -->
+<div id="resolve-dispute-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 pb-20">
+    <div class="relative top-20 mx-auto p-4 border max-w-md w-full shadow-lg rounded-md bg-white mb-20">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Resolve Disputed Match</h3>
+            <button onclick="closeResolveDisputeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="mb-4">
+            <p class="text-sm text-gray-700">
+                <i class="fas fa-info-circle mr-1"></i>
+                Please select how you want to resolve this dispute:
+            </p>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Match Between</label>
+                <div class="p-2 bg-gray-50 rounded-md">
+                    <p class="text-sm"><span class="font-medium">Challenger:</span> <span id="dispute-challenger-name"></span></p>
+                    <p class="text-sm"><span class="font-medium">Challengee:</span> <span id="dispute-challengee-name"></span></p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Resolution</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors">
+                        <input type="radio" name="resolution" value="winner" class="mr-2 mt-1" onclick="showWinnerSelection()" />
+                        <div>
+                            <span class="font-medium">Declare a winner</span>
+                            <p class="text-xs text-gray-600">
+                                Choose which player wins
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors">
+                        <input type="radio" name="resolution" value="remove_challenger" class="mr-2 mt-1" onclick="hideWinnerSelection()" />
+                        <div>
+                            <span class="font-medium">Remove challenger</span>
+                            <p class="text-xs text-gray-600">
+                                Remove from ladder
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors">
+                        <input type="radio" name="resolution" value="remove_challengee" class="mr-2 mt-1" onclick="hideWinnerSelection()" />
+                        <div>
+                            <span class="font-medium">Remove challengee</span>
+                            <p class="text-xs text-gray-600">
+                                Remove from ladder
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors">
+                        <input type="radio" name="resolution" value="remove_both" class="mr-2 mt-1" onclick="hideWinnerSelection()" />
+                        <div>
+                            <span class="font-medium">Remove both</span>
+                            <p class="text-xs text-gray-600">
+                                Remove both players
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors sm:col-span-2">
+                        <input type="radio" name="resolution" value="void_match" class="mr-2 mt-1" onclick="hideWinnerSelection()" />
+                        <div>
+                            <span class="font-medium">Void match</span>
+                            <p class="text-xs text-gray-600">
+                                Cancel without ranking changes
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div id="winner-selection" class="hidden mt-3">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Winner</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex items-center p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50">
+                        <input type="radio" name="winner" id="challenger-winner" value="" class="mr-2" />
+                        <span id="challenger-winner-name" class="text-sm"></span>
+                    </label>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 hover:bg-gray-50">
+                        <input type="radio" name="winner" id="challengee-winner" value="" class="mr-2" />
+                        <span id="challengee-winner-name" class="text-sm"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-gray-200">
+                <p class="mb-3 text-xs text-gray-600">
+                    <i class="fas fa-exclamation-triangle mr-1 text-yellow-600"></i>
+                    This action cannot be undone. Please review before proceeding.
+                </p>
+                <button type="button" onclick="resolveDispute()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
+                    Resolve Dispute
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Search Modal -->
+<div id="searchModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Invite Player to Ladder</h3>
+            <button onclick="closeSearchModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="mb-4">
+            <input type="text" id="userSearchInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Search by username..." />
+            <div id="searchResults" class="mt-2"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/theme-handler.js"></script>
+
 @section Scripts {
     <script>
+        function applyThemeToElements() {
+            // Get the current theme
+            const currentTheme = document.getElementById('theme-data').getAttribute('data-theme');
+
+            // Define theme colors directly
+            const themeColors = {
+                'Wimbledon': '#64408a',      // Purple
+                'RolandGarros': '#084e2e',   // Dark green
+                'USOpen': '#426892',         // Blue
+                'AustralianOpen': '#e9f7ff'  // Light blue
+            };
+
+            // Get colors for the current theme
+            const themeColor = themeColors[currentTheme] || themeColors['Wimbledon'];
+            const textColor = currentTheme === 'AustralianOpen' ? '#000000' : '#ffffff';
+
+            // Apply theme colors
+            document.querySelectorAll('.theme-header').forEach(header => {
+                header.style.backgroundColor = themeColor;
+            });
+
+            document.querySelectorAll('.theme-text').forEach(text => {
+                text.style.color = textColor;
+            });
+        }
+
+        // Apply theme when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            applyThemeToElements();
+
+            // Update when theme changes
+            window.addEventListener('themeChanged', function(e) {
+                if (e.detail && e.detail.theme) {
+                    document.getElementById('theme-data').setAttribute('data-theme', e.detail.theme);
+                }
+                applyThemeToElements();
+            });
+        });
+
+        // Also try applying immediately
+        applyThemeToElements();
+
+        // User search modal functions
+function openSearchModal() {
+    const modal = document.getElementById('searchModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.getElementById('userSearchInput').focus();
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeSearchModal() {
+    const modal = document.getElementById('searchModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        // Clear search results
+        document.getElementById('searchResults').innerHTML = '';
+        document.getElementById('userSearchInput').value = '';
+    }
+}
+
+// Dispute resolution variables
+let currentMatchId = '';
+let currentChallengerId = '';
+let currentChallengeeName = '';
+let currentChallengeeId = '';
+let currentChallengerName = '';
+
+// Open dispute resolution modal
+function openResolveDisputeModal(matchId, challengerId, challengerName, challengeeId, challengeeName) {
+    const modal = document.getElementById('resolve-dispute-modal');
+    if (!modal) return;
+
+    // Reset form selections
+    document.querySelectorAll('input[name="resolution"]').forEach(radio => {
+        radio.checked = false;
+    });
+
+    document.querySelectorAll('input[name="winner"]').forEach(radio => {
+        radio.checked = false;
+    });
+
+    hideWinnerSelection();
+
+    // Set values for current match
+    currentMatchId = matchId;
+    currentChallengerId = challengerId;
+    currentChallengerName = challengerName;
+    currentChallengeeId = challengeeId;
+    currentChallengeeName = challengeeName;
+
+    // Update modal with player names
+    document.getElementById('dispute-challenger-name').textContent = challengerName;
+    document.getElementById('dispute-challengee-name').textContent = challengeeName;
+
+    document.getElementById('challenger-winner').value = challengerId;
+    document.getElementById('challengee-winner').value = challengeeId;
+    document.getElementById('challenger-winner-name').textContent = challengerName;
+    document.getElementById('challengee-winner-name').textContent = challengeeName;
+
+    // Show modal
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeResolveDisputeModal() {
+    const modal = document.getElementById('resolve-dispute-modal');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function showWinnerSelection() {
+    const winnerSection = document.getElementById('winner-selection');
+    winnerSection.classList.remove('hidden');
+}
+
+function hideWinnerSelection() {
+    const winnerSection = document.getElementById('winner-selection');
+    winnerSection.classList.add('hidden');
+
+    // Clear winner selection
+    document.getElementById('challenger-winner').checked = false;
+    document.getElementById('challengee-winner').checked = false;
+}
+
+function resolveDispute() {
+    // Get selected resolution
+    const resolution = document.querySelector('input[name="resolution"]:checked');
+
+    if (!resolution) {
+        alert('Please select a resolution option');
+        return;
+    }
+
+    let winnerId = null;
+
+    // Check if winner resolution and validate selection
+    if (resolution.value === 'winner') {
+        const winnerSelection = document.querySelector('input[name="winner"]:checked');
+        if (!winnerSelection) {
+            alert('Please select a winner');
+            return;
+        }
+        winnerId = winnerSelection.value;
+    }
+
+    // Confirm resolution
+    let confirmationMessage = "Are you sure you want to resolve this dispute by ";
+    switch (resolution.value) {
+        case 'winner':
+            const winnerName = winnerId === currentChallengerId ? currentChallengerName : currentChallengeeName;
+            confirmationMessage += `declaring ${winnerName} as the winner?`;
+            break;
+        case 'remove_challenger':
+            confirmationMessage += `removing ${currentChallengerName} from the ladder?`;
+            break;
+        case 'remove_challengee':
+            confirmationMessage += `removing ${currentChallengeeName} from the ladder?`;
+            break;
+        case 'remove_both':
+            confirmationMessage += "removing both players from the ladder?";
+            break;
+        case 'void_match':
+            confirmationMessage += "voiding the match (no changes to ladder)?";
+            break;
+        default:
+            confirmationMessage += "this method?";
+    }
+
+    if (!confirm(confirmationMessage)) {
+        return;
+    }
+
+    // Send resolution to server
+    fetch('/Tournaments/ResolveLadderDispute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            LadderId: '@Model.Id',
+            MatchId: currentMatchId,
+            Resolution: resolution.value,
+            WinnerId: winnerId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show loading indicator
+            closeResolveDisputeModal();
+
+            // Simple page reload after successful resolution
+            window.location.reload();
+        } else {
+            alert('Error resolving dispute: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error resolving dispute:', error);
+        alert('An error occurred while resolving the dispute');
+    });
+}// Set up search input
+document.addEventListener('DOMContentLoaded', function() {
+    const searchButton = document.getElementById('openSearchModal');
+    if (searchButton) {
+        searchButton.addEventListener('click', openSearchModal);
+    }
+
+    const searchInput = document.getElementById('userSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(function() {
+            const query = this.value.trim();
+            if (query.length >= 2) {
+                searchUsers(query);
+            } else {
+                document.getElementById('searchResults').innerHTML = '';
+            }
+        }, 500));
+    }
+
+    // Close modal when clicking outside
+    const modal = document.getElementById('searchModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSearchModal();
+            }
+        });
+    }
+
+    // Close dispute modal when clicking outside
+    const disputeModal = document.getElementById('resolve-dispute-modal');
+    if (disputeModal) {
+        disputeModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeResolveDisputeModal();
+            }
+        });
+    }
+});
+
+// Debounce function to limit API calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func.apply(this, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Search users function
+function searchUsers(query) {
+    fetch(`/Tournaments/SearchAllUsers?query=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = '';
+
+            if (data.success && data.users && data.users.length > 0) {
+                data.users.forEach(user => {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'p-2 border-b border-gray-200 hover:bg-gray-50 flex justify-between items-center';
+                    userDiv.innerHTML = `
+                        <div>
+                            <p class="font-medium">${user.name}</p>
+                            <p class="text-sm text-gray-600">${user.playerLevel || 'Unknown level'}</p>
+                        </div>
+                        <form action="/Tournaments/InviteToLadder" method="post">
+                            <input type="hidden" name="ladderId" value="${'@Model.Id'}">
+                            <input type="hidden" name="inviteeId" value="${user.id}">
+                            <input type="hidden" name="redirectToDetails" value="true">
+                            <button type="submit" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Invite
+                            </button>
+                        </form>
+                    `;
+                    resultsContainer.appendChild(userDiv);
+                });
+            } else {
+                resultsContainer.innerHTML = `<p class="p-2 text-gray-600">No users found matching "${query}"</p>`;
+            }
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+            document.getElementById('searchResults').innerHTML = `<p class="p-2 text-red-600">Error searching for users</p>`;
+        });
+}
         // Match data store
         const matches = @Html.Raw(Json.Serialize(Model.Matches));
 
@@ -618,4 +1136,21 @@
             }
         });
     </script>
+}
+
+@functions {
+    public string GetResolutionDisplay(string status) {
+        switch (status?.ToLower()) {
+            case "cancelled":
+                return "Match cancelled";
+            case "no_contest":
+                return "No contest";
+            case "disputed":
+                return "Match disputed";
+            case "expired":
+                return "Match expired";
+            default:
+                return status?.Replace("_", " ");
+        }
+    }
 }

@@ -1,0 +1,473 @@
+@* Views/Tournaments/Invitations.cshtml *@
+@model TennisMatchmakingSite2.Models.CompetitionInvitationsViewModel
+@{
+    ViewData["Title"] = "Competition Invitations";
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
+
+    // Initialize active tab (for mobile dropdown)
+    var activeTab = "pending";
+}
+
+<div id="theme-data" data-theme="@currentTheme" class="hidden"></div>
+
+<div class="container mx-auto px-4 pb-20">
+    <div class="mt-4">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
+            <h1 class="text-2xl font-bold">Competition Invitations</h1>
+            <a href="@Url.Action("Index", "Tournaments")" class="mt-2 sm:mt-0 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Competitions
+            </a>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+        <div class="bg-green-50 text-green-800 p-4 rounded-md mb-6 shadow-sm">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                @TempData["SuccessMessage"]
+            </div>
+        </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+        <div class="bg-red-50 text-red-800 p-4 rounded-md mb-6 shadow-sm">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                @TempData["ErrorMessage"]
+            </div>
+        </div>
+        }
+
+        <!-- Mobile Tab Selector Dropdown -->
+        <div class="md:hidden mb-4">
+            <div class="relative">
+                <select id="mobile-tab-selector" class="w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none">
+                    <option value="pending">Pending Invitations</option>
+                    <option value="tournament">Tournament Invitations</option>
+                    <option value="ladder">Ladder Invitations</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Desktop Navigation Tabs -->
+        <div class="hidden md:block mb-6">
+            <div class="flex rounded-t-lg overflow-hidden border-b border-gray-200 theme-tabs">
+                <button type="button" id="pending-tab" data-tab="pending" class="tab-button active flex-1 py-3 px-4 font-medium text-center whitespace-nowrap">
+                    <i class="fas fa-clock mr-2"></i>Pending Invitations
+                </button>
+                <button type="button" id="tournament-tab" data-tab="tournament" class="tab-button flex-1 py-3 px-4 font-medium text-center whitespace-nowrap">
+                    <i class="fas fa-trophy mr-2"></i>Tournament Invitations
+                </button>
+                <button type="button" id="ladder-tab" data-tab="ladder" class="tab-button flex-1 py-3 px-4 font-medium text-center whitespace-nowrap">
+                    <i class="fas fa-list-ol mr-2"></i>Ladder Invitations
+                </button>
+            </div>
+        </div>
+
+        <!-- Pending Invitations Tab -->
+        <div id="pending" class="tab-content active">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold">Pending Invitations</h2>
+                </div>
+
+                <div class="p-4">
+                    @if (!Model.TournamentInvitations.Any(i => i.IsPending) && !Model.LadderInvitations.Any(i => i.IsPending))
+                    {
+                    <div class="bg-gray-50 text-gray-600 p-6 rounded-md text-center">
+                        <p class="mb-2">You don't have any pending invitations.</p>
+                        <a href="@Url.Action("Index", "Tournaments")" class="inline-flex items-center text-primary-600 hover:text-primary-800">
+                            <i class="fas fa-arrow-left mr-2"></i>Browse Competitions
+                        </a>
+                    </div>
+                    }
+                    else
+                    {
+                    <div class="space-y-4">
+                        @foreach (var invitation in Model.TournamentInvitations.Where(i => i.IsPending))
+                            {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow transition-shadow">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                <div>
+                                    <div class="flex items-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mr-2">
+                                            Tournament
+                                        </span>
+                                        <h3 class="font-semibold">@invitation.TournamentName</h3>
+                                    </div>
+                                    <p class="text-gray-600">Invited by: @invitation.InviterName</p>
+                                    <p class="text-sm text-gray-500">
+                                        <i class="far fa-clock mr-1"></i>
+                                        Invited on @invitation.CreatedAt.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <form asp-action="RespondToTournamentInvitation" asp-controller="Tournaments" method="post">
+                                        <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                        <input type="hidden" name="response" value="accept" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-check mr-1"></i>
+                                            Accept
+                                        </button>
+                                    </form>
+                                    <form asp-action="RespondToTournamentInvitation" asp-controller="Tournaments" method="post">
+                                        <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                        <input type="hidden" name="response" value="reject" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-times mr-1"></i>
+                                            Decline
+                                        </button>
+                                    </form>
+                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = invitation.TournamentId })" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors whitespace-nowrap">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                            }
+
+                        @foreach (var invitation in Model.LadderInvitations.Where(i => i.IsPending))
+                            {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow transition-shadow">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                <div>
+                                    <div class="flex items-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                                            Ladder
+                                        </span>
+                                        <h3 class="font-semibold">@invitation.LadderName</h3>
+                                    </div>
+                                    <p class="text-gray-600">Invited by: @invitation.InviterName</p>
+                                    <p class="text-sm text-gray-500">
+                                        <i class="far fa-clock mr-1"></i>
+                                        Invited on @invitation.CreatedAt.ToString("MMM d, yyyy")
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <!-- Accept Ladder Invitation -->
+                                    <form asp-action="RespondToLadderInvitation" asp-controller="Tournaments" method="post">
+                                        <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                        <input type="hidden" name="response" value="accept" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-check mr-1"></i>
+                                            Accept
+                                        </button>
+                                    </form>
+
+                                    <!-- Reject Ladder Invitation -->
+                                    <form asp-action="RespondToLadderInvitation" asp-controller="Tournaments" method="post">
+                                        <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                        <input type="hidden" name="response" value="reject" />
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap">
+                                            <i class="fas fa-times mr-1"></i>
+                                            Decline
+                                        </button>
+                                    </form>
+                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = invitation.LadderId })" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors whitespace-nowrap">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                            }
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Tournament Invitations Tab -->
+        <div id="tournament" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold">Tournament Invitations</h2>
+                </div>
+
+                <div class="p-4">
+                    @if (!Model.TournamentInvitations.Any())
+                    {
+                    <div class="bg-gray-50 text-gray-600 p-6 rounded-md text-center">
+                        <p>You don't have any tournament invitations.</p>
+                    </div>
+                    }
+                    else
+                    {
+                    <div class="space-y-4">
+                        @foreach (var invitation in Model.TournamentInvitations)
+                            {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow transition-shadow">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                <div>
+                                    <h3 class="font-semibold">@invitation.TournamentName</h3>
+                                    <p class="text-gray-600">Invited by: @invitation.InviterName</p>
+                                    <div class="flex items-center mt-1">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                        @(invitation.IsPending ? "bg-yellow-100 text-yellow-800" :
+                                                          invitation.IsAccepted ? "bg-green-100 text-green-800" :
+                                                          invitation.IsRejected ? "bg-gray-100 text-gray-800" :
+                                                          invitation.IsExpired ? "bg-orange-100 text-orange-800" :
+                                                          "bg-red-100 text-red-800")">
+                                            @(invitation.IsPending ? "Pending" :
+                                                              invitation.IsAccepted ? "Accepted" :
+                                                              invitation.IsRejected ? "Declined" :
+                                                              invitation.IsExpired ? "Expired" :
+                                                              "Cancelled")
+                                        </span>
+                                        <span class="ml-2 text-sm text-gray-500">
+                                            @(invitation.UpdatedAt.HasValue ? invitation.UpdatedAt.Value.ToString("MMM d, yyyy") : invitation.CreatedAt.ToString("MMM d, yyyy"))
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    @if (invitation.IsPending)
+                                            {
+                                    <div class="flex flex-wrap gap-2">
+                                        <form asp-action="RespondToTournamentInvitation" asp-controller="Tournaments" method="post">
+                                            <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                            <input type="hidden" name="response" value="accept" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-check mr-1"></i>
+                                                Accept
+                                            </button>
+                                        </form>
+                                        <form asp-action="RespondToTournamentInvitation" asp-controller="Tournaments" method="post">
+                                            <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                            <input type="hidden" name="response" value="reject" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-times mr-1"></i>
+                                                Decline
+                                            </button>
+                                        </form>
+                                    </div>
+                                            }
+                                    <a href="@Url.Action("TournamentDetails", "Tournaments", new { id = invitation.TournamentId })" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors mt-2 md:mt-0 whitespace-nowrap">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                            }
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Ladder Invitations Tab -->
+        <div id="ladder" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold">Ladder Invitations</h2>
+                </div>
+
+                <div class="p-4">
+                    @if (!Model.LadderInvitations.Any())
+                    {
+                    <div class="bg-gray-50 text-gray-600 p-6 rounded-md text-center">
+                        <p>You don't have any ladder invitations.</p>
+                    </div>
+                    }
+                    else
+                    {
+                    <div class="space-y-4">
+                        @foreach (var invitation in Model.LadderInvitations)
+                            {
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow transition-shadow">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                <div>
+                                    <h3 class="font-semibold">@invitation.LadderName</h3>
+                                    <p class="text-gray-600">Invited by: @invitation.InviterName</p>
+                                    <div class="flex items-center mt-1">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                        @(invitation.IsPending ? "bg-yellow-100 text-yellow-800" :
+                                                          invitation.IsAccepted ? "bg-green-100 text-green-800" :
+                                                          invitation.IsRejected ? "bg-gray-100 text-gray-800" :
+                                                          invitation.IsExpired ? "bg-orange-100 text-orange-800" :
+                                                          "bg-red-100 text-red-800")">
+                                            @(invitation.IsPending ? "Pending" :
+                                                              invitation.IsAccepted ? "Accepted" :
+                                                              invitation.IsRejected ? "Declined" :
+                                                              invitation.IsExpired ? "Expired" :
+                                                              "Cancelled")
+                                        </span>
+                                        <span class="ml-2 text-sm text-gray-500">
+                                            @(invitation.UpdatedAt.HasValue ? invitation.UpdatedAt.Value.ToString("MMM d, yyyy") : invitation.CreatedAt.ToString("MMM d, yyyy"))
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    @if (invitation.IsPending)
+                                            {
+                                    <div class="flex flex-wrap gap-2">
+                                        <form asp-action="RespondToLadderInvitation" asp-controller="Tournaments" method="post">
+                                            <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                            <input type="hidden" name="response" value="accept" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-check mr-1"></i>
+                                                Accept
+                                            </button>
+                                        </form>
+                                        <form asp-action="RespondToLadderInvitation" asp-controller="Tournaments" method="post">
+                                            <input type="hidden" name="invitationId" value="@invitation.Id" />
+                                            <input type="hidden" name="response" value="reject" />
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors whitespace-nowrap">
+                                                <i class="fas fa-times mr-1"></i>
+                                                Decline
+                                            </button>
+                                        </form>
+                                    </div>
+                                            }
+                                    <a href="@Url.Action("LadderDetails", "Tournaments", new { id = invitation.LadderId })" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors mt-2 md:mt-0 whitespace-nowrap">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                            }
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Custom theme styling for tabs */
+    /* Custom theme styling for tabs */
+    .tab-button {
+        background-color: #f9f9f9;
+        color: #666;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+        .tab-button:hover:not(.active) {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        .tab-button.active {
+            background-color: white;
+            color: var(--theme-color, #64408a); /* Default to Wimbledon theme color */
+            /* Border will be applied via JavaScript for better control */
+        }
+
+    /* Reset all tab borders first */
+    .tab-button {
+        border-bottom-color: transparent !important;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // Apply theme to tabs
+        // Apply theme to tabs - updated function
+        function applyThemeToTabs() {
+            // Get the current theme
+            const currentTheme = document.getElementById('theme-data').getAttribute('data-theme');
+
+            // Define theme colors directly
+            const themeColors = {
+                'Wimbledon': '#64408a',      // Purple
+                'RolandGarros': '#084e2e',   // Dark green
+                'USOpen': '#426892',         // Blue
+                'AustralianOpen': '#e9f7ff'  // Light blue
+            };
+
+            // Get colors for the current theme
+            const themeColor = themeColors[currentTheme] || themeColors['Wimbledon'];
+
+            // Set CSS variable for active tab styling
+            document.documentElement.style.setProperty('--theme-color', themeColor);
+
+            // Apply to active tab
+            const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab) {
+                // First reset all tab borders
+                document.querySelectorAll('.tab-button').forEach(tab => {
+                    tab.style.borderBottomColor = 'transparent';
+                });
+                // Then set the active tab border
+                activeTab.style.borderBottomColor = themeColor;
+                activeTab.style.borderBottomWidth = '2px';
+            }
+        }
+
+        // Tab navigation with buttons for desktop
+        document.addEventListener('DOMContentLoaded', function () {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const mobileSelector = document.getElementById('mobile-tab-selector');
+
+            function setActiveTab(tabId) {
+                // Hide all tabs
+                tabContents.forEach(tab => {
+                    tab.classList.add('hidden');
+                    tab.classList.remove('active');
+                });
+
+                // Remove active class from all buttons
+                tabButtons.forEach(button => {
+                    button.classList.remove('active');
+                });
+
+                // Show active tab
+                const activeTab = document.getElementById(tabId);
+                if (activeTab) {
+                    activeTab.classList.remove('hidden');
+                    activeTab.classList.add('active');
+
+                    // Add active class to button
+                    const activeButton = document.getElementById(`${tabId}-tab`);
+                    if (activeButton) {
+                        activeButton.classList.add('active');
+                    }
+
+                    // Update mobile selector
+                    if (mobileSelector) {
+                        mobileSelector.value = tabId;
+                    }
+
+                    // Apply theme to active tab
+                    applyThemeToTabs();
+                }
+            }
+
+            // Handle tab button clicks
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const tabId = this.getAttribute('data-tab');
+                    setActiveTab(tabId);
+                });
+            });
+
+            // Handle mobile selector change
+            if (mobileSelector) {
+                mobileSelector.addEventListener('change', function () {
+                    setActiveTab(this.value);
+                });
+            }
+
+            // Apply theme initially
+            applyThemeToTabs();
+
+            // Listen for theme changes
+            window.addEventListener('themeChanged', function (e) {
+                if (e.detail && e.detail.theme) {
+                    document.getElementById('theme-data').setAttribute('data-theme', e.detail.theme);
+                }
+                applyThemeToTabs();
+            });
+        });
+    </script>
+}

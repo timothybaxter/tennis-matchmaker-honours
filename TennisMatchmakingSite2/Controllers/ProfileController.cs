@@ -36,6 +36,22 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
+                // Check for invalid ID input (like just '&')
+                if (id == "&")
+                {
+                    id = null;
+                }
+
+                // If no ID is provided, use the current user's ID
+                if (string.IsNullOrEmpty(id))
+                {
+                    id = HttpContext.Session.GetString("UserId");
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        return RedirectToAction("Login", "Account");
+                    }
+                }
+
                 var currentUserId = HttpContext.Session.GetString("UserId");
                 ViewBag.IsCurrentUser = currentUserId == id;
                 ViewBag.UserId = id;
@@ -95,8 +111,8 @@ namespace TennisMatchmakingSite2.Controllers
                     }
                 }
 
-                // Get match statistics for this user
-                var statsRequest = new HttpRequestMessage(HttpMethod.Get, $"matches/stats?userId={id}");
+                // Get match statistics for this user - UPDATED ENDPOINT
+                var statsRequest = new HttpRequestMessage(HttpMethod.Get, $"comp-matches/stats?userId={id}");
                 statsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var statsResponse = await _httpClient.SendAsync(statsRequest);
@@ -108,8 +124,31 @@ namespace TennisMatchmakingSite2.Controllers
                     if (statsJson.TryGetProperty("stats", out var statsElement))
                     {
                         var stats = JsonSerializer.Deserialize<MatchStatsData>(statsElement.ToString());
+
+                        // Initialize RecentPerformance as empty list if null to avoid errors
+                        if (stats.RecentPerformance == null)
+                        {
+                            stats.RecentPerformance = new List<RecentMatch>();
+                        }
+
                         ViewBag.Stats = stats;
                     }
+                    else
+                    {
+                        // Create default stats object with empty RecentPerformance
+                        ViewBag.Stats = new MatchStatsData
+                        {
+                            RecentPerformance = new List<RecentMatch>()
+                        };
+                    }
+                }
+                else
+                {
+                    // Create default stats object for the view to avoid null reference
+                    ViewBag.Stats = new MatchStatsData
+                    {
+                        RecentPerformance = new List<RecentMatch>()
+                    };
                 }
 
                 return View();
@@ -121,8 +160,7 @@ namespace TennisMatchmakingSite2.Controllers
                 return RedirectToAction("Index", "Home");
             }
         }
-
-        public async Task<IActionResult> MatchHistory(string id)
+        public async Task<IActionResult> MatchHistory(string id, string type = null, int skip = 0, int limit = 10)
         {
             try
             {
@@ -132,7 +170,18 @@ namespace TennisMatchmakingSite2.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
+                // Validate the ID parameter
+                if (string.IsNullOrEmpty(id) || id == "&")
+                {
+                    id = HttpContext.Session.GetString("UserId");
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        return RedirectToAction("Login", "Account");
+                    }
+                }
+
                 ViewBag.UserId = id;
+                ViewBag.CurrentType = type;
 
                 // Get user profile
                 var profileRequest = new HttpRequestMessage(HttpMethod.Get, $"settings/profile/{id}");
@@ -151,19 +200,108 @@ namespace TennisMatchmakingSite2.Controllers
                     }
                 }
 
-                // Get match history
-                var historyRequest = new HttpRequestMessage(HttpMethod.Get, $"matches/history?userId={id}");
+                // Build query string for filtering with proper parameter formatting
+                var queryParams = new List<string>();
+                queryParams.Add($"userId={Uri.EscapeDataString(id)}");  // Always include userId
+                queryParams.Add($"skip={skip}");
+                queryParams.Add($"limit={limit}");
+
+                if (!string.IsNullOrEmpty(type))
+                {
+                    queryParams.Add($"type={Uri.EscapeDataString(type)}");
+                }
+
+                var queryString = string.Join("&", queryParams);
+
+                // Get match history with filters
+                var historyRequest = new HttpRequestMessage(HttpMethod.Get, $"comp-matches/history?{queryString}");
                 historyRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+                _logger.LogInformation($"Requesting match history with query: {queryString}");
                 var response = await _httpClient.SendAsync(historyRequest);
+
                 if (response.IsSuccessStatusCode)
                 {
                     var content = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"Match history response: {content}");
                     var wrapper = JsonDocument.Parse(content).RootElement;
 
                     if (wrapper.TryGetProperty("matches", out var matchesElement))
                     {
-                        ViewBag.Matches = JsonSerializer.Deserialize<List<CompMatchData>>(matchesElement.ToString());
+                        var options = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        };
+
+                        var matches = JsonSerializer.Deserialize<List<CompMatchData>>(matchesElement.ToString(), options);
+                        _logger.LogInformation($"Deserialized {matches.Count} matches");
+
+                        // Process matches to ensure opponent data is available
+                        foreach (var match in matches)
+                        {
+                            // If opponent is null but we have challenger/challengee or player details
+                            if (match.Opponent == null)
+                            {
+                                // Create opponent from available user details
+                                if (match.ChallengerId != null && match.ChallengeeId != null)
+                                {
+                                    // Determine which player is the opponent based on the current user ID
+                                    if (match.ChallengerId == id && match.Challengee != null)
+                                    {
+                                        match.Opponent = new OpponentData
+                                        {
+                                            Id = match.ChallengeeId,
+                                            Name = match.Challengee?.Name ?? "Opponent",
+                                            PlayerLevel = match.Challengee?.PlayerLevel
+                                        };
+                                    }
+                                    else if (match.ChallengeeId == id && match.Challenger != null)
+                                    {
+                                        match.Opponent = new OpponentData
+                                        {
+                                            Id = match.ChallengerId,
+                                            Name = match.Challenger?.Name ?? "Opponent",
+                                            PlayerLevel = match.Challenger?.PlayerLevel
+                                        };
+                                    }
+                                }
+                                else if (match.Player1 != null && match.Player2 != null)
+                                {
+                                    // Tournament match format
+                                    if (match.Player1 == id && match.Player2Details != null)
+                                    {
+                                        match.Opponent = new OpponentData
+                                        {
+                                            Id = match.Player2,
+                                            Name = match.Player2Details?.Name ?? "Opponent",
+                                            PlayerLevel = match.Player2Details?.PlayerLevel
+                                        };
+                                    }
+                                    else if (match.Player2 == id && match.Player1Details != null)
+                                    {
+                                        match.Opponent = new OpponentData
+                                        {
+                                            Id = match.Player1,
+                                            Name = match.Player1Details?.Name ?? "Opponent",
+                                            PlayerLevel = match.Player1Details?.PlayerLevel
+                                        };
+                                    }
+                                }
+
+                                // If we still don't have an opponent, create a placeholder
+                                if (match.Opponent == null)
+                                {
+                                    match.Opponent = new OpponentData { Name = "Unknown Opponent" };
+                                }
+                            }
+                        }
+
+                        ViewBag.Matches = matches;
+                    }
+                    else
+                    {
+                        ViewBag.Matches = new List<CompMatchData>();
+                        _logger.LogWarning("No matches property found in response");
                     }
 
                     if (wrapper.TryGetProperty("pagination", out var paginationElement))
@@ -173,7 +311,9 @@ namespace TennisMatchmakingSite2.Controllers
                 }
                 else
                 {
+                    _logger.LogWarning($"Failed to load match history: {response.StatusCode}, {await response.Content.ReadAsStringAsync()}");
                     TempData["ErrorMessage"] = "Failed to load match history";
+                    ViewBag.Matches = new List<CompMatchData>();
                 }
 
                 return View();
@@ -187,7 +327,7 @@ namespace TennisMatchmakingSite2.Controllers
         }
     }
 
-    public class PaginationData
+        public class PaginationData
     {
         [JsonPropertyName("total")]
         public int Total { get; set; }

@@ -44,6 +44,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWF0Y2hcSW5kZXguY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Match/Requests.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWF0Y2hcUmVxdWVzdHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Match/Test.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTWF0Y2hcVGVzdC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
@@ -84,6 +88,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9NYXRjaENhcmQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_MatchCardContent.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9NYXRjaENhcmRDb250ZW50LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Shared/_NotificationWrapper.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9Ob3RpZmljYXRpb25XcmFwcGVyLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
@@ -122,6 +130,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Tournaments/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVG91cm5hbWVudHNcSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Tournaments/Invitations.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVG91cm5hbWVudHNcSW52aXRhdGlvbnMuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/Tim/honours-repo/TennisMatchmakingSite2/Views/Tournaments/LadderDetails.cshtml]
