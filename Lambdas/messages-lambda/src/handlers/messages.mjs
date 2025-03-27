@@ -4,7 +4,6 @@ import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 import fetch from 'node-fetch';
-import { Lambda } from 'aws-sdk';
 
 // Initialize AWS Lambda client
 const lambda = new Lambda({
@@ -221,9 +220,6 @@ export async function sendMessage(event) {
         const senderId = token.decoded.userId;
         console.log('🔹 Received send message request from:', senderId);
 
-        // Log the full event for debugging
-        console.log('Full event:', JSON.stringify(event, null, 2));
-
         // Ensure request body exists
         if (!event.body) {
             console.error('❌ Request body is missing');
@@ -354,50 +350,6 @@ export async function sendMessage(event) {
         } catch (error) {
             console.error('❌ Error saving message:', error);
             return createResponse(500, { message: 'Error saving message', error: error.message });
-        }
-
-        try {
-            // Get the recipient user ID
-            const conversation = await conversations.findOne({
-                _id: new ObjectId(actualConversationId)
-            });
-
-            if (conversation) {
-                // Find the recipient (the user who is not the sender)
-                const recipientId = conversation.participants.find(id => id !== senderId);
-
-                if (recipientId) {
-                    console.log(`Creating notification for message recipient: ${recipientId}`);
-
-                    // Create notification using notification-lambda
-                    const notificationPayload = {
-                        userId: recipientId,
-                        sourceUserId: senderId,
-                        sourceUserName: sender.name,
-                        type: 'message',
-                        content: `${sender.name}: ${content.length > 50 ? content.substring(0, 47) + '...' : content}`,
-                        relatedItemId: actualConversationId,
-                        token: token.original // Pass the JWT token for API Gateway authorization
-                    };
-
-                    // Invoke notification lambda
-                    const lambdaParams = {
-                        FunctionName: process.env.NOTIFICATION_LAMBDA_NAME || 'notification-lambda',
-                        InvocationType: 'Event', // asynchronous
-                        Payload: JSON.stringify({
-                            httpMethod: 'POST',
-                            path: '/notifications/direct',
-                            body: JSON.stringify(notificationPayload)
-                        })
-                    };
-
-                    await lambda.invoke(lambdaParams).promise();
-                    console.log('✅ Notification lambda invoked successfully');
-                }
-            }
-        } catch (notificationError) {
-            // Log but don't fail if notification fails
-            console.error('❌ Error sending notification:', notificationError);
         }
 
         return createResponse(201, {
