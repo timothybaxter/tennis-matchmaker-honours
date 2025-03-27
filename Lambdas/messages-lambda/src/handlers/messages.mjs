@@ -5,11 +5,6 @@ import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 import fetch from 'node-fetch';
 
-// Initialize AWS Lambda client
-const lambda = new Lambda({
-    region: process.env.AWS_REGION || 'us-east-1'
-});
-
 export async function getConversations(event) {
     try {
         // Extract and verify token
