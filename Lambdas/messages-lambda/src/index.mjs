@@ -1,4 +1,4 @@
-import { getConversations, getMessages, sendMessage, createConversation } from './handlers/messages.mjs';
+import { getConversations, getMessages, sendMessage, createConversation, markConversationRead } from './handlers/messages.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -40,6 +40,10 @@ export const handler = async (event) => {
         // Route: POST /messages/conversation (create conversation)
         else if (method === 'POST' && resource === '/messages/conversation') {
             return await createConversation(event);
+        }
+        else if (method = 'POST' && resource === '/messages/conversation/read') {
+            return await markConversationRead(event);
+
         }
 
         // No route match
