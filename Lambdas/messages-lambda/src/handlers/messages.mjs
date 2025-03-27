@@ -87,7 +87,68 @@ export async function getConversations(event) {
         return createResponse(500, { message: 'Error retrieving conversations', error: error.message });
     }
 }
+// Mark all messages in a conversation as read
+export async function markConversationRead(event) {
+    try {
+        // Extract and verify token
+        const token = extractAndVerifyToken(event);
+        if (!token.isValid) {
+            return token.response;
+        }
 
+        const userId = token.decoded.userId;
+        console.log(`Marking all messages as read for user ${userId}`);
+
+        try {
+            const { conversationId } = JSON.parse(event.body);
+
+            if (!conversationId) {
+                return createResponse(400, { message: 'Conversation ID is required' });
+            }
+
+            // Connect to messages database
+            const messagesDb = await connectToDatabase();
+            const messagesCollection = messagesDb.collection('messages');
+            const conversations = messagesDb.collection('conversations');
+
+            // Verify user is part of this conversation
+            const conversation = await conversations.findOne({
+                _id: new ObjectId(conversationId),
+                participants: userId
+            });
+
+            if (!conversation) {
+                return createResponse(404, { message: 'Conversation not found or you are not a participant' });
+            }
+
+            // Update all unread messages in this conversation that weren't sent by this user
+            const result = await messagesCollection.updateMany(
+                {
+                    conversationId: conversationId,
+                    senderId: { $ne: userId },
+                    read: false
+                },
+                {
+                    $set: {
+                        read: true,
+                        readAt: new Date()
+                    }
+                }
+            );
+
+            return createResponse(200, {
+                message: `${result.modifiedCount} messages marked as read`,
+                modifiedCount: result.modifiedCount
+            });
+        } catch (parseError) {
+            console.error('Error parsing request body:', parseError);
+            return createResponse(400, { message: 'Invalid JSON in request body' });
+        }
+    } catch (error) {
+        console.error('Mark conversation read error:', error);
+        return createResponse(500, { message: 'Error marking messages as read', error: error.message });
+    }
+}
 export async function getMessages(event) {
     try {
         // Extract and verify token
