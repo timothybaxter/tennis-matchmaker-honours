@@ -1,7 +1,9 @@
+// src/handlers/notifications.mjs
 import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
+import fetch from 'node-fetch';
 
 // Get all notifications for a user
 export async function getNotifications(event) {
@@ -151,6 +153,18 @@ export async function createNotification(event) {
 
             const result = await notifications.insertOne(newNotification);
 
+            // =====================================================
+            // NEW CODE: Send real-time notification after database save
+            // =====================================================
+            try {
+                const success = await sendRealTimeNotification(newNotification, token.original);
+                console.log(`Real-time notification delivery ${success ? 'succeeded' : 'failed'}`);
+            } catch (rtError) {
+                console.error('Error sending real-time notification:', rtError);
+                // Don't fail the overall operation if real-time delivery fails
+            }
+            // =====================================================
+
             return createResponse(201, {
                 message: 'Notification created successfully',
                 notificationId: result.insertedId,
@@ -212,6 +226,7 @@ export async function markNotificationRead(event) {
     }
 }
 
+// Delete notification
 export async function deleteNotification(event) {
     try {
         // Extract and verify token
@@ -263,6 +278,98 @@ export async function deleteNotification(event) {
         return createResponse(500, { message: 'Error deleting notification', error: error.message });
     }
 }
+
+// =====================================================
+// NEW FUNCTION: Send real-time notification via API Gateway
+// =====================================================
+async function sendRealTimeNotification(notification, jwtToken) {
+    try {
+        console.log('Sending real-time notification:', JSON.stringify(notification));
+
+        // Determine notification type and endpoint
+        let endpoint;
+        let requestBody;
+
+        // Configure endpoint and request body based on notification type
+        if (notification.type.startsWith('friend_')) {
+            endpoint = 'friend-request';
+            requestBody = {
+                recipientId: notification.userId,
+                senderId: notification.sourceUserId,
+                senderName: notification.sourceUserName,
+                friendshipId: notification.relatedItemId || 'unknown',
+                timestamp: notification.createdAt
+            };
+        } else if (notification.type.startsWith('message')) {
+            endpoint = 'message';
+            requestBody = {
+                recipientId: notification.userId,
+                senderId: notification.sourceUserId,
+                senderName: notification.sourceUserName,
+                conversationId: notification.relatedItemId || 'unknown',
+                content: notification.content,
+                timestamp: notification.createdAt
+            };
+        } else if (notification.type.startsWith('match_') ||
+            notification.type.startsWith('tournament_') ||
+            notification.type.startsWith('ladder_')) {
+            // Generic notification for other types
+            endpoint = 'generic';
+            requestBody = {
+                userId: notification.userId,
+                type: notification.type,
+                message: notification.content,
+                relatedItemId: notification.relatedItemId,
+                source: {
+                    userId: notification.sourceUserId,
+                    name: notification.sourceUserName
+                },
+                timestamp: notification.createdAt
+            };
+        } else {
+            // Default to generic notification
+            endpoint = 'generic';
+            requestBody = {
+                userId: notification.userId,
+                type: notification.type,
+                message: notification.content,
+                relatedItemId: notification.relatedItemId,
+                timestamp: notification.createdAt
+            };
+        }
+
+        // Make request to API Gateway
+        console.log(`Calling ${process.env.NOTIFICATION_API_URL}/notificationsapi/${endpoint}`);
+        console.log('Request body:', JSON.stringify(requestBody));
+
+        const response = await fetch(`${process.env.NOTIFICATION_API_URL}/notificationsapi/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${jwtToken}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        const responseStatus = response.status;
+        let responseText;
+
+        try {
+            responseText = await response.text();
+        } catch (e) {
+            responseText = 'Could not read response text';
+        }
+
+        console.log(`Real-time notification API response: ${responseStatus} - ${responseText}`);
+
+        return responseStatus >= 200 && responseStatus < 300;
+    } catch (error) {
+        console.error('Error sending real-time notification:', error);
+        return false;
+    }
+}
+
+// Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     const authHeader = event.headers.Authorization ||
         event.headers.authorization ||
@@ -288,12 +395,69 @@ function extractAndVerifyToken(event) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         return {
             isValid: true,
-            decoded
+            decoded,
+            original: token  // Save the original token for API calls
         };
     } catch (error) {
         return {
             isValid: false,
             response: createResponse(401, { message: 'Invalid token' })
         };
+    }
+}
+
+
+export async function createNotificationDirect(event) {
+    try {
+        // For direct Lambda invocation, we expect a specific payload format
+        const payload = JSON.parse(event.body || '{}');
+        const { userId, type, content, relatedItemId, sourceUserId, sourceUserName } = payload;
+
+        if (!userId || !type || !content) {
+            console.error('Missing required fields for direct notification:', payload);
+            return createResponse(400, { message: 'userId, type, and content are required' });
+        }
+
+        // Connect to notifications database
+        const notificationsDb = await connectToDatabase();
+        const notifications = notificationsDb.collection('notifications');
+
+        // Create the notification
+        const newNotification = {
+            userId,
+            sourceUserId,
+            sourceUserName,
+            type,
+            content,
+            relatedItemId: relatedItemId || null,
+            isRead: false,
+            createdAt: new Date()
+        };
+
+        const result = await notifications.insertOne(newNotification);
+
+        // Send real-time notification (without token validation)
+        try {
+            // Get token for API Gateway call from environment or payload
+            const jwtToken = payload.token || process.env.NOTIFICATION_API_TOKEN;
+
+            if (!jwtToken) {
+                console.warn('No JWT token available for real-time notification');
+            } else {
+                const success = await sendRealTimeNotification(newNotification, jwtToken);
+                console.log(`Direct real-time notification delivery ${success ? 'succeeded' : 'failed'}`);
+            }
+        } catch (rtError) {
+            console.error('Error sending direct real-time notification:', rtError);
+        }
+
+        return createResponse(201, {
+            message: 'Notification created successfully',
+            notificationId: result.insertedId,
+            notification: newNotification
+        });
+    } catch (error) {
+        console.error('Create direct notification error:', error);
+        return createResponse(500, { message: 'Error creating notification', error: error.message });
     }
 }

@@ -1,8 +1,15 @@
-﻿import jwt from 'jsonwebtoken';
+﻿// src/handlers/messages.mjs
+import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
 import fetch from 'node-fetch';
+import { Lambda } from 'aws-sdk';
+
+// Initialize AWS Lambda client
+const lambda = new Lambda({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
 
 export async function getConversations(event) {
     try {
@@ -349,7 +356,6 @@ export async function sendMessage(event) {
             return createResponse(500, { message: 'Error saving message', error: error.message });
         }
 
-        // Send real-time notifications
         try {
             // Get the recipient user ID
             const conversation = await conversations.findOne({
@@ -359,34 +365,39 @@ export async function sendMessage(event) {
             if (conversation) {
                 // Find the recipient (the user who is not the sender)
                 const recipientId = conversation.participants.find(id => id !== senderId);
-                
+
                 if (recipientId) {
-                    // Create the notification request
-                    const notificationRequest = {
-                        recipientId: recipientId,
-                        senderId: senderId,
-                        senderName: sender.name,
-                        conversationId: actualConversationId,
-                        content: content.substring(0, 100) // Limit preview to 100 chars
+                    console.log(`Creating notification for message recipient: ${recipientId}`);
+
+                    // Create notification using notification-lambda
+                    const notificationPayload = {
+                        userId: recipientId,
+                        sourceUserId: senderId,
+                        sourceUserName: sender.name,
+                        type: 'message',
+                        content: `${sender.name}: ${content.length > 50 ? content.substring(0, 47) + '...' : content}`,
+                        relatedItemId: actualConversationId,
+                        token: token.original // Pass the JWT token for API Gateway authorization
                     };
-                    
-                    // Make request to your API Gateway endpoint that forwards to your ASP.NET API
-                    const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/messages', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`  // Use the JWT token instead of API key
-                        },
-                        body: JSON.stringify(notificationRequest)
-                    });
-                    
-                    const responseText = await notificationResponse.text();
-                    console.log('Real-time notification sent:', responseText);
+
+                    // Invoke notification lambda
+                    const lambdaParams = {
+                        FunctionName: process.env.NOTIFICATION_LAMBDA_NAME || 'notification-lambda',
+                        InvocationType: 'Event', // asynchronous
+                        Payload: JSON.stringify({
+                            httpMethod: 'POST',
+                            path: '/notifications/direct',
+                            body: JSON.stringify(notificationPayload)
+                        })
+                    };
+
+                    await lambda.invoke(lambdaParams).promise();
+                    console.log('✅ Notification lambda invoked successfully');
                 }
             }
         } catch (notificationError) {
             // Log but don't fail if notification fails
-            console.error('❌ Error sending real-time notification:', notificationError);
+            console.error('❌ Error sending notification:', notificationError);
         }
 
         return createResponse(201, {
@@ -417,11 +428,9 @@ export async function createConversation(event) {
                 return createResponse(400, { message: 'Recipient ID is required' });
             }
 
-            // Connect to messages database (primary for this service)
             const messagesDb = await connectToDatabase();
             const conversations = messagesDb.collection('conversations');
 
-            // Connect to users database to verify recipient exists
             const usersDb = await connectToSpecificDatabase('users-db');
             const users = usersDb.collection('users');
 
@@ -472,7 +481,6 @@ export async function createConversation(event) {
     }
 }
 
-// Helper function to extract and verify JWT token
 function extractAndVerifyToken(event) {
     console.log('Headers:', JSON.stringify(event.headers));
     const authHeader = event.headers.Authorization ||
@@ -502,7 +510,8 @@ function extractAndVerifyToken(event) {
         console.log('Decoded token:', JSON.stringify(decoded));
         return {
             isValid: true,
-            decoded
+            decoded,
+            original: token  
         };
     } catch (error) {
         console.error('Token verification error:', error.message);

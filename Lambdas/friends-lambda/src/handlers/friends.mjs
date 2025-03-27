@@ -1,10 +1,15 @@
-import jwt from 'jsonwebtoken';
+﻿import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
-import fetch from 'node-fetch';
+import { Lambda } from 'aws-sdk';
 
-// Full implementation of searchUsers function
+// Initialize AWS Lambda client
+const lambda = new Lambda({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
+
+// Search users function
 export async function searchUsers(event) {
     console.log('searchUsers called with query:', event.queryStringParameters?.query);
 
@@ -114,8 +119,6 @@ export async function searchUsers(event) {
     }
 }
 
-// Add this function to your friends.mjs file
-
 // Search for users without filtering by friendship status
 export async function searchAllUsers(event) {
     console.log('searchAllUsers called with query:', event.queryStringParameters?.query);
@@ -134,7 +137,7 @@ export async function searchAllUsers(event) {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
-        
+
         // Get query parameter
         const query = event.queryStringParameters?.query;
         if (!query || query.length < 2) {
@@ -182,6 +185,7 @@ export async function searchAllUsers(event) {
         return createResponse(500, { message: 'Internal server error' });
     }
 }
+
 // Get all friends for a user
 export async function getFriends(event) {
     try {
@@ -376,28 +380,34 @@ export async function sendFriendRequest(event) {
 
         await notifications.insertOne(newNotification);
 
-        // Send real-time notification
+
         try {
-            // Create notification request
-            const notificationRequest = {
-                recipientId: recipientId,
-                senderId: senderId,
-                senderName: sender.name,
-                friendshipId: result.insertedId.toString()
+            console.log(`Creating real-time notification for friend request recipient: ${recipientId}`);
+
+            // Create notification using notification-lambda
+            const notificationPayload = {
+                userId: recipientId,
+                sourceUserId: senderId,
+                sourceUserName: sender.name,
+                type: 'friend_request',
+                content: `${sender.name} sent you a friend request`,
+                relatedItemId: result.insertedId.toString(),
+                token: token // Pass the JWT token for API Gateway authorization
             };
 
-            // Make request to API Gateway endpoint
-            const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/notificationsapi/friend-request', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`  // Use the JWT token instead of API key
-                },
-                body: JSON.stringify(notificationRequest)
-            });
+            // Invoke notification lambda
+            const lambdaParams = {
+                FunctionName: process.env.NOTIFICATION_LAMBDA_NAME || 'notification-lambda',
+                InvocationType: 'Event', // asynchronous
+                Payload: JSON.stringify({
+                    httpMethod: 'POST',
+                    path: '/notifications/direct',
+                    body: JSON.stringify(notificationPayload)
+                })
+            };
 
-            const responseText = await notificationResponse.text();
-            console.log('Real-time friend request notification sent:', responseText);
+            await lambda.invoke(lambdaParams).promise();
+            console.log('✅ Notification lambda invoked successfully for friend request');
         } catch (notificationError) {
             // Log but don't fail if notification fails
             console.error('Error sending real-time notification:', notificationError);
@@ -577,29 +587,34 @@ export async function respondToFriendRequest(event) {
 
             await notifications.insertOne(newNotification);
 
-            // Send real-time notification
+
             try {
-                // Create notification request for acceptance
-                const notificationRequest = {
+                console.log(`Creating real-time acceptance notification for: ${friendship.userId1}`);
+
+                // Create notification using notification-lambda
+                const notificationPayload = {
                     userId: friendship.userId1,
-                    recipientId: friendship.userId1,
-                    senderId: userId,
-                    senderName: currentUser.name,
-                    content: `${currentUser.name} accepted your friend request`
+                    sourceUserId: userId,
+                    sourceUserName: currentUser.name,
+                    type: 'friend_accepted',
+                    content: `${currentUser.name} accepted your friend request`,
+                    relatedItemId: friendship._id.toString(),
+                    token: token // Pass the JWT token for API Gateway authorization
                 };
 
-                // Make request to refresh notifications
-                const notificationResponse = await fetch(process.env.NOTIFICATION_API_URL + '/api/notificationsapi/refresh', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': process.env.NOTIFICATION_API_KEY
-                    },
-                    body: JSON.stringify(notificationRequest)
-                });
+                // Invoke notification lambda
+                const lambdaParams = {
+                    FunctionName: process.env.NOTIFICATION_LAMBDA_NAME || 'notification-lambda',
+                    InvocationType: 'Event', // asynchronous
+                    Payload: JSON.stringify({
+                        httpMethod: 'POST',
+                        path: '/notifications/direct',
+                        body: JSON.stringify(notificationPayload)
+                    })
+                };
 
-                const responseText = await notificationResponse.text();
-                console.log('Real-time friend request acceptance notification sent:', responseText);
+                await lambda.invoke(lambdaParams).promise();
+                console.log('✅ Notification lambda invoked successfully for friend acceptance');
             } catch (notificationError) {
                 // Log but don't fail if notification fails
                 console.error('Error sending real-time notification for acceptance:', notificationError);
@@ -621,6 +636,37 @@ export async function respondToFriendRequest(event) {
             };
 
             await notifications.insertOne(newNotification);
+
+            try {
+                console.log(`Creating real-time rejection notification for: ${friendship.userId1}`);
+
+                // Create notification using notification-lambda
+                const notificationPayload = {
+                    userId: friendship.userId1,
+                    sourceUserId: userId,
+                    sourceUserName: currentUser.name,
+                    type: 'friend_rejected',
+                    content: `${currentUser.name} declined your friend request`,
+                    token: token // Pass the JWT token for API Gateway authorization
+                };
+
+                // Invoke notification lambda
+                const lambdaParams = {
+                    FunctionName: process.env.NOTIFICATION_LAMBDA_NAME || 'notification-lambda',
+                    InvocationType: 'Event', // asynchronous
+                    Payload: JSON.stringify({
+                        httpMethod: 'POST',
+                        path: '/notifications/direct',
+                        body: JSON.stringify(notificationPayload)
+                    })
+                };
+
+                await lambda.invoke(lambdaParams).promise();
+                console.log('✅ Notification lambda invoked successfully for friend rejection');
+            } catch (notificationError) {
+                // Log but don't fail if notification fails
+                console.error('Error sending real-time notification for rejection:', notificationError);
+            }
 
             return createResponse(200, { message: 'Friend request rejected' });
         }
@@ -737,19 +783,7 @@ export async function checkFriendship(event) {
             }
         }
 
-        if (!friendship) {
-            return createResponse(200, { isFriend: false, hasPendingRequest: false });
-        }
-
-        if (friendship.status === 'pending') {
-            if (friendship.userId1 === userId) {
-                return createResponse(200, { isFriend: false, hasPendingRequest: true });
-            } else {
-                return createResponse(200, { isFriend: false, hasPendingRequest: true });
-            }
-        }
-
-        return createResponse(200, { isFriend: true, hasPendingRequest: false });
+        return createResponse(200, { status: 'accepted' });
     } catch (error) {
         console.error('Error in checkFriendship:', error);
 

@@ -1,4 +1,4 @@
-import { getNotifications, createNotification, markNotificationRead, deleteNotification } from './handlers/notifications.mjs';
+import { getNotifications, createNotification, markNotificationRead, deleteNotification, createNotificationDirect } from './handlers/notifications.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 
 export const handler = async (event) => {
@@ -24,6 +24,8 @@ export const handler = async (event) => {
                 return await deleteNotification(event);
             case 'DELETE /notifications/{id}':
                 return await deleteNotification(event);
+            case 'POST /notifications/direct':
+                return await createNotificationDirect(event);
             default:
                 return createResponse(404, { message: 'Route not found', route: routeKey });
         }
