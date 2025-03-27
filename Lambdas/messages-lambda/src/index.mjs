@@ -41,7 +41,7 @@ export const handler = async (event) => {
         else if (method === 'POST' && resource === '/messages/conversation') {
             return await createConversation(event);
         }
-        else if (method === 'POST' && resource === '/messages/conversation/read') {
+        else if (method === 'POST' && resource === '/messages/conversations/read') {
             return await markConversationRead(event);
         }
 
