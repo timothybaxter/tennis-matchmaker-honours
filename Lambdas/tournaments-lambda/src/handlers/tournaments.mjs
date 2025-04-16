@@ -1313,7 +1313,7 @@ function compareSubmissions(scores1, scores2, winner1, winner2) {
     return true;
 }
 
-// Revised advanceWinner function to correctly handle byes
+// Full advanceWinner function with fix
 async function advanceWinner(tournamentId, match, winnerId, tournaments, matches) {
     try {
         console.log(`Advancing winner ${winnerId} from match ${match.matchNumber} in round ${match.round}`);
@@ -1475,10 +1475,8 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
                 console.log(`Updated existing match ${existingMatch.matchNumber} with ${playerPosition}=${playerPosition === 'player1' ? player1 : player2}`);
             }
 
-            // Check if this is now the final match with all players assigned
             if (player1 && player2 && !existingMatch.winner) {
-                // Don't auto-complete the final match even if it's the same player on both sides
-                // The match should be played out normally
+                
                 console.log(`Final match has both players assigned and ready to play`);
             }
         } else {
@@ -1489,12 +1487,11 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
                 const matchDeadline = new Date();
                 matchDeadline.setHours(matchDeadline.getHours() + tournament.challengeWindow);
 
-                // IMPORTANT CHANGE: Only treat as bye match if it's not the final round 
-                // and both sides have the same winner or one side is empty
                 const isByeMatch = nextRound < tournament.bracket.numRounds && (
-                    (player1 && player2 && player1 === player2) ||
-                    (player1 && !player2) ||
-                    (!player1 && player2)
+                    (player1 && player2 && player1 === player2) || 
+                    ((player1 && !player2) || (!player1 && player2)) && 
+              
+                    !isNextRoundMatchBetweenByePlayers(tournament, nextRound, nextMatch.matchNumber)
                 );
 
                 let status = 'scheduled';
@@ -1548,6 +1545,30 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
         console.error('Error in advanceWinner:', error);
         console.error(error.stack);
     }
+}
+
+function isNextRoundMatchBetweenByePlayers(tournament, roundNumber, matchNumber) {
+    // Get the current round's matches that feed into this next round match
+    const previousRound = roundNumber - 1;
+    if (previousRound < 1) return false;
+
+    const previousRoundData = tournament.bracket.rounds.find(r => r.roundNumber === previousRound);
+    if (!previousRoundData) return false;
+
+    // Find the two matches that feed into this next round match
+    const feederMatches = previousRoundData.matches.filter(m => {
+        const nextMatchNum = Math.ceil(m.matchNumber / 2);
+        return nextMatchNum === matchNumber;
+    });
+
+    // Check if both feeder matches are bye matches
+    if (feederMatches.length === 2 &&
+        feederMatches[0].isByeMatch &&
+        feederMatches[1].isByeMatch) {
+        return true;
+    }
+
+    return false;
 }
 // This function explicitly creates the final match for a tournament if needed
 async function ensureFinalMatchExists(tournamentId) {
