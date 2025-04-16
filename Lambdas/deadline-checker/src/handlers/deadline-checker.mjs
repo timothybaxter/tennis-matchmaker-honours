@@ -1,4 +1,3 @@
-// src/handlers/deadline-checker.mjs
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';
@@ -24,12 +23,15 @@ export const handler = async (event) => {
             // Process tournaments and ladder deadlines
             const tournamentResults = await checkTournamentDeadlines();
             const ladderResults = await checkLadderDeadlines();
+            // NEW: Process regular match deadlines
+            const regularMatchResults = await checkRegularMatchDeadlines();
 
             // Return results
             return createResponse(200, {
                 message: 'Deadline check completed',
                 tournamentMatches: tournamentResults.processed,
                 ladderMatches: ladderResults.processed,
+                regularMatches: regularMatchResults.processed,
                 timestamp: new Date().toISOString()
             });
         }
@@ -37,11 +39,13 @@ export const handler = async (event) => {
         // If not from API Gateway (direct Lambda invocation)
         const tournamentResults = await checkTournamentDeadlines();
         const ladderResults = await checkLadderDeadlines();
+        const regularMatchResults = await checkRegularMatchDeadlines();
 
         return {
             message: 'Deadline check completed',
             tournamentMatches: tournamentResults.processed,
-            ladderMatches: ladderResults.processed
+            ladderMatches: ladderResults.processed,
+            regularMatches: regularMatchResults.processed
         };
     } catch (error) {
         console.error('Error in deadline checker:', error);
@@ -58,6 +62,39 @@ export const handler = async (event) => {
         };
     }
 };
+// Clean up all regular matches that are past their scheduled time
+async function checkRegularMatchDeadlines() {
+    try {
+        console.log('Checking regular match deadlines...');
+
+        // Connect to matches database
+        const matchesDb = await connectToSpecificDatabase('matches-db');
+        const matches = matchesDb.collection('matches');
+
+        // Use current time as the cutoff - delete all matches past their scheduled time
+        const now = new Date();
+
+        // Find all matches with matchTime in the past, regardless of status
+        const expiredMatches = await matches.find({
+            matchTime: { $lt: now }
+        }).toArray();
+
+        console.log(`Found ${expiredMatches.length} expired regular matches`);
+
+        // Delete all expired matches
+        if (expiredMatches.length > 0) {
+            const result = await matches.deleteMany({
+                matchTime: { $lt: now }
+            });
+            console.log(`Deleted ${result.deletedCount} expired regular matches`);
+        }
+
+        return { processed: expiredMatches.length };
+    } catch (error) {
+        console.error('Error checking regular match deadlines:', error);
+        throw error;
+    }
+}
 
 // Check tournament matches with expired deadlines
 async function checkTournamentDeadlines() {
@@ -126,7 +163,6 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
     try {
         console.log(`Processing expired tournament match: ${match._id}`);
 
-        // 1. Mark match as expired
         await matches.updateOne(
             { _id: match._id },
             {
@@ -139,7 +175,6 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
             }
         );
 
-        // 2. Get tournament
         const tournament = await tournaments.findOne({
             _id: new ObjectId(match.tournamentId)
         });
@@ -149,27 +184,21 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
             return;
         }
 
-        // 3. Calculate the next match number
         const nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1;
         const currentRound = match.round;
         const nextRound = currentRound + 1;
 
-        // Adjust next match number based on tournament structure
         let nextRealMatchNumber = nextMatchNumber;
         if (currentRound > 1) {
-            // For non-first rounds, calculate the actual match number
             const matchesInPreviousRound = Math.pow(2, tournament.bracket.numRounds - currentRound + 1);
             nextRealMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + matchesInPreviousRound / 2;
         } else {
-            // For first round matches
             nextRealMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + Math.pow(2, tournament.bracket.numRounds - 2);
         }
 
-        // Determine if this is a right or left branch match
         const isRightBranch = match.matchNumber % 2 === 0;
         const playerPosition = isRightBranch ? 'player2' : 'player1';
 
-        // 4. Find the sibling match that feeds into the same next match
         const siblingMatchNumber = isRightBranch ? match.matchNumber - 1 : match.matchNumber + 1;
         const siblingMatch = await matches.findOne({
             tournamentId: match.tournamentId,
@@ -177,12 +206,9 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
             round: currentRound
         });
 
-        // 5. Handle tournament bracket updates
         if (siblingMatch && siblingMatch.status === 'completed') {
-            // The sibling match has a winner, advance them with a bye
             const byePlayer = siblingMatch.winner;
 
-            // Update tournament bracket to advance the player
             await tournaments.updateOne(
                 { _id: new ObjectId(match.tournamentId) },
                 {
@@ -195,7 +221,6 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
                 }
             );
 
-            // 6. Create a bye match in the next round if needed
             const nextMatch = await matches.findOne({
                 tournamentId: match.tournamentId,
                 round: nextRound,
@@ -203,7 +228,6 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
             });
 
             if (!nextMatch) {
-                // Create a bye match with automatic advancement
                 const matchDeadline = new Date();
                 matchDeadline.setHours(matchDeadline.getHours() + tournament.challengeWindow);
 
@@ -228,11 +252,9 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
                 await matches.insertOne(newMatch);
                 console.log(`Created bye match in round ${nextRound}`);
 
-                // Continue advancing through the bracket if needed
                 await advanceWinner(match.tournamentId, newMatch, byePlayer, tournaments, matches);
             }
         } else {
-            // Both matches in this branch are expired, create empty slot in next round
             await tournaments.updateOne(
                 { _id: new ObjectId(match.tournamentId) },
                 {
@@ -247,7 +269,6 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
             );
         }
 
-        // 7. Send notifications to players
         await sendExpiredMatchNotifications(match, 'tournament');
 
         console.log(`Successfully processed expired tournament match ${match._id}`);
@@ -256,12 +277,10 @@ async function handleExpiredTournamentMatch(match, tournaments, matches) {
     }
 }
 
-// Handle an expired ladder match
 async function handleExpiredLadderMatch(match, matches, ladders) {
     try {
         console.log(`Processing expired ladder match: ${match._id}`);
 
-        // Mark the match as disputed
         await matches.updateOne(
             { _id: match._id },
             {
@@ -274,7 +293,6 @@ async function handleExpiredLadderMatch(match, matches, ladders) {
             }
         );
 
-        // Get the ladder to notify the admin
         const ladder = await ladders.findOne({
             _id: new ObjectId(match.ladderId)
         });
@@ -284,7 +302,6 @@ async function handleExpiredLadderMatch(match, matches, ladders) {
             return;
         }
 
-        // Send notifications
         await sendExpiredMatchNotifications(match, 'ladder', ladder.creatorId);
 
         console.log(`Successfully processed expired ladder match ${match._id}`);
@@ -293,26 +310,21 @@ async function handleExpiredLadderMatch(match, matches, ladders) {
     }
 }
 
-// Advance winners in tournament brackets
 async function advanceWinner(tournamentId, match, winnerId, tournaments, matches) {
     try {
-        // Get tournament
         const tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
         if (!tournament || tournament.status !== 'active') {
             return;
         }
 
-        // Get the bracket structure
         const bracket = tournament.bracket;
         if (!bracket || !bracket.rounds) {
             return;
         }
 
-        // Find the current match in the bracket
         const currentRound = match.round;
         const nextRound = currentRound + 1;
 
-        // If this is the final round, update tournament as completed
         if (nextRound > bracket.numRounds) {
             await tournaments.updateOne(
                 { _id: new ObjectId(tournamentId) },
@@ -327,22 +339,17 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             return;
         }
 
-        // Find the next match to advance to
         let nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1;
 
         if (currentRound > 1) {
-            // For rounds beyond the first, calculate based on the previous round's match count
             const matchesInPreviousRound = Math.pow(2, bracket.numRounds - currentRound + 1);
             nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + matchesInPreviousRound / 2;
         } else {
-            // For first round matches, simpler calculation
             nextMatchNumber = Math.floor((match.matchNumber - 1) / 2) + 1 + Math.pow(2, bracket.numRounds - 2);
         }
 
-        // Determine if this match feeds into player1 or player2 slot
         const playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
 
-        // Find the next match in the bracket
         const nextRoundMatches = bracket.rounds[nextRound - 1].matches;
         const nextMatch = nextRoundMatches.find(m => m.matchNumber === nextMatchNumber);
 
@@ -351,7 +358,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             return;
         }
 
-        // Update the bracket structure - update current match winner
         const updatePath = `bracket.rounds.${currentRound - 1}.matches`;
         const matchIndex = bracket.rounds[currentRound - 1].matches.findIndex(m => m.matchNumber === match.matchNumber);
 
@@ -369,7 +375,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
             }
         );
 
-        // Update next match with the advancing player
         const nextUpdatePath = `bracket.rounds.${nextRound - 1}.matches`;
         const nextMatchIndex = bracket.rounds[nextRound - 1].matches.findIndex(m => m.matchNumber === nextMatch.matchNumber);
 
@@ -476,7 +481,6 @@ async function advanceWinner(tournamentId, match, winnerId, tournaments, matches
 // Send notifications for expired matches
 async function sendExpiredMatchNotifications(match, matchType, adminId = null) {
     try {
-        // Notify players
         const recipients = [];
 
         if (matchType === 'tournament') {
@@ -486,11 +490,9 @@ async function sendExpiredMatchNotifications(match, matchType, adminId = null) {
             if (match.challengerId) recipients.push(match.challengerId);
             if (match.challengeeId) recipients.push(match.challengeeId);
 
-            // Notify ladder admin
             if (adminId) recipients.push(adminId);
         }
 
-        // Get context details (tournament or ladder name)
         let contextName = "";
         try {
             if (matchType === 'tournament') {
@@ -512,9 +514,7 @@ async function sendExpiredMatchNotifications(match, matchType, adminId = null) {
             console.error('Error getting context name:', error);
         }
 
-        // Send notifications to all recipients
         for (const recipientId of recipients) {
-            // Prepare notification
             const notificationRequest = {
                 recipientId,
                 senderId: 'system',
@@ -534,7 +534,6 @@ async function sendExpiredMatchNotifications(match, matchType, adminId = null) {
     }
 }
 
-// Send a notification
 async function sendNotification(notificationData) {
     try {
         if (!process.env.NOTIFICATION_API_URL) {

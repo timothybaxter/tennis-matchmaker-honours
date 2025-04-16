@@ -1,13 +1,7 @@
 import { MongoClient } from 'mongodb';
-
-// Cache for MongoDB client and database connections
 let cachedClient = null;
 let cachedDbs = {};
 
-/**
- * Connect to the primary database for this service
- * Enhanced with debugging logs
- */
 export async function connectToDatabase() {
     try {
         console.log('Attempting to connect to primary database...');
@@ -18,8 +12,6 @@ export async function connectToDatabase() {
 
         let dbName = 'compMatches-db'; // Default database
 
-        // Set database name based on function name
-        // Set database name based on function name
         if (functionName.includes('friends')) {
             dbName = 'friends-db';
         } else if (functionName.includes('messages')) {
@@ -50,10 +42,6 @@ export async function connectToDatabase() {
     }
 }
 
-/**
- * Connect to a specific database by name
- * Added support for users-db which contains user information
- */
 export async function connectToSpecificDatabase(dbName) {
     try {
         console.log(`Connecting to specific database: ${dbName}`);
@@ -64,9 +52,7 @@ export async function connectToSpecificDatabase(dbName) {
     }
 }
 
-/**
- * Get or create a database connection
- */
+
 async function getDatabase(dbName) {
     try {
         // Return cached connection if available

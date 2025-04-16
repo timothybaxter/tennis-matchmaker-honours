@@ -1,5 +1,4 @@
-﻿// src/handlers/messages.mjs
-import jwt from 'jsonwebtoken';
+﻿import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 import { ObjectId } from 'mongodb';

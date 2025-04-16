@@ -1,4 +1,3 @@
-// index.mjs - Main entry point for the deadline checker Lambda
 import { handler as checkDeadlines } from './handlers/deadline-checker.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 

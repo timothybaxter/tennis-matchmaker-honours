@@ -1,4 +1,3 @@
-// src/index.mjs
 import { getCourts, searchNearby } from './handlers/courts.mjs';
 import { createResponse, createCorsResponse } from './utils/responses.mjs';
 

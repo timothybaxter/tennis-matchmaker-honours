@@ -1,4 +1,3 @@
-// src/handlers/notifications.mjs
 import jwt from 'jsonwebtoken';
 import { connectToDatabase, connectToSpecificDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';

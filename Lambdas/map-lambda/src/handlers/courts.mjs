@@ -1,4 +1,3 @@
-// src/handlers/courts.mjs
 import { connectToDatabase } from '../utils/database.mjs';
 import { createResponse } from '../utils/responses.mjs';
 

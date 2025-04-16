@@ -1,18 +1,13 @@
 import { MongoClient } from 'mongodb';
 
-// Cache for MongoDB client and database connections
 let cachedClient = null;
 let cachedDbs = {};
 
-/**
- * Connect to the primary database for this service
- * Enhanced with debugging logs
- */
+
 export async function connectToDatabase() {
     try {
         console.log('Attempting to connect to primary database...');
 
-        // Determine which database to use
         const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME || '';
         console.log(`Function name: ${functionName}`);
 
@@ -47,10 +42,7 @@ export async function connectToDatabase() {
     }
 }
 
-/**
- * Connect to a specific database by name
- * Added support for users-db which contains user information
- */
+
 export async function connectToSpecificDatabase(dbName) {
     try {
         console.log(`Connecting to specific database: ${dbName}`);
@@ -61,9 +53,7 @@ export async function connectToSpecificDatabase(dbName) {
     }
 }
 
-/**
- * Get or create a database connection
- */
+
 async function getDatabase(dbName) {
     try {
         // Return cached connection if available
