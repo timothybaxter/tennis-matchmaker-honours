@@ -28,24 +28,27 @@ namespace TennisMatchmakingSite2.Controllers
             {
                 _logger.LogInformation($"Received message notification: {JsonSerializer.Serialize(request)}");
 
-                // Send to everyone - for testing
-                await _hubContext.Clients.All.SendAsync("ReceiveMessage", new
+                // Create message notification object
+                var notification = new
                 {
                     conversationId = request.ConversationId,
                     senderId = request.SenderId,
                     senderName = request.SenderName,
                     content = request.Content,
                     timestamp = request.Timestamp
-                });
+                };
 
-                // Send to user group
-                await _hubContext.Clients.Group($"user_{request.RecipientId}").SendAsync("ReceiveMessage", new
+                // Send to user's group
+                await _hubContext.Clients.Group($"user_{request.RecipientId}").SendAsync("ReceiveMessage", notification);
+
+                // Also try to send via the general notification channel
+                await _hubContext.Clients.Group($"user_{request.RecipientId}").SendAsync("ReceiveNotification", new
                 {
-                    conversationId = request.ConversationId,
-                    senderId = request.SenderId,
-                    senderName = request.SenderName,
-                    content = request.Content,
-                    timestamp = request.Timestamp
+                    type = "message",
+                    title = "New Message",
+                    message = $"{request.SenderName}: {(request.Content?.Length > 30 ? request.Content.Substring(0, 27) + "..." : request.Content)}",
+                    timestamp = request.Timestamp,
+                    data = notification
                 });
 
                 _logger.LogInformation($"Successfully sent message notification to user {request.RecipientId}");
@@ -75,11 +78,18 @@ namespace TennisMatchmakingSite2.Controllers
                     timestamp = request.Timestamp
                 };
 
-                // Send to all clients (for testing)
-                await _hubContext.Clients.All.SendAsync("ReceiveFriendRequest", notification);
-
-                // Also send to user group
+                // Send via the friend request specific channel
                 await _hubContext.Clients.Group($"user_{request.RecipientId}").SendAsync("ReceiveFriendRequest", notification);
+
+                // Also send via the general notification channel
+                await _hubContext.Clients.Group($"user_{request.RecipientId}").SendAsync("ReceiveNotification", new
+                {
+                    type = "friend_request",
+                    title = "Friend Request",
+                    message = $"{request.SenderName} sent you a friend request",
+                    timestamp = request.Timestamp,
+                    data = notification
+                });
 
                 _logger.LogInformation($"Successfully sent friend request notification to user {request.RecipientId}");
                 return Ok(new { success = true });
@@ -87,6 +97,76 @@ namespace TennisMatchmakingSite2.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending friend request notification");
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("generic")]
+        public async Task<IActionResult> PushGenericNotification([FromBody] GenericNotificationRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Received generic notification: {JsonSerializer.Serialize(request)}");
+
+                // Create a title based on the notification type
+                string title = GetTitleFromType(request.Type);
+
+                // Send via the general notification channel
+                await _hubContext.Clients.Group($"user_{request.UserId}").SendAsync("ReceiveNotification", new
+                {
+                    type = request.Type,
+                    title = title,
+                    message = request.Message,
+                    timestamp = request.Timestamp ?? DateTime.UtcNow,
+                    relatedItemId = request.RelatedItemId,
+                    source = request.Source,
+                    metadata = request.Metadata
+                });
+
+                // For specific notifications, also send via type-specific channels
+                if (request.Type.StartsWith("match_"))
+                {
+                    await _hubContext.Clients.Group($"user_{request.UserId}").SendAsync("ReceiveMatchNotification", new
+                    {
+                        type = request.Type,
+                        title = title,
+                        message = request.Message,
+                        matchId = request.RelatedItemId,
+                        timestamp = request.Timestamp ?? DateTime.UtcNow,
+                        source = request.Source
+                    });
+                }
+                else if (request.Type.StartsWith("tournament_"))
+                {
+                    await _hubContext.Clients.Group($"user_{request.UserId}").SendAsync("ReceiveTournamentNotification", new
+                    {
+                        type = request.Type,
+                        title = title,
+                        message = request.Message,
+                        tournamentId = request.RelatedItemId,
+                        timestamp = request.Timestamp ?? DateTime.UtcNow,
+                        source = request.Source
+                    });
+                }
+                else if (request.Type.StartsWith("ladder_"))
+                {
+                    await _hubContext.Clients.Group($"user_{request.UserId}").SendAsync("ReceiveLadderNotification", new
+                    {
+                        type = request.Type,
+                        title = title,
+                        message = request.Message,
+                        ladderId = request.RelatedItemId,
+                        timestamp = request.Timestamp ?? DateTime.UtcNow,
+                        source = request.Source
+                    });
+                }
+
+                _logger.LogInformation($"Successfully sent {request.Type} notification to user {request.UserId}");
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending generic notification");
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
         }
@@ -125,19 +205,25 @@ namespace TennisMatchmakingSite2.Controllers
                     timestamp = DateTime.UtcNow
                 };
 
-                // Send to ALL clients for testing
-                await _hubContext.Clients.All.SendAsync("ReceiveFriendRequest", notification);
-
-                // Also try via general notification
+                // Send via the general notification channel
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", new
                 {
-                    type = "Test",
-                    message = "This is a test notification via ReceiveNotification",
-                    timestamp = DateTime.UtcNow
+                    type = "test",
+                    title = "Test Notification",
+                    message = "This is a test notification",
+                    timestamp = DateTime.UtcNow,
+                    data = notification
                 });
 
                 // Also try group
-                await _hubContext.Clients.Group($"user_{userId}").SendAsync("ReceiveFriendRequest", notification);
+                await _hubContext.Clients.Group($"user_{userId}").SendAsync("ReceiveNotification", new
+                {
+                    type = "test",
+                    title = "Test Notification (Group)",
+                    message = $"This is a test notification sent to your user group",
+                    timestamp = DateTime.UtcNow,
+                    data = notification
+                });
 
                 return Ok(new
                 {
@@ -204,6 +290,29 @@ namespace TennisMatchmakingSite2.Controllers
                 "
             });
         }
+
+        // Helper method to generate notification titles based on type
+        private string GetTitleFromType(string type)
+        {
+            return type switch
+            {
+                "friend_request" => "Friend Request",
+                "friend_accepted" => "Friend Request Accepted",
+                "friend_rejected" => "Friend Request Declined",
+                "message" => "New Message",
+                "match_invite" => "Match Invitation",
+                "match_edited" => "Match Updated",
+                "match_deleted" => "Match Cancelled",
+                "match_joined" => "Player Joined Match",
+                "match_request" => "Match Join Request",
+                "tournament_invite" => "Tournament Invitation",
+                "tournament_match_scheduled" => "Tournament Match Scheduled",
+                "tournament_match_result" => "Tournament Match Result",
+                "tournament_completed" => "Tournament Completed",
+                "ladder_challenge" => "Ladder Challenge",
+                _ => "Notification"
+            };
+        }
     }
 
     public class MessageNotificationRequest
@@ -223,6 +332,23 @@ namespace TennisMatchmakingSite2.Controllers
         public string SenderName { get; set; }
         public string FriendshipId { get; set; }
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    }
+
+    public class GenericNotificationRequest
+    {
+        public string UserId { get; set; }
+        public string Type { get; set; }
+        public string Message { get; set; }
+        public string RelatedItemId { get; set; }
+        public SourceInfo Source { get; set; }
+        public Dictionary<string, string> Metadata { get; set; }
+        public DateTime? Timestamp { get; set; }
+    }
+
+    public class SourceInfo
+    {
+        public string UserId { get; set; }
+        public string Name { get; set; }
     }
 
     public class RefreshNotificationRequest

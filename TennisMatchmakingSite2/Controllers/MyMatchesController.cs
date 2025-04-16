@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
 using System.Linq;
+using TennisMatchmakingSite2.Services;
 
 namespace TennisMatchmakingSite2.Controllers
 {
@@ -14,11 +15,16 @@ namespace TennisMatchmakingSite2.Controllers
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
         private readonly ILogger<MyMatchesController> _logger;
+        private readonly NotificationService _notificationService;
 
-        public MyMatchesController(IConfiguration configuration, ILogger<MyMatchesController> logger)
+        public MyMatchesController(
+            IConfiguration configuration,
+            ILogger<MyMatchesController> logger,
+            NotificationService notificationService) // Add NotificationService dependency
         {
             _configuration = configuration;
             _logger = logger;
+            _notificationService = notificationService;
             _httpClient = new HttpClient
             {
                 BaseAddress = new Uri(_configuration["ApiBaseUrl"] ?? throw new InvalidOperationException("ApiBaseUrl not configured"))
@@ -149,6 +155,9 @@ namespace TennisMatchmakingSite2.Controllers
             try
             {
                 var token = HttpContext.Session.GetString("JWTToken");
+                var submitterUserId = HttpContext.Session.GetString("UserId");
+                var submitterName = HttpContext.Session.GetString("UserName");
+
                 if (string.IsNullOrEmpty(token))
                 {
                     return RedirectToAction("Login", "Account");
@@ -161,6 +170,40 @@ namespace TennisMatchmakingSite2.Controllers
                     TempData["ErrorMessage"] = "Tournament ID is missing. Cannot submit result.";
                     return RedirectToAction(nameof(Index));
                 }
+
+                _logger.LogInformation("SubmitTournamentResult called - TournamentId: {TournamentId}, MatchId: {MatchId}, Winner: {Winner}, SubmitterUserId: {SubmitterUserId}",
+                    tournamentId, matchId, winner, submitterUserId);
+
+                // Get tournament details to identify players
+                var tournament = await FetchDataFromApi<TournamentDetailData>($"tournaments/{tournamentId}", token);
+                if (tournament == null)
+                {
+                    TempData["ErrorMessage"] = "Tournament details could not be loaded";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Get match details
+                var matchDetails = tournament.Matches?.FirstOrDefault(m => m.Id == matchId);
+                if (matchDetails == null)
+                {
+                    TempData["ErrorMessage"] = "Match not found";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Get player IDs and names for notifications
+                var player1Id = matchDetails.Player1;
+                var player2Id = matchDetails.Player2;
+                var player1Details = tournament.PlayerDetails?.FirstOrDefault(p => p.Id == player1Id);
+                var player2Details = tournament.PlayerDetails?.FirstOrDefault(p => p.Id == player2Id);
+                var player1Name = player1Details?.Name ?? "Opponent";
+                var player2Name = player2Details?.Name ?? "Opponent";
+
+                // Determine the opponent
+                string opponentId = submitterUserId == player1Id ? player2Id : player1Id;
+                string opponentName = submitterUserId == player1Id ? player2Name : player1Name;
+
+                _logger.LogInformation("Determined opponent - OpponentId: {OpponentId}, OpponentName: {OpponentName}",
+                    opponentId, opponentName);
 
                 // Submit to the tournament endpoint with proper URL format
                 var request = new HttpRequestMessage(HttpMethod.Post, $"tournaments/{tournamentId}/matches/{matchId}/result");
@@ -187,7 +230,97 @@ namespace TennisMatchmakingSite2.Controllers
                 }
                 else
                 {
-                    TempData["SuccessMessage"] = "Match result submitted successfully";
+                    // Check if match is finalized
+                    bool isMatchFinalized = false;
+                    try
+                    {
+                        using (JsonDocument document = JsonDocument.Parse(responseContent))
+                        {
+                            if (document.RootElement.TryGetProperty("status", out JsonElement statusElement) &&
+                                (statusElement.GetString() == "completed" || statusElement.GetString() == "confirmed"))
+                            {
+                                isMatchFinalized = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error parsing match status from response");
+                    }
+
+                    _logger.LogInformation("Match status determined - IsFinalized: {IsFinalized}", isMatchFinalized);
+
+                    // If the match is not yet finalized, notify the opponent to submit their result too
+                    if (!isMatchFinalized && !string.IsNullOrEmpty(opponentId))
+                    {
+                        // Use the specialized notification method for tournament match submissions
+                        var notificationSent = await _notificationService.SendTournamentMatchSubmissionNotification(
+                            opponentId,
+                            submitterName,
+                            tournamentId,
+                            tournament.Name,
+                            matchId
+                        );
+
+                        if (notificationSent)
+                        {
+                            _logger.LogInformation("Notification sent successfully to opponent {OpponentId}", opponentId);
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to send notification to opponent {OpponentId}", opponentId);
+                        }
+                    }
+
+                    // If match is finalized, notify both players and tournament participants
+                    if (isMatchFinalized)
+                    {
+                        _logger.LogInformation("Match is finalized. Notifying participants.");
+
+                        // Format scores for display (e.g., "6-4, 7-5")
+                        string scoreDisplay = string.Join(", ", Scores.Select(s => $"{s.Player1}-{s.Player2}"));
+
+                        // Get winner details
+                        string winnerName = winner == player1Id ? player1Name : player2Name;
+                        string loserName = winner == player1Id ? player2Name : player1Name;
+
+                        // Notify opponent about match result
+                        if (opponentId != submitterUserId)
+                        {
+                            await _notificationService.SendTournamentMatchResultNotification(
+                                opponentId,
+                                submitterUserId == player1Id ? player1Name : player2Name,
+                                winner == opponentId,
+                                tournamentId,
+                                tournament.Name,
+                                matchId
+                            );
+                        }
+
+                        // Notify all tournament participants about the result
+                        if (tournament.Players != null)
+                        {
+                            foreach (var playerId in tournament.Players)
+                            {
+                                // Skip the players who were in the match
+                                if (playerId == player1Id || playerId == player2Id)
+                                    continue;
+
+                                await _notificationService.CreateNotificationAsync(
+                                    playerId,
+                                    "tournament_match_completed",
+                                    $"{winnerName} defeated {loserName} ({scoreDisplay}) in tournament \"{tournament.Name}\"",
+                                    matchId,
+                                    null,
+                                    new Dictionary<string, string> { { "tournamentId", tournamentId } }
+                                );
+                            }
+                        }
+                    }
+
+                    TempData["SuccessMessage"] = isMatchFinalized
+                        ? "Match result finalized successfully"
+                        : "Match result submitted successfully. Waiting for opponent to confirm.";
                 }
 
                 return RedirectToAction(nameof(Index));
@@ -206,6 +339,9 @@ namespace TennisMatchmakingSite2.Controllers
             try
             {
                 var token = HttpContext.Session.GetString("JWTToken");
+                var submitterUserId = HttpContext.Session.GetString("UserId");
+                var submitterName = HttpContext.Session.GetString("UserName");
+
                 if (string.IsNullOrEmpty(token))
                 {
                     return RedirectToAction("Login", "Account");
@@ -218,6 +354,43 @@ namespace TennisMatchmakingSite2.Controllers
                     TempData["ErrorMessage"] = "Ladder ID is missing. Cannot submit result.";
                     return RedirectToAction(nameof(Index));
                 }
+
+                _logger.LogInformation("SubmitLadderResult called - LadderId: {LadderId}, MatchId: {MatchId}, Winner: {Winner}, SubmitterUserId: {SubmitterUserId}",
+                    ladderId, matchId, winner, submitterUserId);
+
+                // Get ladder details
+                var ladder = await FetchDataFromApi<LadderDetailData>($"ladders/{ladderId}", token);
+                if (ladder == null)
+                {
+                    TempData["ErrorMessage"] = "Ladder details could not be loaded";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Get match details
+                var matchDetails = ladder.Matches?.FirstOrDefault(m => m.Id == matchId);
+                if (matchDetails == null)
+                {
+                    TempData["ErrorMessage"] = "Match not found";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Get player IDs and determine opponent
+                var challengerId = matchDetails.ChallengerId;
+                var challengeeId = matchDetails.ChallengeeId;
+
+                // Find player details
+                var challengerDetails = ladder.Positions.FirstOrDefault(p => p.PlayerId == challengerId)?.PlayerDetails;
+                var challengeeDetails = ladder.Positions.FirstOrDefault(p => p.PlayerId == challengeeId)?.PlayerDetails;
+
+                var challengerName = challengerDetails?.Name ?? "Challenger";
+                var challengeeName = challengeeDetails?.Name ?? "Opponent";
+
+                // Determine opponent based on submitter
+                string opponentId = submitterUserId == challengerId ? challengeeId : challengerId;
+                string opponentName = submitterUserId == challengerId ? challengeeName : challengerName;
+
+                _logger.LogInformation("Determined opponent - OpponentId: {OpponentId}, OpponentName: {OpponentName}",
+                    opponentId, opponentName);
 
                 // Submit to the ladder endpoint with proper URL format
                 var request = new HttpRequestMessage(HttpMethod.Post, $"ladders/{ladderId}/matches/{matchId}/result");
@@ -244,7 +417,99 @@ namespace TennisMatchmakingSite2.Controllers
                 }
                 else
                 {
-                    TempData["SuccessMessage"] = "Match result submitted successfully";
+                    // Check if match is now finalized
+                    bool isMatchFinalized = false;
+                    try
+                    {
+                        using (JsonDocument document = JsonDocument.Parse(responseContent))
+                        {
+                            if (document.RootElement.TryGetProperty("status", out JsonElement statusElement) &&
+                                (statusElement.GetString() == "completed" || statusElement.GetString() == "confirmed"))
+                            {
+                                isMatchFinalized = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error parsing match status from response");
+                    }
+
+                    _logger.LogInformation("Match status determined - IsFinalized: {IsFinalized}", isMatchFinalized);
+
+                    // If this is the first submission (not yet finalized), notify the opponent
+                    if (!isMatchFinalized && !string.IsNullOrEmpty(opponentId))
+                    {
+                        // Use the specialized LadderChallengeResultNotification method 
+                        // (since ladder doesn't have a dedicated match submission notification)
+                        var notificationSent = await _notificationService.SendLadderChallengeResultNotification(
+                            opponentId,
+                            submitterName,
+                            false, // Since this is a submission not a result
+                            ladderId,
+                            ladder.Name,
+                            matchId
+                        );
+
+                        if (notificationSent)
+                        {
+                            _logger.LogInformation("Notification sent successfully to opponent {OpponentId}", opponentId);
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to send notification to opponent {OpponentId}", opponentId);
+                        }
+                    }
+
+                    // If match is finalized, notify players about the result
+                    if (isMatchFinalized)
+                    {
+                        _logger.LogInformation("Match is finalized. Notifying participants.");
+
+                        // Notify opponent about match result
+                        if (opponentId != submitterUserId)
+                        {
+                            await _notificationService.SendLadderChallengeResultNotification(
+                                opponentId,
+                                submitterUserId == challengerId ? challengerName : challengeeName,
+                                winner == opponentId,
+                                ladderId,
+                                ladder.Name,
+                                matchId
+                            );
+                        }
+
+                        // Store pre-match positions to check for changes later
+                        var preMatchPositions = ladder.Positions.ToDictionary(p => p.PlayerId, p => p.Rank);
+
+                        // Get updated ladder to check position changes
+                        var updatedLadder = await FetchDataFromApi<LadderDetailData>($"ladders/{ladderId}", token);
+
+                        if (updatedLadder != null)
+                        {
+                            var updatedPositions = updatedLadder.Positions.ToDictionary(p => p.PlayerId, p => p.Rank);
+
+                            // Notify players of position changes
+                            foreach (var position in updatedPositions)
+                            {
+                                if (preMatchPositions.TryGetValue(position.Key, out int oldRank) &&
+                                    position.Value != oldRank)
+                                {
+                                    await _notificationService.SendLadderPositionChangeNotification(
+                                        position.Key,
+                                        ladderId,
+                                        ladder.Name,
+                                        oldRank,
+                                        position.Value
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    TempData["SuccessMessage"] = isMatchFinalized
+                        ? "Match result finalized successfully"
+                        : "Match result submitted successfully. Waiting for opponent to confirm.";
                 }
 
                 return RedirectToAction(nameof(Index));
@@ -316,93 +581,25 @@ namespace TennisMatchmakingSite2.Controllers
                     // Continue with regular submission
                 }
 
-                // Now submit the result normally, but with isResubmission=true
-                // Determine the correct endpoint based on type
-                string endpoint;
+                // Based on type, redirect to the appropriate submission method
                 if (type.ToLower() == "tournament")
                 {
-                    endpoint = $"tournaments/{id}/matches/{matchId}/result";
+                    return await SubmitTournamentResult(id, matchId, winner, Scores);
+                }
+                else if (type.ToLower() == "ladder")
+                {
+                    return await SubmitLadderResult(id, matchId, winner, Scores);
                 }
                 else
                 {
-                    endpoint = $"ladders/{id}/matches/{matchId}/result";
+                    TempData["ErrorMessage"] = "Invalid competition type";
+                    return RedirectToAction(nameof(Index));
                 }
-
-                var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var requestBody = new
-                {
-                    winner = winner,
-                    scores = Scores.Select(s => new { player1 = s.Player1, player2 = s.Player2 }).ToList(),
-                    isResubmission = true // Explicitly mark as resubmission
-                };
-
-                var jsonContent = JsonSerializer.Serialize(requestBody);
-                _logger.LogInformation("Request body: {RequestBody}", jsonContent);
-
-                request.Content = JsonContent.Create(requestBody);
-
-                // Send the API request
-                var response = await _httpClient.SendAsync(request);
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation("Resubmission response: {StatusCode}, Content: {Content}",
-                    response.StatusCode, responseContent);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    // If we get the "already submitted" error, try directly modifying the match state
-                    if (responseContent.Contains("already submitted"))
-                    {
-                        // Try a workaround using a different API call pattern
-                        var alternateEndpoint = "";
-
-                        if (type.ToLower() == "tournament")
-                        {
-                            alternateEndpoint = $"tournaments/{id}/force-resubmit/{matchId}";
-                        }
-                        else
-                        {
-                            alternateEndpoint = $"ladders/{id}/force-resubmit/{matchId}";
-                        }
-
-                        var alternateRequest = new HttpRequestMessage(HttpMethod.Post, alternateEndpoint);
-                        alternateRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                        alternateRequest.Content = JsonContent.Create(requestBody);
-
-                        var alternateResponse = await _httpClient.SendAsync(alternateRequest);
-                        var alternateContent = await alternateResponse.Content.ReadAsStringAsync();
-
-                        _logger.LogInformation("Alternate submission response: {StatusCode}, Content: {Content}",
-                            alternateResponse.StatusCode, alternateContent);
-
-                        if (alternateResponse.IsSuccessStatusCode)
-                        {
-                            TempData["SuccessMessage"] = "Match result resubmitted successfully (alternate method)";
-                            return RedirectToAction(nameof(Index));
-                        }
-                        else
-                        {
-                            TempData["ErrorMessage"] = "Failed to resubmit match result. Please contact support or try again.";
-                        }
-                    }
-                    else
-                    {
-                        TempData["ErrorMessage"] = $"Failed to resubmit match result: {responseContent}";
-                    }
-                }
-                else
-                {
-                    TempData["SuccessMessage"] = "Match result resubmitted successfully";
-                }
-
-                return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error resubmitting match result");
-                TempData["ErrorMessage"] = $"An error occurred while resubmitting the match result: {ex.Message}";
+                _logger.LogError(ex, "Error resubmitting disputed result");
+                TempData["ErrorMessage"] = "An error occurred while resubmitting the match result";
                 return RedirectToAction(nameof(Index));
             }
         }
@@ -454,6 +651,53 @@ namespace TennisMatchmakingSite2.Controllers
                 _logger.LogError(ex, "Error responding to ladder challenge");
                 TempData["ErrorMessage"] = "An error occurred while responding to the challenge";
                 return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // Helper method to fetch data from API
+        private async Task<T> FetchDataFromApi<T>(string endpoint, string token) where T : class
+        {
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Process the response content based on the expected type
+                    if (typeof(T) == typeof(TournamentDetailData))
+                    {
+                        var wrapper = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                        if (wrapper != null && wrapper.TryGetValue("tournament", out var tournament))
+                        {
+                            var json = System.Text.Json.JsonSerializer.Serialize(tournament);
+                            return System.Text.Json.JsonSerializer.Deserialize<T>(json);
+                        }
+                    }
+                    else if (typeof(T) == typeof(LadderDetailData))
+                    {
+                        var wrapper = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                        if (wrapper != null && wrapper.TryGetValue("ladder", out var ladder))
+                        {
+                            var json = System.Text.Json.JsonSerializer.Serialize(ladder);
+                            return System.Text.Json.JsonSerializer.Deserialize<T>(json);
+                        }
+                    }
+
+                    // Direct deserialization fallback
+                    return await response.Content.ReadFromJsonAsync<T>();
+                }
+
+                _logger.LogWarning("API request failed: {StatusCode} {ReasonPhrase}",
+                    response.StatusCode, response.ReasonPhrase);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching data from API endpoint {Endpoint}", endpoint);
+                return null;
             }
         }
     }

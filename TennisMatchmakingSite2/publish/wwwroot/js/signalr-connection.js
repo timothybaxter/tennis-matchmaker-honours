@@ -1,23 +1,4 @@
-// signalr-connection.js - Enhanced logging version with fixed variable references
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/tennisMatchmakerHub")
-    .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry with backoff
-    .configureLogging(signalR.LogLevel.Information)
-    .build();
 
-// Connection state
-let isConnected = false;
-let notificationCount = 0;
-let originalTitle = document.title;
-
-// Add a global window function to display notifications (for testing)
-window.displayTestNotification = function (title, message) {
-    console.log("Test notification triggered:", title, message);
-    showToast(title, message);
-    return "Toast displayed";
-};
-
-// Helper function to safely get the current user ID
 function getCurrentUserId() {
     // Try to get it from window
     if (window.currentUserId) {
@@ -34,322 +15,203 @@ function getCurrentUserId() {
     return sessionStorage.getItem('userId');
 }
 
-// Start the connection
-async function startConnection() {
-    try {
-        if (connection.state === signalR.HubConnectionState.Disconnected) {
-            console.log("Attempting to establish SignalR connection...");
-            await connection.start();
-            console.log("SignalR Connected successfully.");
-            isConnected = true;
+// Build the connection with explicit querystring for user identification
+const userId = getCurrentUserId() || sessionStorage.getItem('userId') || '';
+const connectionUrl = '/tennisMatchmakerHub' + (userId ? `?userId=${userId}` : '');
 
-            // Update connection status indicator if it exists
-            const statusElement = document.getElementById("connection-status");
-            if (statusElement) {
-                statusElement.textContent = "Connected";
-                statusElement.className = "text-green-500";
+const connection = new signalR.HubConnectionBuilder()
+    .withUrl(connectionUrl, {
+        // Add logging query parameter
+        withCredentials: true, // Use credentials (cookies/session)
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling, // Try WebSockets first, fallback to long polling
+        skipNegotiation: false, // Don't skip negotiation
+        accessTokenFactory: () => {
+            // Try to get JWT token for authorization
+            const token = sessionStorage.getItem('JWTToken');
+            if (token) {
+                console.log("Using token from session storage for SignalR connection");
+                return token;
             }
-
-            // Log registered handlers
-            console.log("Connection has these handlers registered:",
-                "ReceiveMessage", "MessageSent", "MessageFailed",
-                "ReceiveFriendRequest", "FriendRequestSent", "FriendRequestFailed",
-                "ReceiveMatchInvite", "ReceiveNotification");
+            return null;
         }
-    } catch (err) {
-        console.error("SignalR Connection failed: ", err);
-        isConnected = false;
+    })
+    .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry with backoff
+    .configureLogging(signalR.LogLevel.Information)
+    .build();
 
-        // Update connection status indicator if it exists
-        const statusElement = document.getElementById("connection-status");
-        if (statusElement) {
-            statusElement.textContent = "Disconnected";
-            statusElement.className = "text-red-500";
+// Connection state
+let isConnected = false;
+let connectionStartPromise = null;
+let isConnecting = false;
+let connectionStatus = "disconnected"; // disconnected, connecting, connected, reconnecting
+
+// Add a global window function to display notifications (for testing)
+window.displayTestNotification = function (title, message) {
+    console.log("Test notification triggered:", title, message);
+    if (typeof window.showToast === 'function') {
+        window.showToast(title, message);
+    } else {
+        alert(`${title}: ${message}`);
+    }
+    return "Toast displayed";
+};
+
+// Improved connection function with promise caching
+async function startConnection() {
+    // If already connecting, return the existing promise
+    if (isConnecting && connectionStartPromise) {
+        console.log("Connection already in progress, reusing promise");
+        return connectionStartPromise;
+    }
+
+    // If already connected, just return a resolved promise
+    if (connection.state === signalR.HubConnectionState.Connected) {
+        console.log("Connection already established");
+        connectionStatus = "connected";
+        updateConnectionStatus("Connected", "text-green-500");
+        return Promise.resolve();
+    }
+
+    // Start a new connection attempt
+    isConnecting = true;
+    connectionStatus = "connecting";
+    console.log("Starting new connection attempt...");
+    updateConnectionStatus("Connecting...", "text-yellow-500");
+
+    // Create a new promise to track this connection attempt
+    connectionStartPromise = new Promise((resolve, reject) => {
+        connection.start()
+            .then(() => {
+                console.log("SignalR Connected successfully!");
+                isConnected = true;
+                connectionStatus = "connected";
+                updateConnectionStatus("Connected", "text-green-500");
+
+                // Add user to their user group for more reliable targeting
+                const userId = getCurrentUserId();
+                if (userId) {
+                    console.log(`Joining user group: user_${userId}`);
+                    // No direct way to add to group from client, but the hub will handle this
+                }
+
+                isConnecting = false;
+                resolve();
+            })
+            .catch(err => {
+                console.error("SignalR Connection failed: ", err);
+                isConnected = false;
+                connectionStatus = "disconnected";
+                updateConnectionStatus("Disconnected", "text-red-500");
+                isConnecting = false;
+                reject(err);
+
+                // Schedule reconnect
+                setTimeout(() => {
+                    connectionStartPromise = null; // Clear the failed promise
+                    console.log("Attempting reconnection after failure...");
+                    startConnection();
+                }, 5000);
+            });
+    });
+
+    return connectionStartPromise;
+}
+
+// Helper function to update the connection status UI
+function updateConnectionStatus(text, className) {
+    const statusElement = document.getElementById("connection-status");
+    if (statusElement) {
+        statusElement.textContent = text;
+
+        // Remove all color classes and add the new one
+        statusElement.className = className;
+    }
+
+    // Also update the tooltip/hover text for more detail
+    const indicatorElement = document.getElementById("connection-status-indicator");
+    if (indicatorElement) {
+        if (connection.connectionId) {
+            indicatorElement.title = `Connected (ID: ${connection.connectionId})`;
+        } else {
+            indicatorElement.title = `${text} - Last attempt: ${new Date().toLocaleTimeString()}`;
         }
-
-        // Try to reconnect in 5 seconds
-        setTimeout(startConnection, 5000);
     }
 }
 
 // Connection event handlers
-connection.onclose(async () => {
-    console.log("SignalR Connection closed.");
+connection.onclose(async error => {
+    console.log("SignalR Connection closed:", error);
     isConnected = false;
+    connectionStatus = "disconnected";
+    updateConnectionStatus("Disconnected", "text-red-500");
 
-    // Update connection status indicator if it exists
-    const statusElement = document.getElementById("connection-status");
-    if (statusElement) {
-        statusElement.textContent = "Disconnected";
-        statusElement.className = "text-red-500";
+    // Log detailed diagnostics
+    console.log("Close reason:", error?.message || "Unknown");
+    console.log("Connection state at close:", connection.state);
+    console.log("Connection ID at close:", connection.connectionId || "None");
+
+    // Update UI indicators
+    if (document.getElementById('debug-last-event')) {
+        document.getElementById('debug-last-event').textContent = `Connection closed: ${error?.message || 'Unknown reason'}`;
     }
 
-    await startConnection();
+    // Schedule restart after a short delay
+    console.log("Scheduling connection restart after closure...");
+    setTimeout(() => {
+        connectionStartPromise = null; // Clear any existing promises
+        console.log("Attempting to restart connection after closure...");
+        startConnection().catch(err => {
+            console.error("Failed to restart connection after closure:", err);
+        });
+    }, 3000);
 });
 
 connection.onreconnecting(error => {
     console.log("SignalR Connection reconnecting:", error);
     isConnected = false;
+    connectionStatus = "reconnecting";
+    updateConnectionStatus("Reconnecting...", "text-yellow-500");
 
-    // Update connection status indicator if it exists
-    const statusElement = document.getElementById("connection-status");
-    if (statusElement) {
-        statusElement.textContent = "Reconnecting...";
-        statusElement.className = "text-yellow-500";
+    // Log detailed info
+    console.log(`Connection state: ${connection.state}`);
+    console.log(`Connection ID: ${connection.connectionId || 'None'}`);
+    console.log(`Last error: ${error?.message || 'Unknown'}`);
+
+    // Update any UI indicators
+    if (document.getElementById('debug-last-event')) {
+        document.getElementById('debug-last-event').textContent = `Reconnecting: ${error?.message}`;
     }
 });
 
 connection.onreconnected(connectionId => {
     console.log("SignalR Connection reconnected with ID:", connectionId);
     isConnected = true;
+    connectionStatus = "connected";
+    updateConnectionStatus("Connected", "text-green-500");
 
-    // Update connection status indicator if it exists
-    const statusElement = document.getElementById("connection-status");
-    if (statusElement) {
-        statusElement.textContent = "Connected";
-        statusElement.className = "text-green-500";
-    }
-});
-
-// Handle incoming messages
-connection.on("ReceiveMessage", (message) => {
-    console.log("RECEIVED MESSAGE:", message);
-
-    // Update UI if in conversation view
-    const messagesContainer = document.getElementById("messagesContainer");
-    const conversationId = document.querySelector('input[name="conversationId"]')?.value;
-
-    if (messagesContainer && message.conversationId === conversationId) {
-        // Add message to conversation
-        const userId = getCurrentUserId();
-        const isCurrentUser = message.senderId === userId;
-
-        const messageDiv = document.createElement("div");
-        messageDiv.className = `flex ${isCurrentUser ? "justify-end" : "justify-start"} mb-3`;
-
-        messageDiv.innerHTML = `
-            <div class="max-w-xs sm:max-w-md ${isCurrentUser ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"} p-3 rounded-lg">
-                <div class="text-sm font-medium">
-                    ${isCurrentUser ? "You" : (message.senderName || "User")}
-                </div>
-                <div class="mt-1">${message.content}</div>
-                <div class="text-xs text-gray-500 mt-1 text-right">
-                    ${new Date(message.timestamp).toLocaleString()}
-                </div>
-            </div>
-        `;
-
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    } else {
-        // Show notification for new message
-        showToast("New Message", `${message.senderName} sent you a message`);
-        updateNotificationBadge();
-        updateTitleNotification();
+    // Force joining the user group again
+    const userId = getCurrentUserId();
+    if (userId) {
+        connection.invoke("JoinUserGroup", userId)
+            .then(() => console.log(`Rejoined user group user_${userId} after reconnection`))
+            .catch(err => console.error(`Error rejoining user group: ${err.message}`));
     }
 
-    // Play notification sound
-    playNotificationSound();
-});
-
-// Message status handlers
-connection.on("MessageSent", (message) => {
-    console.log("MESSAGE SENT SUCCESSFULLY:", message);
-});
-
-connection.on("MessageFailed", (error) => {
-    console.error("MESSAGE FAILED:", error);
-});
-
-// Friend request handlers
-connection.on("ReceiveFriendRequest", (request) => {
-    console.log("FRIEND REQUEST RECEIVED:", request);
-
-    try {
-        // Show notification
-        showToast("Friend Request", `${request.senderName || 'Someone'} sent you a friend request`);
-        updateNotificationBadge();
-        updateTitleNotification();
-        playNotificationSound();
-
-        // If on friend requests page, update the UI
-        const requestsContainer = document.querySelector('.space-y-4');
-        if (requestsContainer && window.location.href.includes("/Social/FriendRequests")) {
-            // Refresh the page to show new request
-            window.location.reload();
-        }
-
-        console.log("Friend request notification displayed successfully");
-    } catch (error) {
-        console.error("Error displaying friend request notification:", error);
+    // Update any UI indicators
+    if (document.getElementById('debug-last-event')) {
+        document.getElementById('debug-last-event').textContent = `Reconnected: ${new Date().toLocaleTimeString()}`;
     }
 });
-
-connection.on("FriendRequestSent", (request) => {
-    console.log("FRIEND REQUEST SENT:", request);
-});
-
-connection.on("FriendRequestFailed", (error) => {
-    console.error("FRIEND REQUEST FAILED:", error);
-});
-
-// Match invite handlers
-connection.on("ReceiveMatchInvite", (invite) => {
-    console.log("MATCH INVITE RECEIVED:", invite);
-
-    // Show notification
-    showToast("Match Invitation", `${invite.senderName} invited you to a match`);
-    updateNotificationBadge();
-    updateTitleNotification();
-    playNotificationSound();
-});
-
-// General notification handler
-connection.on("ReceiveNotification", (notification) => {
-    console.log("NOTIFICATION RECEIVED:", notification);
-
-    // Show notification based on type
-    showToast(notification.type || "Notification", notification.message || "You have a new notification");
-    updateNotificationBadge();
-    updateTitleNotification();
-    playNotificationSound();
-});
-
-// User online/offline status
-connection.on("UserOnline", (userId) => {
-    console.log("User online:", userId);
-    // Update UI to show user is online
-    updateFriendStatus(userId, true);
-});
-
-connection.on("UserOffline", (userId) => {
-    console.log("User offline:", userId);
-    // Update UI to show user is offline
-    updateFriendStatus(userId, false);
-});
-
-// Method to refresh notifications
-connection.on("RefreshNotifications", () => {
-    console.log("REFRESHING NOTIFICATIONS");
-    // Reload notifications page if we're on it
-    if (window.location.href.includes("/Social/Index")) {
-        window.location.reload();
-    }
-});
-
-// Helper functions
-function updateFriendStatus(userId, isOnline) {
-    const friendElements = document.querySelectorAll(`[data-friend-id="${userId}"]`);
-    friendElements.forEach(element => {
-        const statusIndicator = element.querySelector(".status-indicator");
-        if (statusIndicator) {
-            statusIndicator.className = `status-indicator w-3 h-3 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`;
-            statusIndicator.title = isOnline ? "Online" : "Offline";
-        }
-    });
-}
-
-function updateTitleNotification() {
-    // Only update if not in active tab
-    if (!document.hasFocus()) {
-        notificationCount++;
-        document.title = `(${notificationCount}) ${originalTitle}`;
-    }
-}
-
-// Reset notification count when tab becomes active
-window.addEventListener('focus', () => {
-    notificationCount = 0;
-    document.title = originalTitle;
-});
-
-function playNotificationSound() {
-    const audio = document.getElementById("notification-sound");
-    if (audio) {
-        audio.play().catch(err => {
-            console.log('Could not play notification sound:', err);
-        });
-    }
-}
-
-function updateNotificationBadge() {
-    const notificationBadge = document.getElementById("notification-badge");
-    if (notificationBadge) {
-        // Get current count or default to 0
-        const currentCount = parseInt(notificationBadge.textContent || '0');
-        // Increment and update
-        notificationBadge.textContent = currentCount + 1;
-        notificationBadge.classList.remove("hidden");
-    }
-}
-
-// Toast notification function
-function showToast(title, message) {
-    console.log("Showing toast:", title, message);
-
-    // Create container if it doesn't exist
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs';
-        document.body.appendChild(toastContainer);
-        console.log("Created toast container");
-    }
-
-    // Create toast
-    const toast = document.createElement('div');
-    toast.className = 'bg-white rounded-lg shadow-lg border border-gray-200 p-3';
-    toast.style.transform = 'translateX(0)'; // Override the transform initially
-    toast.innerHTML = `
-        <div class="flex items-start">
-            <div class="flex-shrink-0 text-green-500 mr-2">
-                <i class="fas fa-bell"></i>
-            </div>
-            <div class="flex-1">
-                <div class="font-medium">${title}</div>
-                <div class="text-sm text-gray-600">${message}</div>
-            </div>
-            <button class="ml-2 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `;
-
-    // Add to container
-    toastContainer.appendChild(toast);
-    console.log("Toast appended to container");
-
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-            console.log("Toast auto-removed after timeout");
-        }
-    }, 5000);
-}
 
 // Start connection when the document is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Save original title
-    originalTitle = document.title;
     console.log("Document ready, initializing SignalR connection...");
     console.log("Current user ID:", getCurrentUserId());
 
-    // Check if the showToast function is accessible
-    if (typeof showToast === 'function') {
-        console.log("showToast function is accessible");
-        // Try displaying a test toast on page load
-        setTimeout(() => {
-            showToast("Page Load Test", "This is a test notification on page load");
-            console.log("Page load test toast triggered");
-        }, 2000);
-    } else {
-        console.error("showToast function is NOT accessible");
-    }
-
     // Start connection
-    startConnection();
+    startConnection().catch(err => {
+        console.error("Initial connection attempt failed:", err);
+    });
 
     // Add notification sound if not already present
     if (!document.getElementById('notification-sound')) {
@@ -361,13 +223,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Global functions for message sending with enhanced logging
+// Global functions for message sending
 window.sendDirectMessage = async (recipientId, message, conversationId) => {
     try {
         console.log("SENDING DIRECT MESSAGE:", { recipientId, message, conversationId });
 
-        if (!isConnected) {
-            console.log("Connection not established, reconnecting...");
+        if (connection.state !== signalR.HubConnectionState.Connected) {
+            console.log("Connection not established, connecting...");
             await startConnection();
         }
 
@@ -389,8 +251,8 @@ window.sendFriendRequest = async (recipientId) => {
     try {
         console.log("SENDING FRIEND REQUEST to:", recipientId);
 
-        if (!isConnected) {
-            console.log("Connection not established, reconnecting...");
+        if (connection.state !== signalR.HubConnectionState.Connected) {
+            console.log("Connection not established, connecting...");
             await startConnection();
         }
 
@@ -412,8 +274,8 @@ window.sendMatchInvite = async (recipientId, matchId) => {
     try {
         console.log("SENDING MATCH INVITE:", { recipientId, matchId });
 
-        if (!isConnected) {
-            console.log("Connection not established, reconnecting...");
+        if (connection.state !== signalR.HubConnectionState.Connected) {
+            console.log("Connection not established, connecting...");
             await startConnection();
         }
 
@@ -432,25 +294,35 @@ window.sendMatchInvite = async (recipientId, matchId) => {
 };
 
 // Debug function to test the connection
-window.testSignalR = () => {
-    console.log("SignalR connection state:", connection.state);
-    console.log("Is connected (local variable):", isConnected);
-    console.log("Current user ID:", getCurrentUserId());
-
-    // Try displaying a test toast directly
-    showToast("Test Notification", "This is from the testSignalR function");
-    console.log("Test toast triggered from testSignalR");
-
+window.checkSignalRConnection = function () {
     return {
-        state: connection.state,
+        connectionState: connection.state,
+        statusText: connectionStatus,
         isConnected: isConnected,
         connectionId: connection.connectionId,
-        userId: getCurrentUserId()
+        userId: getCurrentUserId(),
+        reconnectAttempts: connection.reconnectRetryCount || 0,
+        serverTimeoutInMs: connection.serverTimeoutInMilliseconds,
+        lastMessageAt: connection.lastMessageAt || 'Never',
+        groups: [`user_${getCurrentUserId()}`]
     };
 };
 
 // Add a manual test function directly accessible from browser console
-window.testToast = () => {
-    showToast("Manual Test", "This is a manually triggered test notification");
-    return "Manual test toast triggered";
+window.testSignalRConnection = async function () {
+    try {
+        await startConnection();
+        console.log("SignalR connection test successful");
+        return {
+            success: true,
+            connectionId: connection.connectionId,
+            state: connection.state
+        };
+    } catch (error) {
+        console.error("SignalR connection test failed:", error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
 };

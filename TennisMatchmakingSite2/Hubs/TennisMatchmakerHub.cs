@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System;
+using System.Linq;
 
 namespace TennisMatchmakingSite2.Hubs
 {
@@ -20,8 +21,10 @@ namespace TennisMatchmakingSite2.Hubs
         {
             try
             {
-                string userId = Context.GetHttpContext().Session.GetString("UserId");
-                string userName = Context.GetHttpContext().Session.GetString("UserName");
+                // Get user ID from session
+                var httpContext = Context.GetHttpContext();
+                string userId = httpContext?.Session?.GetString("UserId");
+                string userName = httpContext?.Session?.GetString("UserName");
 
                 _logger.LogInformation($"SignalR connection attempt - User ID: {userId ?? "null"}, Name: {userName ?? "Unknown"}, Connection ID: {Context.ConnectionId}");
 
@@ -33,6 +36,7 @@ namespace TennisMatchmakingSite2.Hubs
 
                     // Add the user to their own user group for easier targeting
                     await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+                    _logger.LogInformation($"Added connection {Context.ConnectionId} to group user_{userId}");
 
                     // Notify friends that this user is online
                     await Clients.Others.SendAsync("UserOnline", userId);
@@ -40,6 +44,16 @@ namespace TennisMatchmakingSite2.Hubs
                 else
                 {
                     _logger.LogWarning($"Connection attempted without valid UserId in session. Connection ID: {Context.ConnectionId}");
+
+                    // Try to get user ID from query string (fallback for API connections)
+                    string queryUserId = httpContext?.Request.Query["userId"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(queryUserId))
+                    {
+                        _logger.LogInformation($"Using user ID from query string: {queryUserId}");
+                        _userConnections.TryAdd(queryUserId, Context.ConnectionId);
+                        await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{queryUserId}");
+                        _logger.LogInformation($"Added connection {Context.ConnectionId} to group user_{queryUserId}");
+                    }
                 }
 
                 await base.OnConnectedAsync();
@@ -67,6 +81,26 @@ namespace TennisMatchmakingSite2.Hubs
 
                     // Notify friends that this user is offline
                     await Clients.Others.SendAsync("UserOffline", userId);
+                }
+                else
+                {
+                    // Try to find the user ID from the connection dictionary
+                    var userIdEntry = _userConnections.FirstOrDefault(x => x.Value == Context.ConnectionId);
+                    if (!string.IsNullOrEmpty(userIdEntry.Key))
+                    {
+                        _userConnections.TryRemove(userIdEntry.Key, out _);
+                        _logger.LogInformation($"User {userIdEntry.Key} disconnected (found by connection ID). Connection ID: {Context.ConnectionId}");
+
+                        // Remove from user group
+                        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userIdEntry.Key}");
+
+                        // Notify friends that this user is offline
+                        await Clients.Others.SendAsync("UserOffline", userIdEntry.Key);
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"Unknown user disconnected. Connection ID: {Context.ConnectionId}");
+                    }
                 }
 
                 await base.OnDisconnectedAsync(exception);
@@ -346,6 +380,81 @@ namespace TennisMatchmakingSite2.Hubs
             }
         }
 
+        // Method for explicitly joining a user group (can be called by clients)
+        public async Task JoinUserGroup(string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("JoinUserGroup called with empty userId");
+                return;
+            }
+
+            try
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+                _logger.LogInformation($"Connection {Context.ConnectionId} explicitly joined group user_{userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error adding connection to group user_{userId}");
+            }
+        }
+
+        // Add a direct notification method for testing
+        public async Task SendTestNotification(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                {
+                    _logger.LogWarning("SendTestNotification called with empty userId");
+                    await Clients.Caller.SendAsync("TestFailed", new { error = "User ID is required" });
+                    return;
+                }
+
+                _logger.LogInformation($"Sending test notification to user {userId}");
+
+                // Create test notification
+                var notification = new
+                {
+                    type = "test",
+                    title = "Test Notification",
+                    message = $"This is a test notification sent at {DateTime.Now.ToLongTimeString()}",
+                    timestamp = DateTime.UtcNow
+                };
+
+                // Try all possible ways to reach the user
+                bool sentDirectly = false;
+                if (_userConnections.TryGetValue(userId, out string connectionId))
+                {
+                    await Clients.Client(connectionId).SendAsync("ReceiveNotification", notification);
+                    _logger.LogInformation($"Test notification sent directly to connection {connectionId}");
+                    sentDirectly = true;
+                }
+
+                // Also send to the user's group
+                await Clients.Group($"user_{userId}").SendAsync("ReceiveNotification", notification);
+                _logger.LogInformation($"Test notification sent to group user_{userId}");
+
+                // Notify the caller of success
+                var result = new
+                {
+                    success = true,
+                    sentDirectly = sentDirectly,
+                    sentToGroup = true,
+                    timestamp = DateTime.Now,
+                    userId = userId
+                };
+
+                await Clients.Caller.SendAsync("TestSucceeded", result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SendTestNotification");
+                await Clients.Caller.SendAsync("TestFailed", new { error = ex.Message });
+            }
+        }
+
         // Get online status of a user - for direct calls from controllers
         public bool IsUserOnline(string userId)
         {
@@ -360,6 +469,18 @@ namespace TennisMatchmakingSite2.Hubs
             var onlineUsers = new List<string>(_userConnections.Keys);
             _logger.LogInformation($"Getting online users list: {onlineUsers.Count} users online");
             return onlineUsers;
+        }
+
+        // Get all connection IDs - static method for use from controllers
+        public static List<string> GetAllConnectionIds()
+        {
+            return _userConnections.Values.ToList();
+        }
+
+        // Get all user connections - static method for use from controllers
+        public static Dictionary<string, string> GetAllUserConnections()
+        {
+            return new Dictionary<string, string>(_userConnections);
         }
 
         // Method to directly message a user from outside the hub (e.g., from a controller)

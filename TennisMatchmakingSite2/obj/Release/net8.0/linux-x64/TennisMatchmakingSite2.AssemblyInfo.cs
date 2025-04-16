@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5b8188e7d159e224a61d719ac6aff6dc6021524e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a5398c2303f608078abe21423d287add2aef67d1")]
 [assembly: System.Reflection.AssemblyProductAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TennisMatchmakingSite2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

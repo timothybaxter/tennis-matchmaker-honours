@@ -7,7 +7,10 @@
     <!-- Profile Settings Section -->
     <div class="max-w-2xl mx-auto mt-8">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 class="text-2xl font-bold mb-6">Profile Settings</h2>
+            <div class="page-heading-container">
+                <h2 class="text-2xl font-bold mb-6">Profile Settings</h2>
+            </div>
+
 
             @if (TempData["SuccessMessage"] != null)
             {
@@ -182,53 +185,69 @@
                 <div id="theme-section" class="accordion-content hidden mt-4">
                     @using (Html.BeginForm("UpdateTheme", "Settings", FormMethod.Post))
                     {
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2 mb-2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="col-span-1 md:col-span-2 mb-2">
                             <p class="text-sm text-gray-600 mb-4">Select a Grand Slam theme to customise your experience</p>
                         </div>
 
-                        <div class="color-scheme-option @(Model.Theme == GrandSlamTheme.Wimbledon ? "border-green-500" : "border-gray-200")"
+                        <div class="color-scheme-option border-2 rounded-lg overflow-hidden @(Model.Theme == GrandSlamTheme.Wimbledon ? "border-purple-500 ring-2 ring-purple-300" : "border-gray-200")"
                              onclick="selectColorScheme(this, 'Wimbledon')">
                             <input type="radio" name="Theme" value="Wimbledon" class="hidden"
                                    @(Model.Theme == GrandSlamTheme.Wimbledon ? "checked" : "")>
-                            <div class="bg-purple-100 rounded-lg p-4 cursor-pointer hover:bg-purple-50 transition-colors">
-                                <h4 class="font-medium text-purple-800">Wimbledon</h4>
-                                <p class="text-sm text-purple-600">Classic Green & Purple theme</p>
+                            <div class="h-16 bg-purple-700"></div>
+                            <div class="p-4 bg-white">
+                                <h4 class="font-medium text-gray-900">Wimbledon</h4>
+                                <div class="flex items-center mt-2">
+                                    <span class="w-4 h-4 rounded-full bg-purple-600 mr-2"></span>
+                                    <span class="text-sm text-gray-600">Purple & White</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="color-scheme-option @(Model.Theme == GrandSlamTheme.RolandGarros ? "border-orange-500" : "border-gray-200")"
+                        <div class="color-scheme-option border-2 rounded-lg overflow-hidden @(Model.Theme == GrandSlamTheme.RolandGarros ? "border-green-700 ring-2 ring-green-300" : "border-gray-200")"
                              onclick="selectColorScheme(this, 'RolandGarros')">
                             <input type="radio" name="Theme" value="RolandGarros" class="hidden"
                                    @(Model.Theme == GrandSlamTheme.RolandGarros ? "checked" : "")>
-                            <div class="bg-orange-100 rounded-lg p-4 cursor-pointer hover:bg-orange-50 transition-colors">
-                                <h4 class="font-medium text-orange-800">Roland Garros</h4>
-                                <p class="text-sm text-orange-600">Clay & Green theme</p>
+                            <div class="h-16 bg-green-800"></div>
+                            <div class="p-4 bg-white">
+                                <h4 class="font-medium text-gray-900">Roland Garros</h4>
+                                <div class="flex items-center mt-2">
+                                    <span class="w-4 h-4 rounded-full bg-green-700 mr-2"></span>
+                                    <span class="text-sm text-gray-600">Dark Green & Clay</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="color-scheme-option @(Model.Theme == GrandSlamTheme.USOpen ? "border-blue-500" : "border-gray-200")"
+                        <div class="color-scheme-option border-2 rounded-lg overflow-hidden @(Model.Theme == GrandSlamTheme.USOpen ? "border-blue-600 ring-2 ring-blue-300" : "border-gray-200")"
                              onclick="selectColorScheme(this, 'USOpen')">
                             <input type="radio" name="Theme" value="USOpen" class="hidden"
                                    @(Model.Theme == GrandSlamTheme.USOpen ? "checked" : "")>
-                            <div class="bg-blue-100 rounded-lg p-4 cursor-pointer hover:bg-blue-50 transition-colors">
-                                <h4 class="font-medium text-blue-800">US Open</h4>
-                                <p class="text-sm text-blue-600">Blue & Green theme</p>
+                            <div class="h-16 bg-blue-600"></div>
+                            <div class="p-4 bg-white">
+                                <h4 class="font-medium text-gray-900">US Open</h4>
+                                <div class="flex items-center mt-2">
+                                    <span class="w-4 h-4 rounded-full bg-blue-600 mr-2"></span>
+                                    <span class="text-sm text-gray-600">Blue & White</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="color-scheme-option @(Model.Theme == GrandSlamTheme.AustralianOpen ? "border-yellow-500" : "border-gray-200")"
+                        <div class="color-scheme-option border-2 rounded-lg overflow-hidden @(Model.Theme == GrandSlamTheme.AustralianOpen ? "border-blue-300 ring-2 ring-blue-100" : "border-gray-200")"
                              onclick="selectColorScheme(this, 'AustralianOpen')">
                             <input type="radio" name="Theme" value="AustralianOpen" class="hidden"
                                    @(Model.Theme == GrandSlamTheme.AustralianOpen ? "checked" : "")>
-                            <div class="bg-blue-100 rounded-lg p-4 cursor-pointer hover:bg-blue-50 transition-colors">
-                                <h4 class="font-medium text-blue-800">Australian Open</h4>
-                                <p class="text-sm text-blue-600">Light blue & black theme</p>
+                            <div class="h-16 bg-blue-100"></div>
+                            <div class="p-4 bg-white">
+                                <h4 class="font-medium text-gray-900">Australian Open</h4>
+                                <div class="flex items-center mt-2">
+                                    <span class="w-4 h-4 rounded-full bg-blue-100 border border-gray-300 mr-2"></span>
+                                    <span class="text-sm text-gray-600">Light Blue & Black</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="col-span-2 mt-4">
-                            <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        <div class="col-span-1 md:col-span-2 mt-6">
+                            <button type="submit" class="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium">
                                 Apply Theme
                             </button>
                         </div>
@@ -246,7 +265,7 @@
             const section = document.getElementById(sectionId);
             const button = section.previousElementSibling;
             const icon = button.querySelector('i');
-            
+
             // Close all other sections in the same container
             const container = section.closest('.divide-y, .bg-white');
             container.querySelectorAll('.accordion-content').forEach(content => {
@@ -266,30 +285,43 @@
             // Remove selected class from all options
             document.querySelectorAll('.color-scheme-option').forEach(opt => {
                 opt.classList.remove('selected');
-                opt.classList.remove('border-green-500');
-                opt.classList.remove('border-orange-500');
-                opt.classList.remove('border-blue-500');
-                opt.classList.remove('border-yellow-500');
+                opt.classList.remove('border-purple-500');
+                opt.classList.remove('border-green-700');
+                opt.classList.remove('border-blue-600');
+                opt.classList.remove('border-blue-300');
+                opt.classList.remove('ring-2');
+                opt.classList.remove('ring-purple-300');
+                opt.classList.remove('ring-green-300');
+                opt.classList.remove('ring-blue-300');
+                opt.classList.remove('ring-blue-100');
                 opt.classList.add('border-gray-200');
             });
-            
+
             // Add selected class to clicked option
             element.classList.add('selected');
             switch(scheme) {
                 case 'Wimbledon':
-                    element.classList.add('border-green-500');
+                    element.classList.add('border-purple-500');
+                    element.classList.add('ring-2');
+                    element.classList.add('ring-purple-300');
                     break;
                 case 'RolandGarros':
-                    element.classList.add('border-orange-500');
+                    element.classList.add('border-green-700');
+                    element.classList.add('ring-2');
+                    element.classList.add('ring-green-300');
                     break;
                 case 'USOpen':
-                    element.classList.add('border-blue-500');
+                    element.classList.add('border-blue-600');
+                    element.classList.add('ring-2');
+                    element.classList.add('ring-blue-300');
                     break;
                 case 'AustralianOpen':
-                    element.classList.add('border-yellow-500');
+                    element.classList.add('border-blue-300');
+                    element.classList.add('ring-2');
+                    element.classList.add('ring-blue-100');
                     break;
             }
-            
+
             // Check the radio button
             element.querySelector('input[type="radio"]').checked = true;
 

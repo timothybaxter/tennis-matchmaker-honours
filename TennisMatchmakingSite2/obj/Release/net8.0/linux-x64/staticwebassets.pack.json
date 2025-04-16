@@ -5,6 +5,10 @@
       "PackagePath": "staticwebassets\\TennisMatchmakingSite2.orr580fkh1.bundle.scp.css"
     },
     {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\expandable-sections.css",
+      "PackagePath": "staticwebassets\\css\\expandable-sections.css"
+    },
+    {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\site.css",
       "PackagePath": "staticwebassets\\css\\site.css"
     },
@@ -49,6 +53,18 @@
       "PackagePath": "staticwebassets\\js\\match.js"
     },
     {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\mobile-expandable-sections.js",
+      "PackagePath": "staticwebassets\\js\\mobile-expandable-sections.js"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-labels.js",
+      "PackagePath": "staticwebassets\\js\\notification-labels.js"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-manager.js",
+      "PackagePath": "staticwebassets\\js\\notification-manager.js"
+    },
+    {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\signalr-connection.js",
       "PackagePath": "staticwebassets\\js\\signalr-connection.js"
     },
@@ -59,6 +75,10 @@
     {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\theme-handler.js",
       "PackagePath": "staticwebassets\\js\\theme-handler.js"
+    },
+    {
+      "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\tournament-scripts.js",
+      "PackagePath": "staticwebassets\\js\\tournament-scripts.js"
     },
     {
       "Id": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\lib\\bootstrap\\LICENSE",

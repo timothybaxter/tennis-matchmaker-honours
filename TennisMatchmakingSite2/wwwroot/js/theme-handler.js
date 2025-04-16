@@ -134,3 +134,21 @@ window.getThemeColors = function (themeName) {
 document.addEventListener('themeChanged', function (e) {
     window.applyTheme(e.detail.theme);
 });
+
+// Extend the applyTheme function to handle page heading containers
+const originalApplyTheme = window.applyTheme;
+window.applyTheme = function (themeName) {
+    // Call the original function first
+    if (originalApplyTheme) {
+        originalApplyTheme(themeName);
+    }
+
+    // Get the theme color
+    const theme = themes[themeName] || themes['Wimbledon'];
+    const themeColor = theme.navbarColor;
+
+    // Apply to page heading containers
+    document.querySelectorAll('.page-heading-container').forEach(container => {
+        container.style.borderLeftColor = themeColor;
+    });
+};

@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "OPFEgeDfUYnc8dHz+nl+Fm7AsWZNPnQZdrztRX56oAc=",
+  "Hash": "eOmDtDlejHuyfJQ9td6fpn0bMbUrQzIF1JtZ85KsEKM=",
   "Source": "TennisMatchmakingSite2",
   "BasePath": "_content/TennisMatchmakingSite2",
   "Mode": "Default",
@@ -59,6 +59,27 @@
       "OriginalItemSpec": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\TennisMatchmakingSite2.bundle.scp.css"
     },
     {
+      "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\expandable-sections.css",
+      "SourceId": "TennisMatchmakingSite2",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\",
+      "BasePath": "_content/TennisMatchmakingSite2",
+      "RelativePath": "css/expandable-sections#[.{fingerprint}]?.css",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "5olcvo7pq2",
+      "Integrity": "S3jNNq3JDWnTlTkwmc2gpLLiGYrAH4ZmY0lVG4cjvuI=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\css\\expandable-sections.css"
+    },
+    {
       "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\site.css",
       "SourceId": "TennisMatchmakingSite2",
       "SourceType": "Discovered",
@@ -73,8 +94,8 @@
       "RelatedAsset": "",
       "AssetTraitName": "",
       "AssetTraitValue": "",
-      "Fingerprint": "myef7gdveq",
-      "Integrity": "fjB81coNVOpb8vNau3IBTfZGTQJrtMfPcC39yXZpntw=",
+      "Fingerprint": "jfi2zcxx2i",
+      "Integrity": "z8xjCfUS6c9F3DzB2Pew/lDy5okedxA9oIHU5g6YKeo=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\css\\site.css"
@@ -290,6 +311,69 @@
       "OriginalItemSpec": "wwwroot\\js\\match-functions.js"
     },
     {
+      "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\mobile-expandable-sections.js",
+      "SourceId": "TennisMatchmakingSite2",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\",
+      "BasePath": "_content/TennisMatchmakingSite2",
+      "RelativePath": "js/mobile-expandable-sections#[.{fingerprint}]?.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "oc7xjqob9w",
+      "Integrity": "eH6SknWrDsojbMOu1kh+jymQvKSNbRviI/eQq55i7Lk=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\mobile-expandable-sections.js"
+    },
+    {
+      "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-labels.js",
+      "SourceId": "TennisMatchmakingSite2",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\",
+      "BasePath": "_content/TennisMatchmakingSite2",
+      "RelativePath": "js/notification-labels#[.{fingerprint}]?.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "qtdnn6r3mj",
+      "Integrity": "QpsuvkOFlsPjEDzcU0xZ0qVlGMojE5DuwWbzYIs0Mes=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\notification-labels.js"
+    },
+    {
+      "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-manager.js",
+      "SourceId": "TennisMatchmakingSite2",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\",
+      "BasePath": "_content/TennisMatchmakingSite2",
+      "RelativePath": "js/notification-manager#[.{fingerprint}]?.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "ey3i6wv81r",
+      "Integrity": "euUSGgSPL4nO2c7wKC9nwN1w2eqmINjUrR5txquqEXQ=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\notification-manager.js"
+    },
+    {
       "Identity": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\signalr-connection.js",
       "SourceId": "TennisMatchmakingSite2",
       "SourceType": "Discovered",
@@ -304,8 +388,8 @@
       "RelatedAsset": "",
       "AssetTraitName": "",
       "AssetTraitValue": "",
-      "Fingerprint": "at93m86w07",
-      "Integrity": "klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=",
+      "Fingerprint": "6lkeq22rak",
+      "Integrity": "uuEyLZ5BBhQcrPRhsHm65oT7iDG0Z13ImQEyxdtuckk=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\signalr-connection.js"
@@ -346,8 +430,8 @@
       "RelatedAsset": "",
       "AssetTraitName": "",
       "AssetTraitValue": "",
-      "Fingerprint": "efte5bp8zi",
-      "Integrity": "ek2Vbr4yiuc5g74ThP5xWNQTf2NAdwfgVcQXGIlR5mA=",
+      "Fingerprint": "m3b86429br",
+      "Integrity": "MqAfmgZhZHoouIEDYNgB+p4p4m3gKj15UxSsOqJKkk4=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\theme-handler.js"
@@ -7243,6 +7327,88 @@
   ],
   "Endpoints": [
     {
+      "Route": "css/expandable-sections.5olcvo7pq2.css",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\expandable-sections.css",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1065"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/css"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"S3jNNq3JDWnTlTkwmc2gpLLiGYrAH4ZmY0lVG4cjvuI=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Sat, 29 Mar 2025 13:12:43 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "5olcvo7pq2"
+        },
+        {
+          "Name": "label",
+          "Value": "css/expandable-sections.css"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-S3jNNq3JDWnTlTkwmc2gpLLiGYrAH4ZmY0lVG4cjvuI="
+        }
+      ]
+    },
+    {
+      "Route": "css/expandable-sections.css",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\expandable-sections.css",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1065"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/css"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"S3jNNq3JDWnTlTkwmc2gpLLiGYrAH4ZmY0lVG4cjvuI=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Sat, 29 Mar 2025 13:12:43 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-S3jNNq3JDWnTlTkwmc2gpLLiGYrAH4ZmY0lVG4cjvuI="
+        }
+      ]
+    },
+    {
       "Route": "css/site.css",
       "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\site.css",
       "Selectors": [],
@@ -7253,7 +7419,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "16283"
+          "Value": "17193"
         },
         {
           "Name": "Content-Type",
@@ -7261,11 +7427,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"fjB81coNVOpb8vNau3IBTfZGTQJrtMfPcC39yXZpntw=\""
+          "Value": "\"z8xjCfUS6c9F3DzB2Pew/lDy5okedxA9oIHU5g6YKeo=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Mon, 24 Mar 2025 18:33:37 GMT"
+          "Value": "Sat, 29 Mar 2025 13:24:10 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -7275,12 +7441,12 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-fjB81coNVOpb8vNau3IBTfZGTQJrtMfPcC39yXZpntw="
+          "Value": "sha256-z8xjCfUS6c9F3DzB2Pew/lDy5okedxA9oIHU5g6YKeo="
         }
       ]
     },
     {
-      "Route": "css/site.myef7gdveq.css",
+      "Route": "css/site.jfi2zcxx2i.css",
       "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\css\\site.css",
       "Selectors": [],
       "ResponseHeaders": [
@@ -7290,7 +7456,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "16283"
+          "Value": "17193"
         },
         {
           "Name": "Content-Type",
@@ -7298,11 +7464,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"fjB81coNVOpb8vNau3IBTfZGTQJrtMfPcC39yXZpntw=\""
+          "Value": "\"z8xjCfUS6c9F3DzB2Pew/lDy5okedxA9oIHU5g6YKeo=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Mon, 24 Mar 2025 18:33:37 GMT"
+          "Value": "Sat, 29 Mar 2025 13:24:10 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -7312,7 +7478,7 @@
       "EndpointProperties": [
         {
           "Name": "fingerprint",
-          "Value": "myef7gdveq"
+          "Value": "jfi2zcxx2i"
         },
         {
           "Name": "label",
@@ -7320,7 +7486,7 @@
         },
         {
           "Name": "integrity",
-          "Value": "sha256-fjB81coNVOpb8vNau3IBTfZGTQJrtMfPcC39yXZpntw="
+          "Value": "sha256-z8xjCfUS6c9F3DzB2Pew/lDy5okedxA9oIHU5g6YKeo="
         }
       ]
     },
@@ -8145,8 +8311,8 @@
       ]
     },
     {
-      "Route": "js/signalr-connection.at93m86w07.js",
-      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\signalr-connection.js",
+      "Route": "js/mobile-expandable-sections.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\mobile-expandable-sections.js",
       "Selectors": [],
       "ResponseHeaders": [
         {
@@ -8155,7 +8321,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "16215"
+          "Value": "1817"
         },
         {
           "Name": "Content-Type",
@@ -8163,11 +8329,48 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=\""
+          "Value": "\"eH6SknWrDsojbMOu1kh+jymQvKSNbRviI/eQq55i7Lk=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Thu, 06 Mar 2025 18:57:47 GMT"
+          "Value": "Sat, 29 Mar 2025 13:12:22 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-eH6SknWrDsojbMOu1kh+jymQvKSNbRviI/eQq55i7Lk="
+        }
+      ]
+    },
+    {
+      "Route": "js/mobile-expandable-sections.oc7xjqob9w.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\mobile-expandable-sections.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1817"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"eH6SknWrDsojbMOu1kh+jymQvKSNbRviI/eQq55i7Lk=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Sat, 29 Mar 2025 13:12:22 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -8177,7 +8380,216 @@
       "EndpointProperties": [
         {
           "Name": "fingerprint",
-          "Value": "at93m86w07"
+          "Value": "oc7xjqob9w"
+        },
+        {
+          "Name": "label",
+          "Value": "js/mobile-expandable-sections.js"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-eH6SknWrDsojbMOu1kh+jymQvKSNbRviI/eQq55i7Lk="
+        }
+      ]
+    },
+    {
+      "Route": "js/notification-labels.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-labels.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "14241"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"QpsuvkOFlsPjEDzcU0xZ0qVlGMojE5DuwWbzYIs0Mes=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Fri, 28 Mar 2025 17:17:24 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-QpsuvkOFlsPjEDzcU0xZ0qVlGMojE5DuwWbzYIs0Mes="
+        }
+      ]
+    },
+    {
+      "Route": "js/notification-labels.qtdnn6r3mj.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-labels.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "14241"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"QpsuvkOFlsPjEDzcU0xZ0qVlGMojE5DuwWbzYIs0Mes=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Fri, 28 Mar 2025 17:17:24 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "qtdnn6r3mj"
+        },
+        {
+          "Name": "label",
+          "Value": "js/notification-labels.js"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-QpsuvkOFlsPjEDzcU0xZ0qVlGMojE5DuwWbzYIs0Mes="
+        }
+      ]
+    },
+    {
+      "Route": "js/notification-manager.ey3i6wv81r.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-manager.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "12348"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"euUSGgSPL4nO2c7wKC9nwN1w2eqmINjUrR5txquqEXQ=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Fri, 28 Mar 2025 17:32:32 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "ey3i6wv81r"
+        },
+        {
+          "Name": "label",
+          "Value": "js/notification-manager.js"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-euUSGgSPL4nO2c7wKC9nwN1w2eqmINjUrR5txquqEXQ="
+        }
+      ]
+    },
+    {
+      "Route": "js/notification-manager.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\notification-manager.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "12348"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"euUSGgSPL4nO2c7wKC9nwN1w2eqmINjUrR5txquqEXQ=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Fri, 28 Mar 2025 17:32:32 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-euUSGgSPL4nO2c7wKC9nwN1w2eqmINjUrR5txquqEXQ="
+        }
+      ]
+    },
+    {
+      "Route": "js/signalr-connection.6lkeq22rak.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\signalr-connection.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "12379"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"uuEyLZ5BBhQcrPRhsHm65oT7iDG0Z13ImQEyxdtuckk=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Fri, 28 Mar 2025 17:25:14 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "6lkeq22rak"
         },
         {
           "Name": "label",
@@ -8185,7 +8597,7 @@
         },
         {
           "Name": "integrity",
-          "Value": "sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA="
+          "Value": "sha256-uuEyLZ5BBhQcrPRhsHm65oT7iDG0Z13ImQEyxdtuckk="
         }
       ]
     },
@@ -8200,7 +8612,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "16215"
+          "Value": "12379"
         },
         {
           "Name": "Content-Type",
@@ -8208,11 +8620,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA=\""
+          "Value": "\"uuEyLZ5BBhQcrPRhsHm65oT7iDG0Z13ImQEyxdtuckk=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Thu, 06 Mar 2025 18:57:47 GMT"
+          "Value": "Fri, 28 Mar 2025 17:25:14 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -8222,7 +8634,7 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-klUGjlqfMOKmSJXlbhGdA266LMmIjkzvbf+Uc8bPmUA="
+          "Value": "sha256-uuEyLZ5BBhQcrPRhsHm65oT7iDG0Z13ImQEyxdtuckk="
         }
       ]
     },
@@ -8309,51 +8721,6 @@
       ]
     },
     {
-      "Route": "js/theme-handler.efte5bp8zi.js",
-      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\theme-handler.js",
-      "Selectors": [],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "4700"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/javascript"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"ek2Vbr4yiuc5g74ThP5xWNQTf2NAdwfgVcQXGIlR5mA=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Thu, 20 Mar 2025 18:19:17 GMT"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "max-age=31536000, immutable"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "fingerprint",
-          "Value": "efte5bp8zi"
-        },
-        {
-          "Name": "label",
-          "Value": "js/theme-handler.js"
-        },
-        {
-          "Name": "integrity",
-          "Value": "sha256-ek2Vbr4yiuc5g74ThP5xWNQTf2NAdwfgVcQXGIlR5mA="
-        }
-      ]
-    },
-    {
       "Route": "js/theme-handler.js",
       "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\theme-handler.js",
       "Selectors": [],
@@ -8364,7 +8731,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "4700"
+          "Value": "5305"
         },
         {
           "Name": "Content-Type",
@@ -8372,11 +8739,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"ek2Vbr4yiuc5g74ThP5xWNQTf2NAdwfgVcQXGIlR5mA=\""
+          "Value": "\"MqAfmgZhZHoouIEDYNgB+p4p4m3gKj15UxSsOqJKkk4=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Thu, 20 Mar 2025 18:19:17 GMT"
+          "Value": "Sat, 29 Mar 2025 13:24:28 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -8386,7 +8753,52 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-ek2Vbr4yiuc5g74ThP5xWNQTf2NAdwfgVcQXGIlR5mA="
+          "Value": "sha256-MqAfmgZhZHoouIEDYNgB+p4p4m3gKj15UxSsOqJKkk4="
+        }
+      ]
+    },
+    {
+      "Route": "js/theme-handler.m3b86429br.js",
+      "AssetFile": "C:\\Users\\Tim\\honours-repo\\TennisMatchmakingSite2\\wwwroot\\js\\theme-handler.js",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "5305"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/javascript"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"MqAfmgZhZHoouIEDYNgB+p4p4m3gKj15UxSsOqJKkk4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Sat, 29 Mar 2025 13:24:28 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "m3b86429br"
+        },
+        {
+          "Name": "label",
+          "Value": "js/theme-handler.js"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-MqAfmgZhZHoouIEDYNgB+p4p4m3gKj15UxSsOqJKkk4="
         }
       ]
     },

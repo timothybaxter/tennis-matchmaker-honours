@@ -5,14 +5,18 @@
     var recipientId = ViewBag.RecipientId;
     var recipientName = ViewBag.RecipientName;
     var currentUserId = Context.Session.GetString("UserId");
+    var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
     }
+
+    <div id="theme-data" data-theme="@currentTheme" class="hidden"></div>
 
     <div class="container mx-auto px-4 pb-20">
         <div class="max-w-3xl mx-auto mt-8">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
-                <div class="p-4 border-b border-gray-200">
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-4 overflow-hidden">
+                <!-- Header -->
+                <div class="p-4 border-b border-gray-200 theme-header">
                     <div class="flex justify-between items-center">
-                        <h2 class="text-xl font-bold">
+                        <h2 class="text-xl font-bold theme-text">
                             @if (!string.IsNullOrEmpty(recipientName))
                         {
                             <span>Conversation with @recipientName</span>
@@ -22,14 +26,14 @@
                             <span>Conversation</span>
                         }
                         </h2>
-                        <a href="@Url.Action("Messages", "Social")" class="text-blue-600 hover:text-blue-800">
+                        <a href="@Url.Action("Messages", "Social")" class="theme-text hover:opacity-80 transition-opacity">
                             <i class="fas fa-arrow-left mr-1"></i> Back to Messages
                         </a>
                     </div>
                 </div>
 
                 <!-- Messages Container -->
-                <div class="p-4 h-96 overflow-y-auto space-y-4" id="messagesContainer">
+                <div class="p-4 h-96 overflow-y-auto space-y-4 bg-gray-50" id="messagesContainer">
                     @if (!Model.Any())
                 {
                     <div class="text-center text-gray-500 my-8" id="no-messages-placeholder">
@@ -43,12 +47,15 @@
                         var isCurrentUser = message.SenderId == currentUserId;
                     <div class="flex @(isCurrentUser ? "justify-end" : "justify-start")"
                          data-message-id="@message.Id"
-                            data-unread="@(message.Read ? "false" : "true")">
-                        <div class="max-w-xs sm:max-w-md @(isCurrentUser ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800") p-3 rounded-lg">
+                         data-unread="@(message.Read ? "false" : "true")">
+                        <div class="max-w-xs sm:max-w-md @(isCurrentUser
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-white text-gray-800 border-gray-200")
+                                p-3 rounded-lg shadow-sm border">
                             <div class="text-sm font-medium">
                                 @(isCurrentUser ? "You" : (message.SenderName ?? "User"))
                             </div>
-                            <div class="mt-1">@message.Content</div>
+                            <div class="mt-1 break-words">@message.Content</div>
                             <div class="text-xs text-gray-500 mt-1 text-right">
                                 @(message.Timestamp?.ToString("g") ?? "")
                             </div>
@@ -59,7 +66,7 @@
                 </div>
 
                 <!-- Message Form -->
-                <div class="p-4 border-t border-gray-200">
+                <div class="p-4 border-t border-gray-200 bg-white">
                     @if (TempData["ErrorMessage"] != null)
                 {
                     <div class="mb-3 p-3 bg-red-100 text-red-700 rounded-md">
@@ -75,9 +82,11 @@
 
                         <div class="flex items-end space-x-2">
                             <div class="flex-grow">
-                                <textarea name="content" id="messageContent" rows="2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Type your message..." required></textarea>
+                                <textarea name="content" id="messageContent" rows="2"
+                                          class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="Type your message..." required></textarea>
                             </div>
-                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            <button type="submit" id="send-button" class="px-4 py-2 text-white rounded-md hover:opacity-90 transition-opacity">
                                 <i class="fas fa-paper-plane mr-1"></i> Send
                             </button>
                         </div>
@@ -92,10 +101,38 @@
 
     @section Scripts {
         <script>
-        // Current user data for messaging
-        const currentUserId = '@currentUserId';
-        const conversationId = '@conversationId';
-        const recipientId = '@recipientId';
+        // Apply theme styling
+        function applyThemeToElements() {
+            // Get the current theme
+            const currentTheme = document.getElementById('theme-data').getAttribute('data-theme');
+
+            // Define theme colors directly
+            const themeColors = {
+                'Wimbledon': '#64408a',      // Purple
+                'RolandGarros': '#084e2e',   // Dark green
+                'USOpen': '#426892',         // Blue
+                'AustralianOpen': '#e9f7ff'  // Light blue
+            };
+
+            // Get colors for the current theme
+            const themeColor = themeColors[currentTheme] || themeColors['Wimbledon'];
+            const textColor = currentTheme === 'AustralianOpen' ? '#000000' : '#ffffff';
+
+            // Apply theme colors
+            document.querySelectorAll('.theme-header').forEach(header => {
+                header.style.backgroundColor = themeColor;
+            });
+
+            document.querySelectorAll('.theme-text').forEach(text => {
+                text.style.color = textColor;
+            });
+
+            // Apply to send button directly
+            const sendButton = document.getElementById('send-button');
+            if (sendButton) {
+                sendButton.style.backgroundColor = themeColor;
+            }
+        }
 
         // Scroll to bottom of messages container
         function scrollToBottom() {
@@ -125,11 +162,14 @@
 
             // Set message content
             messageDiv.innerHTML = `
-                <div class="max-w-xs sm:max-w-md ${isSent ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'} p-3 rounded-lg">
+                <div class="max-w-xs sm:max-w-md ${isSent
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : 'bg-white text-gray-800 border-gray-200'}
+                        p-3 rounded-lg shadow-sm border">
                     <div class="text-sm font-medium">
                         ${isSent ? 'You' : (message.senderName || 'User')}
                     </div>
-                    <div class="mt-1">${message.content}</div>
+                    <div class="mt-1 break-words">${message.content}</div>
                     <div class="text-xs text-gray-500 mt-1 text-right">
                         ${new Date(message.timestamp).toLocaleString()}
                     </div>
@@ -168,42 +208,59 @@
             }
         }
 
-        // Mark unread messages as read
-        function markMessagesAsRead() {
-            const unreadMessages = document.querySelectorAll('[data-unread="true"]');
-            console.log(`Found ${unreadMessages.length} unread messages`);
+            function markAllMessagesRead() {
+                const conversationId = document.getElementById('conversationId')?.value;
 
-            unreadMessages.forEach(message => {
-                const messageId = message.getAttribute('data-message-id');
-                if (messageId) {
-                    console.log(`Marking message ${messageId} as read`);
-                    fetch('/Social/MarkMessageAsRead', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
-                        },
-                        body: `messageId=${messageId}`
-                    }).then(response => {
-                        if (response.ok) {
-                            message.setAttribute('data-unread', 'false');
-                        }
-                    }).catch(error => {
-                        console.error('Error marking message as read:', error);
-                    });
+                // Make sure we have a valid conversationId
+                if (!conversationId || conversationId === 'new' || conversationId === '&') {
+                    console.log("Invalid conversation ID for marking as read:", conversationId);
+                    return;
                 }
-            });
-        }
+
+                console.log(`Marking all messages as read in conversation: ${conversationId}`);
+
+                fetch('/Social/MarkAllMessagesRead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ conversationId: conversationId })
+                })
+                    .then(response => {
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Mark all messages as read response:', data);
+                        // Update UI to reflect read status
+                        document.querySelectorAll('[data-unread="true"]').forEach(el => {
+                            el.setAttribute('data-unread', 'false');
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error marking messages as read:', error);
+                    });
+            }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Apply theme
+            applyThemeToElements();
+
+            // Listen for theme changes
+            window.addEventListener('themeChanged', function(e) {
+                if (e.detail && e.detail.theme) {
+                    document.getElementById('theme-data').setAttribute('data-theme', e.detail.theme);
+                }
+                applyThemeToElements();
+            });
+
             // Scroll to bottom initially
             scrollToBottom();
 
             // Focus the message input
             document.getElementById('messageContent').focus();
 
-            // Mark messages as read
-            markMessagesAsRead();
+            // Mark all messages as read when the conversation is opened
+            markAllMessagesRead();
 
             // Listen for SignalR message events directly
             if (typeof connection !== 'undefined') {
@@ -212,8 +269,8 @@
                     console.log('Real-time message received:', message);
 
                     // Only process messages for this conversation
-                    if (message.conversationId === conversationId) {
-                        const isFromCurrentUser = message.senderId === currentUserId;
+                    if (message.conversationId === "@conversationId") {
+                        const isFromCurrentUser = message.senderId === "@currentUserId";
                         addMessageToUI(message, isFromCurrentUser);
                     }
                 });
@@ -223,7 +280,7 @@
                     console.log('Message sent successfully:', message);
 
                     // Only add if it's for the current conversation
-                    if (message.conversationId === conversationId) {
+                    if (message.conversationId === "@conversationId") {
                         addMessageToUI(message, true);
                     }
                 });
@@ -253,7 +310,7 @@
                     const convId = document.getElementById('conversationId').value;
                     const recId = convId === 'new' ?
                         document.getElementById('recipientId').value :
-                        recipientId;
+                        "@recipientId";
 
                     try {
                         // First try SignalR
@@ -262,6 +319,9 @@
                         if (!success) {
                             // If SignalR fails, submit the form normally
                             this.submit();
+                        } else {
+                            // Make sure we scroll to bottom after sending
+                            setTimeout(scrollToBottom, 100);
                         }
                     } catch (error) {
                         console.error('Error sending message via SignalR:', error);
@@ -270,6 +330,9 @@
                 }
                 // If no SignalR, let the form submit normally
             });
+
+            // Ensure we scroll to bottom when window is resized
+            window.addEventListener('resize', scrollToBottom);
         });
         </script>
     }

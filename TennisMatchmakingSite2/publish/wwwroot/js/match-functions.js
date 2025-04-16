@@ -113,18 +113,30 @@ function hideCreateMatchModal() {
 }
 
 // Placeholder functions
-function messageUser(userName) {
-    alert('Messaging functionality coming soon');
+// Message user function
+function messageUser(userId, userName) {
+    if (!userId) {
+        console.error('No user ID provided for messaging');
+        return;
+    }
+    // Prevent card toggle
+    event.stopPropagation();
+
+    // Navigate to new conversation page
+    window.location.href = "/Social/NewConversation?userId=" + userId + "&userName=" + encodeURIComponent(userName);
 }
 
-function requestMatch(matchId) {
-    alert('Match request functionality coming soon');
-}
+function viewProfile(userId) {
+    if (!userId) {
+        console.error('No user ID provided for profile view');
+        return;
+    }
+    // Prevent card toggle
+    event.stopPropagation();
 
-function viewProfile(userName) {
-    alert('Profile view functionality coming soon');
+    // Navigate to profile page
+    window.location.href = "/Profile/ViewProfile/" + userId;
 }
-
 // Event Listeners when document loads
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('createMatchModal');

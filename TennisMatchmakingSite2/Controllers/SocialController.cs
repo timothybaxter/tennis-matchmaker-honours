@@ -8,6 +8,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using TennisMatchmakingSite2.Hubs;
 using TennisMatchmakingSite2.Models;
+using TennisMatchmakingSite2.Services;
 
 namespace TennisMatchmakingSite2.Controllers
 {
@@ -17,15 +18,18 @@ namespace TennisMatchmakingSite2.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<SocialController> _logger;
         private readonly IHubContext<TennisMatchmakerHub> _hubContext;
+        private readonly NotificationService _notificationService;
 
         public SocialController(
             IConfiguration configuration,
             ILogger<SocialController> logger,
-            IHubContext<TennisMatchmakerHub> hubContext)
+            IHubContext<TennisMatchmakerHub> hubContext,
+            NotificationService notificationService)
         {
             _configuration = configuration;
             _logger = logger;
             _hubContext = hubContext;
+            _notificationService = notificationService;
             _httpClient = new HttpClient
             {
                 BaseAddress = new Uri(_configuration["ApiBaseUrl"] ?? throw new InvalidOperationException("ApiBaseUrl not configured"))
@@ -52,7 +56,69 @@ namespace TennisMatchmakingSite2.Controllers
                 if (response.IsSuccessStatusCode)
                 {
                     var notificationsResponse = await response.Content.ReadFromJsonAsync<NotificationsResponse>();
-                    return View(notificationsResponse?.Notifications ?? new List<NotificationModel>());
+                    var notificationsList = notificationsResponse?.Notifications ?? new List<NotificationModel>();
+
+                    // Count only unread notifications
+                    var unreadNotifications = notificationsList.Where(n => !n.IsRead).ToList();
+                    var unreadCount = unreadNotifications.Count;
+                    ViewBag.UnreadNotificationCount = unreadCount;
+
+                    _logger.LogInformation($"Found {unreadCount} unread notifications out of {notificationsList.Count} total");
+
+                    // IMMEDIATELY mark each unread notification as read one by one
+                    // This is a more direct approach than the background task
+                    if (unreadCount > 0)
+                    {
+                        _logger.LogInformation($"Marking {unreadCount} notifications as read");
+
+                        foreach (var notification in unreadNotifications)
+                        {
+                            try
+                            {
+                                // Create a direct request for each notification
+                                var markReadRequest = new HttpRequestMessage(HttpMethod.Post, "notifications/read");
+                                markReadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                                // Use stringContent to ensure proper JSON formatting
+                                var jsonString = $"{{\"notificationId\":\"{notification.Id}\"}}";
+                                markReadRequest.Content = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+
+                                var markReadResponse = await _httpClient.SendAsync(markReadRequest);
+                                var responseContent = await markReadResponse.Content.ReadAsStringAsync();
+
+                                if (markReadResponse.IsSuccessStatusCode)
+                                {
+                                    _logger.LogInformation($"Successfully marked notification {notification.Id} as read");
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"Failed to mark notification {notification.Id} as read: {markReadResponse.StatusCode}, {responseContent}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error marking notification {notification.Id} as read");
+                            }
+                        }
+
+                        // Send update to clients after we've processed everything
+                        var userId = HttpContext.Session.GetString("UserId");
+                        if (!string.IsNullOrEmpty(userId))
+                        {
+                            try
+                            {
+                                await _hubContext.Clients.Group($"user_{userId}")
+                                    .SendAsync("RefreshNotifications");
+                                _logger.LogInformation("Sent notification refresh signal to user");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error sending SignalR notification");
+                            }
+                        }
+                    }
+
+                    return View(notificationsList);
                 }
 
                 // Return empty list if there's an error
@@ -63,6 +129,87 @@ namespace TennisMatchmakingSite2.Controllers
             {
                 _logger.LogError(ex, "Error in Social Index action");
                 return View(new List<NotificationModel>());
+            }
+        }
+
+        // Modified helper method - doesn't access HttpContext
+        private async Task MarkNotificationAsReadWithoutContext(string notificationId, string token)
+        {
+            try
+            {
+                _logger.LogInformation($"Marking notification {notificationId} as read");
+
+                // Create a new HttpClient instance to avoid thread safety issues
+                using (var client = new HttpClient())
+                {
+                    client.BaseAddress = new Uri(_configuration["ApiBaseUrl"]);
+
+                    // Use POST request with proper headers
+                    var request = new HttpRequestMessage(HttpMethod.Post, "notifications/read");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                    // Create request body with the notification ID
+                    var jsonString = $"{{\"notificationId\":\"{notificationId}\"}}";
+                    request.Content = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+
+                    // Send the request
+                    var response = await client.SendAsync(request);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation($"Successfully marked notification {notificationId} as read");
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"Failed to mark notification {notificationId} as read: {response.StatusCode}, {responseContent}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error marking notification {notificationId} as read");
+            }
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetUnreadCount()
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWTToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { count = 0 });
+                }
+
+                // Get unread notifications count - explicitly request only unread
+                var request = new HttpRequestMessage(HttpMethod.Get, "notifications?unread=true");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Unread count response: {response.StatusCode}, {responseContent}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var notificationsResponse = await response.Content.ReadFromJsonAsync<NotificationsResponse>();
+                    int count = notificationsResponse?.Notifications?.Count ?? 0;
+
+                    _logger.LogInformation($"Unread notification count: {count}");
+
+                    // Update ViewBag for use in views
+                    ViewBag.UnreadNotificationCount = count;
+
+                    return Json(new { count });
+                }
+
+                _logger.LogWarning($"Error getting unread notification count: {response.StatusCode}");
+                return Json(new { count = 0 });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetUnreadCount action");
+                return Json(new { count = 0 });
             }
         }
 
@@ -375,8 +522,6 @@ namespace TennisMatchmakingSite2.Controllers
                 if (response.IsSuccessStatusCode)
                 {
                     // Message was successfully saved in the database
-
-                    // Determine the correct conversation ID and recipient ID
                     string actualConversationId = conversationId;
                     string actualRecipientId = recipientId;
 
@@ -387,74 +532,96 @@ namespace TennisMatchmakingSite2.Controllers
                         {
                             var responseObj = JsonSerializer.Deserialize<JsonDocument>(responseContent);
                             actualConversationId = responseObj.RootElement.GetProperty("conversationId").GetString();
-
-                            // Recipient ID is already provided for new conversations
+                            _logger.LogInformation($"Got conversation ID from response: {actualConversationId}");
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error parsing new conversation response");
+                            _logger.LogError(ex, "Error extracting conversation ID from response");
                         }
                     }
-                    // For existing conversations, determine the recipient (the other user)
-                    else
+
+                    // If we don't have a recipient ID or need to confirm it, make an API call to get conversation details
+                    if (string.IsNullOrEmpty(actualRecipientId) || conversationId != "new")
                     {
                         try
                         {
-                            // Extract conversation info to find the other participant
-                            using (JsonDocument doc = JsonDocument.Parse(responseContent))
+                            _logger.LogInformation($"Making additional call to get conversation details for {actualConversationId}");
+
+                            // Get conversation details to find the other participant
+                            var conversationRequest = new HttpRequestMessage(HttpMethod.Get, $"messages/{Uri.EscapeDataString(actualConversationId)}");
+                            conversationRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                            var conversationResponse = await _httpClient.SendAsync(conversationRequest);
+                            if (conversationResponse.IsSuccessStatusCode)
                             {
-                                if (doc.RootElement.TryGetProperty("conversation", out JsonElement convElement))
+                                var conversationContent = await conversationResponse.Content.ReadAsStringAsync();
+                                _logger.LogInformation($"Conversation details response: {conversationContent}");
+
+                                using var doc = JsonDocument.Parse(conversationContent);
+
+                                // Try to find conversation in the response
+                                if (doc.RootElement.TryGetProperty("conversation", out var convElement))
                                 {
-                                    if (convElement.TryGetProperty("participants", out JsonElement participantsElement) &&
+                                    if (convElement.TryGetProperty("participants", out var participantsElement) &&
                                         participantsElement.ValueKind == JsonValueKind.Array)
                                     {
-                                        foreach (JsonElement participantElement in participantsElement.EnumerateArray())
+                                        foreach (var participantElement in participantsElement.EnumerateArray())
                                         {
                                             string participantId = participantElement.GetString();
+                                            _logger.LogInformation($"Found participant: {participantId}");
+
                                             if (participantId != currentUserId)
                                             {
                                                 actualRecipientId = participantId;
+                                                _logger.LogInformation($"Found recipient ID: {actualRecipientId}");
                                                 break;
                                             }
                                         }
                                     }
                                 }
                             }
+                            else
+                            {
+                                _logger.LogWarning($"Failed to get conversation details: {conversationResponse.StatusCode}");
+                            }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error determining recipient ID from existing conversation");
+                            _logger.LogError(ex, "Error fetching conversation details for notification");
                         }
                     }
 
-                    // Send real-time notification via SignalR if we have the recipient ID
+                    // Send notification using the notification service
                     if (!string.IsNullOrEmpty(actualRecipientId))
                     {
                         try
                         {
-                            // Create message object for real-time notification
-                            var messageObj = new
+                            // Get a preview of the content for the notification
+                            string messagePreview = content;
+                            if (content.Length > 50)
                             {
-                                senderId = currentUserId,
-                                senderName = currentUserName,
-                                recipientId = actualRecipientId,
-                                content = content,
-                                conversationId = actualConversationId,
-                                timestamp = DateTime.UtcNow
-                            };
+                                messagePreview = content.Substring(0, 47) + "...";
+                            }
 
-                            // First try to send to specific user
-                            await _hubContext.Clients.User(actualRecipientId).SendAsync("ReceiveMessage", messageObj);
+                            _logger.LogInformation($"Sending message notification: RecipientId={actualRecipientId}, SenderName={currentUserName}, ConversationId={actualConversationId}");
 
-                            // Also try sending to a group with the user's ID as fallback
-                            await _hubContext.Clients.Group($"user_{actualRecipientId}").SendAsync("ReceiveMessage", messageObj);
+                            var notificationResult = await _notificationService.SendMessageNotification(
+                                actualRecipientId,
+                                currentUserName,
+                                actualConversationId,
+                                messagePreview
+                            );
 
-                            _logger.LogInformation($"Sent real-time notification to user {actualRecipientId} for message in conversation {actualConversationId}");
+                            _logger.LogInformation($"Message notification result: {notificationResult}");
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error sending real-time notification via SignalR");
+                            _logger.LogError(ex, "Error sending message notification");
                         }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Cannot send notification - recipient ID is missing or empty");
                     }
 
                     // Redirect to the conversation
@@ -490,12 +657,15 @@ namespace TennisMatchmakingSite2.Controllers
                 }
 
                 var token = HttpContext.Session.GetString("JWTToken");
+                var currentUserId = HttpContext.Session.GetString("UserId");
+                var currentUserName = HttpContext.Session.GetString("UserName");
+
                 if (string.IsNullOrEmpty(token))
                 {
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Send friend request
+                // Send friend request through API
                 var request = new HttpRequestMessage(HttpMethod.Post, "friends/request");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 request.Content = JsonContent.Create(new
@@ -504,15 +674,48 @@ namespace TennisMatchmakingSite2.Controllers
                 });
 
                 var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
+                    // Extract friendship ID if available
+                    string friendshipId = null;
+                    try
+                    {
+                        using (JsonDocument doc = JsonDocument.Parse(responseContent))
+                        {
+                            if (doc.RootElement.TryGetProperty("friendshipId", out JsonElement idElement))
+                            {
+                                friendshipId = idElement.GetString();
+                                _logger.LogInformation($"Extracted friendshipId: {friendshipId}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error extracting friendshipId from response");
+                    }
+
+                    // Send notification using the notification service
+                    try
+                    {
+                        await _notificationService.SendFriendRequestNotification(
+                            userId,
+                            currentUserName,
+                            friendshipId
+                        );
+                        _logger.LogInformation($"Sent friend request notification to user {userId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error sending friend request notification");
+                    }
+
                     TempData["SuccessMessage"] = "Friend request sent successfully";
                 }
                 else
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogError($"Error sending friend request: {response.StatusCode}, {errorContent}");
+                    _logger.LogError($"Error sending friend request: {response.StatusCode}, {responseContent}");
                     TempData["ErrorMessage"] = "Failed to send friend request";
                 }
 
@@ -542,71 +745,109 @@ namespace TennisMatchmakingSite2.Controllers
 
                 _logger.LogInformation($"Responding to friend request: {requestId}, Accept: {accept}, User: {userId}");
 
-                // 1. Respond to friend request
-                var request = new HttpRequestMessage(HttpMethod.Post, "friends/respond");
-                request.Headers.Add("Authorization", "Bearer " + token);
-                request.Content = JsonContent.Create(new
+                // First, get request details before responding
+                string requesterId = null;
+                string requesterName = null;
+
+                try
+                {
+                    var friendRequestsRequest = new HttpRequestMessage(HttpMethod.Get, "friends/requests");
+                    friendRequestsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    var friendRequestsResponse = await _httpClient.SendAsync(friendRequestsRequest);
+
+                    if (friendRequestsResponse.IsSuccessStatusCode)
+                    {
+                        var requestsResponse = await friendRequestsResponse.Content.ReadFromJsonAsync<FriendRequestsResponse>();
+                        var request = requestsResponse?.FriendRequests?.FirstOrDefault(r => r.FriendshipId.ToString() == requestId);
+
+                        if (request != null && request.Requester != null)
+                        {
+                            requesterId = request.Requester.Id?.ToString();
+                            requesterName = request.Requester.Name;
+                            _logger.LogInformation($"Found requester details: ID={requesterId}, Name={requesterName}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error getting friend request details");
+                    // Continue even if we can't get the requester details
+                }
+
+                // Respond to friend request
+                var respondRequest = new HttpRequestMessage(HttpMethod.Post, "friends/respond");
+                respondRequest.Headers.Add("Authorization", "Bearer " + token);
+                respondRequest.Content = JsonContent.Create(new
                 {
                     friendshipId = requestId,
                     accept
                 });
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(respondRequest);
                 var responseContent = await response.Content.ReadAsStringAsync();
                 _logger.LogInformation($"Response to friend request: {response.StatusCode}, {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // 2. Find and delete the original notification
-                    // First, get all notifications to find the one related to this friendship
-                    var getNotificationsRequest = new HttpRequestMessage(HttpMethod.Get, "notifications");
-                    getNotificationsRequest.Headers.Add("Authorization", "Bearer " + token);
-
-                    var getNotificationsResponse = await _httpClient.SendAsync(getNotificationsRequest);
-
-                    if (getNotificationsResponse.IsSuccessStatusCode)
+                    // Send notifications based on response
+                    if (!string.IsNullOrEmpty(requesterId))
                     {
-                        var notificationsResponse = await getNotificationsResponse.Content.ReadFromJsonAsync<NotificationsResponse>();
-
-                        if (notificationsResponse?.Notifications != null)
+                        try
                         {
-                            // Find the notification related to this friendship
-                            var relatedNotification = notificationsResponse.Notifications
-                                .FirstOrDefault(n => n.Type == "friend_request" && n.RelatedItemId == requestId);
-
-                            if (relatedNotification != null)
+                            if (accept)
                             {
-                                // Delete the original notification
-                                var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"notifications/{relatedNotification.Id}");
-                                deleteRequest.Headers.Add("Authorization", "Bearer " + token);
-
-                                await _httpClient.SendAsync(deleteRequest);
-
-                                // 3. Create a new notification about the response
-                                var createNotificationRequest = new HttpRequestMessage(HttpMethod.Post, "notifications");
-                                createNotificationRequest.Headers.Add("Authorization", "Bearer " + token);
-
-                                // Extract requester info from original notification
-                                var requesterName = relatedNotification.SourceUserName ?? "User";
-                                var requesterId = relatedNotification.SourceUserId;
-
-                                // Create appropriate content based on accept/decline
-                                var notificationContent = accept
-                                    ? $"You accepted {requesterName}'s friend request"
-                                    : $"You declined {requesterName}'s friend request";
-
-                                createNotificationRequest.Content = JsonContent.Create(new
-                                {
-                                    recipientId = userId,
-                                    type = accept ? "friend_accepted" : "friend_declined",
-                                    content = notificationContent,
-                                    relatedItemId = requestId,
-                                    sourceUserId = requesterId
-                                });
-
-                                await _httpClient.SendAsync(createNotificationRequest);
+                                await _notificationService.SendFriendRequestAcceptedNotification(
+                                    requesterId,
+                                    userName,
+                                    requestId
+                                );
+                                _logger.LogInformation($"Sent friend request accepted notification to user {requesterId}");
+                            }
+                            else
+                            {
+                                await _notificationService.SendFriendRequestDeclinedNotification(
+                                    requesterId,
+                                    userName
+                                );
+                                _logger.LogInformation($"Sent friend request declined notification to user {requesterId}");
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error sending friend request response notification");
+                        }
+                    }
+
+                    // Delete the original notification for the current user
+                    try
+                    {
+                        var getNotificationsRequest = new HttpRequestMessage(HttpMethod.Get, "notifications");
+                        getNotificationsRequest.Headers.Add("Authorization", "Bearer " + token);
+                        var getNotificationsResponse = await _httpClient.SendAsync(getNotificationsRequest);
+
+                        if (getNotificationsResponse.IsSuccessStatusCode)
+                        {
+                            var notificationsResponse = await getNotificationsResponse.Content.ReadFromJsonAsync<NotificationsResponse>();
+
+                            if (notificationsResponse?.Notifications != null)
+                            {
+                                // Find the notification related to this friendship
+                                var relatedNotification = notificationsResponse.Notifications
+                                    .FirstOrDefault(n => n.Type == "friend_request" && n.RelatedItemId == requestId);
+
+                                if (relatedNotification != null)
+                                {
+                                    // Delete the original notification
+                                    var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"notifications/{relatedNotification.Id}");
+                                    deleteRequest.Headers.Add("Authorization", "Bearer " + token);
+                                    await _httpClient.SendAsync(deleteRequest);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error cleaning up friend request notifications");
                     }
 
                     TempData["SuccessMessage"] = accept ? "Friend request accepted" : "Friend request declined";
@@ -625,8 +866,6 @@ namespace TennisMatchmakingSite2.Controllers
 
             return RedirectToAction("FriendRequests");
         }
-
-
 
         [HttpPost]
         public async Task<IActionResult> MarkNotificationRead(string notificationId)
@@ -662,6 +901,7 @@ namespace TennisMatchmakingSite2.Controllers
 
             return RedirectToAction("Index");
         }
+
         [HttpPost]
         public async Task<IActionResult> DeleteNotification(string notificationId)
         {
@@ -675,7 +915,7 @@ namespace TennisMatchmakingSite2.Controllers
 
                 _logger.LogInformation("Deleting notification: {NotificationId}", notificationId);
 
-                // Use DELETE request with ID in the URL path - RESTful approach
+                // Create DELETE request
                 var request = new HttpRequestMessage(HttpMethod.Delete, $"notifications/{notificationId}");
                 request.Headers.Add("Authorization", "Bearer " + token);
 
@@ -687,6 +927,21 @@ namespace TennisMatchmakingSite2.Controllers
 
                 if (response.IsSuccessStatusCode)
                 {
+                    // If we're on the social page, update the unread count viewbag
+                    if (Request.Path.Value?.Contains("/Social") == true)
+                    {
+                        // Get new unread count after deletion
+                        var countRequest = new HttpRequestMessage(HttpMethod.Get, "notifications?unread=true");
+                        countRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                        var countResponse = await _httpClient.SendAsync(countRequest);
+
+                        if (countResponse.IsSuccessStatusCode)
+                        {
+                            var notificationsResponse = await countResponse.Content.ReadFromJsonAsync<NotificationsResponse>();
+                            ViewBag.UnreadNotificationCount = notificationsResponse?.Notifications?.Count ?? 0;
+                        }
+                    }
+
                     return Json(new { success = true });
                 }
                 else
@@ -702,6 +957,118 @@ namespace TennisMatchmakingSite2.Controllers
                 return Json(new { success = false, message = "An error occurred" });
             }
         }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchUsers(string query)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWTToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "Not authenticated" });
+                }
+
+                if (string.IsNullOrEmpty(query) || query.Length < 2)
+                {
+                    return Json(new { success = false, message = "Search query must be at least 2 characters" });
+                }
+
+                // Call the friends/search endpoint in the Lambda function
+                var request = new HttpRequestMessage(HttpMethod.Get, $"friends/search?query={Uri.EscapeDataString(query)}");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                _logger.LogInformation($"Sending search request to Lambda: {request.RequestUri}");
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                _logger.LogInformation($"Search response: {response.StatusCode}, Content: {responseContent}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Deserialize using your existing SearchUsersResponse model
+                    var searchResponse = await response.Content.ReadFromJsonAsync<SearchUsersResponse>();
+
+                    // Return the response in the format your JavaScript expects
+                    return Json(new
+                    {
+                        success = true,
+                        users = searchResponse?.Users ?? new List<UserModel>()
+                    });
+                }
+                else
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = $"Failed to search users: {response.StatusCode}"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SearchUsers action");
+                return Json(new
+                {
+                    success = false,
+                    message = "An error occurred during search: " + ex.Message
+                });
+            }
+        }
+        // Add this to your SocialController.cs
+
+        [HttpPost]
+        public async Task<IActionResult> MarkAllMessagesRead([FromBody] ConversationReadRequest requestData)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWTToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "Not authenticated" });
+                }
+
+                // Validate the conversation ID
+                if (string.IsNullOrEmpty(requestData?.ConversationId) || requestData.ConversationId == "&")
+                {
+                    _logger.LogWarning("Invalid conversation ID for marking as read: {ConversationId}", requestData?.ConversationId);
+                    return Json(new { success = false, message = "Invalid conversation ID" });
+                }
+
+                _logger.LogInformation("Marking all messages as read in conversation: {ConversationId}", requestData.ConversationId);
+
+                using (var client = new HttpClient())
+                {
+                    client.BaseAddress = new Uri(_configuration["ApiBaseUrl"]);
+
+                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, "messages/conversations/read");
+                    httpRequest.Headers.Add("Authorization", "Bearer " + token);
+
+                    var jsonString = $"{{\"conversationId\":\"{requestData.ConversationId}\"}}";
+                    httpRequest.Content = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(httpRequest);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    _logger.LogInformation("Mark conversation read response: {StatusCode}, Content: {Content}",
+                        response.StatusCode, responseContent);
+
+                    return Json(new { success = response.IsSuccessStatusCode });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking all messages as read");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // Add this class to properly bind the request
+        public class ConversationReadRequest
+        {
+            public string ConversationId { get; set; }
+        }
+
         [HttpPost]
         public async Task<IActionResult> MarkMessageAsRead(string messageId)
         {
@@ -713,21 +1080,39 @@ namespace TennisMatchmakingSite2.Controllers
                     return Json(new { success = false, message = "Not authenticated" });
                 }
 
-                var request = new HttpRequestMessage(HttpMethod.Post, "messages/read");
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                request.Content = JsonContent.Create(new { messageId });
+                _logger.LogInformation("Marking message as read: {MessageId}", messageId);
 
-                var response = await _httpClient.SendAsync(request);
+                // Create a completely new HttpClient for this request only
+                using (var client = new HttpClient())
+                {
+                    client.BaseAddress = new Uri(_configuration["ApiBaseUrl"]);
 
-                if (response.IsSuccessStatusCode)
-                {
-                    return Json(new { success = true });
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogError($"Error marking message read: {response.StatusCode}, {errorContent}");
-                    return Json(new { success = false, message = "Failed to mark message as read" });
+                    // Create a new request message
+                    var request = new HttpRequestMessage(HttpMethod.Post, "messages/read");
+
+                    // Manually add the authorization header as a simple string
+                    request.Headers.Add("Authorization", "Bearer " + token);
+
+                    // Create simple string content instead of using JsonContent
+                    var jsonString = $"{{\"messageId\":\"{messageId}\"}}";
+                    request.Content = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(request);
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    _logger.LogInformation("Mark message read response: {StatusCode}, Content: {Content}",
+                        response.StatusCode, responseContent);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return Json(new { success = true });
+                    }
+                    else
+                    {
+                        _logger.LogError("Error marking message read: {StatusCode}, {Content}",
+                            response.StatusCode, responseContent);
+                        return Json(new { success = false, message = "Failed to mark message as read" });
+                    }
                 }
             }
             catch (Exception ex)
@@ -738,4 +1123,3 @@ namespace TennisMatchmakingSite2.Controllers
         }
     }
 }
-

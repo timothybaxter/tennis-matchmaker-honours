@@ -92,11 +92,12 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Ladder Info -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="theme-header p-4 rounded-t-lg">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 expandable-section">
+                <div class="theme-header p-4 rounded-t-lg section-header flex justify-between items-center">
                     <h2 class="text-lg font-semibold theme-text">Ladder Information</h2>
+                    <i class="fas fa-chevron-down expand-indicator transform transition-transform duration-200 md:hidden"></i>
                 </div>
-                <div class="p-6">
+                <div class="p-6 section-content">
                     <div class="space-y-3">
                         <div>
                             <p class="text-sm font-medium text-gray-700">Created by</p>
@@ -152,11 +153,12 @@
             <!-- Ladder Rankings & Matches -->
             <div class="md:col-span-2 space-y-6">
                 <!-- Ladder Rankings -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div class="theme-header p-4 rounded-t-lg">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 expandable-section">
+                    <div class="theme-header p-4 rounded-t-lg section-header flex justify-between items-center">
                         <h2 class="text-lg font-semibold theme-text">Ladder Rankings</h2>
+                        <i class="fas fa-chevron-down expand-indicator transform transition-transform duration-200 md:hidden"></i>
                     </div>
-                    <div class="p-6">
+                    <div class="p-6 section-content">
                         @if (!Model.Positions.Any())
                         {
                         <p class="text-gray-600">No players in this ladder yet.</p>
@@ -224,14 +226,14 @@
                                         <td class="py-3 px-3 text-right">
                                             <div class="flex justify-end gap-2">
                                                 @if (isChallengeable)
- {
+                                                {
                                                 <form asp-action="IssueChallenge" asp-route-id="@Model.Id" asp-route-challengeeId="@position.PlayerId" method="post" class="inline">
                                                     <button type="submit" class="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
                                                         <i class="fas fa-chess-knight mr-1"></i>
                                                         Challenge
                                                     </button>
                                                 </form>
- }
+                                                }
                                                 <a href="@Url.Action("ViewProfile", "Profile", new { id = position.PlayerId })"
                                                    class="inline-flex items-center px-3 py-1 text-sm font-medium text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
                                                     <i class="fas fa-user mr-1"></i>
@@ -253,11 +255,12 @@
                 {
                     var activeMatches = Model.Matches.Where(m => m.Status == "accepted" || m.Status == "disputed").ToList();
 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div class="theme-header p-4 rounded-t-lg">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 expandable-section">
+                    <div class="theme-header p-4 rounded-t-lg section-header flex justify-between items-center">
                         <h2 class="text-lg font-semibold theme-text">Active Challenges (@activeMatches.Count)</h2>
+                        <i class="fas fa-chevron-down expand-indicator transform transition-transform duration-200 md:hidden"></i>
                     </div>
-                    <div class="p-6">
+                    <div class="p-6 section-content">
                         <div class="space-y-4">
                             @foreach (var match in activeMatches.OrderBy(m => m.CreatedAt))
                             {
@@ -363,11 +366,12 @@
                 {
                     var completedMatches = Model.Matches.Where(m => m.Status == "completed" || m.Status == "cancelled" || m.Status == "no_contest").ToList();
 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div class="theme-header p-4 rounded-t-lg">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 expandable-section">
+                    <div class="theme-header p-4 rounded-t-lg section-header flex justify-between items-center">
                         <h2 class="text-lg font-semibold theme-text">Recent Matches (@completedMatches.Count)</h2>
+                        <i class="fas fa-chevron-down expand-indicator transform transition-transform duration-200 md:hidden"></i>
                     </div>
-                    <div class="p-6">
+                    <div class="p-6 section-content">
                         <div class="space-y-4">
                             @foreach (var match in completedMatches.OrderByDescending(m => m.CompletedAt).Take(5))
                             {
@@ -438,7 +442,7 @@
                                           }
                                 </div>
                             </div>
-}
+                            }
                         </div>
 
                         @if (completedMatches.Count > 5)
@@ -719,6 +723,7 @@
 </div>
 
 <script src="/js/theme-handler.js"></script>
+<script src="/js/mobile-expandable-sections.js"></script>
 
 @section Scripts {
     <script>
@@ -765,259 +770,242 @@
         applyThemeToElements();
 
         // User search modal functions
-function openSearchModal() {
-    const modal = document.getElementById('searchModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        document.getElementById('userSearchInput').focus();
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeSearchModal() {
-    const modal = document.getElementById('searchModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        document.body.style.overflow = '';
-        // Clear search results
-        document.getElementById('searchResults').innerHTML = '';
-        document.getElementById('userSearchInput').value = '';
-    }
-}
-
-// Dispute resolution variables
-let currentMatchId = '';
-let currentChallengerId = '';
-let currentChallengeeName = '';
-let currentChallengeeId = '';
-let currentChallengerName = '';
-
-// Open dispute resolution modal
-function openResolveDisputeModal(matchId, challengerId, challengerName, challengeeId, challengeeName) {
-    const modal = document.getElementById('resolve-dispute-modal');
-    if (!modal) return;
-
-    // Reset form selections
-    document.querySelectorAll('input[name="resolution"]').forEach(radio => {
-        radio.checked = false;
-    });
-
-    document.querySelectorAll('input[name="winner"]').forEach(radio => {
-        radio.checked = false;
-    });
-
-    hideWinnerSelection();
-
-    // Set values for current match
-    currentMatchId = matchId;
-    currentChallengerId = challengerId;
-    currentChallengerName = challengerName;
-    currentChallengeeId = challengeeId;
-    currentChallengeeName = challengeeName;
-
-    // Update modal with player names
-    document.getElementById('dispute-challenger-name').textContent = challengerName;
-    document.getElementById('dispute-challengee-name').textContent = challengeeName;
-
-    document.getElementById('challenger-winner').value = challengerId;
-    document.getElementById('challengee-winner').value = challengeeId;
-    document.getElementById('challenger-winner-name').textContent = challengerName;
-    document.getElementById('challengee-winner-name').textContent = challengeeName;
-
-    // Show modal
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeResolveDisputeModal() {
-    const modal = document.getElementById('resolve-dispute-modal');
-    if (!modal) return;
-
-    modal.classList.add('hidden');
-    document.body.style.overflow = '';
-}
-
-function showWinnerSelection() {
-    const winnerSection = document.getElementById('winner-selection');
-    winnerSection.classList.remove('hidden');
-}
-
-function hideWinnerSelection() {
-    const winnerSection = document.getElementById('winner-selection');
-    winnerSection.classList.add('hidden');
-
-    // Clear winner selection
-    document.getElementById('challenger-winner').checked = false;
-    document.getElementById('challengee-winner').checked = false;
-}
-
-function resolveDispute() {
-    // Get selected resolution
-    const resolution = document.querySelector('input[name="resolution"]:checked');
-
-    if (!resolution) {
-        alert('Please select a resolution option');
-        return;
-    }
-
-    let winnerId = null;
-
-    // Check if winner resolution and validate selection
-    if (resolution.value === 'winner') {
-        const winnerSelection = document.querySelector('input[name="winner"]:checked');
-        if (!winnerSelection) {
-            alert('Please select a winner');
-            return;
+        function openSearchModal() {
+            const modal = document.getElementById('searchModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.getElementById('userSearchInput').focus();
+                document.body.style.overflow = 'hidden';
+            }
         }
-        winnerId = winnerSelection.value;
-    }
 
-    // Confirm resolution
-    let confirmationMessage = "Are you sure you want to resolve this dispute by ";
-    switch (resolution.value) {
-        case 'winner':
-            const winnerName = winnerId === currentChallengerId ? currentChallengerName : currentChallengeeName;
-            confirmationMessage += `declaring ${winnerName} as the winner?`;
-            break;
-        case 'remove_challenger':
-            confirmationMessage += `removing ${currentChallengerName} from the ladder?`;
-            break;
-        case 'remove_challengee':
-            confirmationMessage += `removing ${currentChallengeeName} from the ladder?`;
-            break;
-        case 'remove_both':
-            confirmationMessage += "removing both players from the ladder?";
-            break;
-        case 'void_match':
-            confirmationMessage += "voiding the match (no changes to ladder)?";
-            break;
-        default:
-            confirmationMessage += "this method?";
-    }
-
-    if (!confirm(confirmationMessage)) {
-        return;
-    }
-
-    // Send resolution to server
-    fetch('/Tournaments/ResolveLadderDispute', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            LadderId: '@Model.Id',
-            MatchId: currentMatchId,
-            Resolution: resolution.value,
-            WinnerId: winnerId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show loading indicator
-            closeResolveDisputeModal();
-
-            // Simple page reload after successful resolution
-            window.location.reload();
-        } else {
-            alert('Error resolving dispute: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error resolving dispute:', error);
-        alert('An error occurred while resolving the dispute');
-    });
-}// Set up search input
-document.addEventListener('DOMContentLoaded', function() {
-    const searchButton = document.getElementById('openSearchModal');
-    if (searchButton) {
-        searchButton.addEventListener('click', openSearchModal);
-    }
-
-    const searchInput = document.getElementById('userSearchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', debounce(function() {
-            const query = this.value.trim();
-            if (query.length >= 2) {
-                searchUsers(query);
-            } else {
+        function closeSearchModal() {
+            const modal = document.getElementById('searchModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+                // Clear search results
                 document.getElementById('searchResults').innerHTML = '';
+                document.getElementById('userSearchInput').value = '';
             }
-        }, 500));
-    }
+        }
 
-    // Close modal when clicking outside
-    const modal = document.getElementById('searchModal');
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeSearchModal();
+        // Dispute resolution variables
+        let currentMatchId = '';
+        let currentChallengerId = '';
+        let currentChallengeeName = '';
+        let currentChallengeeId = '';
+        let currentChallengerName = '';
+
+        // Open dispute resolution modal
+        function openResolveDisputeModal(matchId, challengerId, challengerName, challengeeId, challengeeName) {
+            const modal = document.getElementById('resolve-dispute-modal');
+            if (!modal) return;
+
+            // Reset form selections
+            document.querySelectorAll('input[name="resolution"]').forEach(radio => {
+                radio.checked = false;
+            });
+
+            document.querySelectorAll('input[name="winner"]').forEach(radio => {
+                radio.checked = false;
+            });
+
+            hideWinnerSelection();
+
+            // Set values for current match
+            currentMatchId = matchId;
+            currentChallengerId = challengerId;
+            currentChallengerName = challengerName;
+            currentChallengeeId = challengeeId;
+            currentChallengeeName = challengeeName;
+
+            // Update modal with player names
+            document.getElementById('dispute-challenger-name').textContent = challengerName;
+            document.getElementById('dispute-challengee-name').textContent = challengeeName;
+
+            document.getElementById('challenger-winner').value = challengerId;
+            document.getElementById('challengee-winner').value = challengeeId;
+            document.getElementById('challenger-winner-name').textContent = challengerName;
+            document.getElementById('challengee-winner-name').textContent = challengeeName;
+
+            // Show modal
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeResolveDisputeModal() {
+            const modal = document.getElementById('resolve-dispute-modal');
+            if (!modal) return;
+
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function showWinnerSelection() {
+            const winnerSection = document.getElementById('winner-selection');
+            winnerSection.classList.remove('hidden');
+        }
+
+        function hideWinnerSelection() {
+            const winnerSection = document.getElementById('winner-selection');
+            winnerSection.classList.add('hidden');
+
+            // Clear winner selection
+            document.getElementById('challenger-winner').checked = false;
+            document.getElementById('challengee-winner').checked = false;
+        }
+
+        function resolveDispute() {
+            // Get selected resolution
+            const resolution = document.querySelector('input[name="resolution"]:checked');
+
+            if (!resolution) {
+                alert('Please select a resolution option');
+                return;
             }
-        });
-    }
 
-    // Close dispute modal when clicking outside
-    const disputeModal = document.getElementById('resolve-dispute-modal');
-    if (disputeModal) {
-        disputeModal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeResolveDisputeModal();
+            console.log("Selected resolution:", resolution.value);
+
+            let winnerId = null;
+
+            // Check if winner resolution and validate selection
+            if (resolution.value === 'winner') {
+                const winnerSelection = document.querySelector('input[name="winner"]:checked');
+                if (!winnerSelection) {
+                    alert('Please select a winner');
+                    return;
+                }
+                winnerId = winnerSelection.value;
+                console.log("Selected winner:", winnerId);
             }
-        });
-    }
-});
 
-// Debounce function to limit API calls
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func.apply(this, args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
+            // Try with different case variations to see which works
+            // First try with camelCase (standard JSON style)
+            const payload = {
+                ladderId: '@Model.Id',
+                matchId: currentMatchId,
+                resolution: resolution.value,
+                winnerId: winnerId
+            };
 
-// Search users function
-function searchUsers(query) {
-    fetch(`/Tournaments/SearchAllUsers?query=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            const resultsContainer = document.getElementById('searchResults');
-            resultsContainer.innerHTML = '';
+            console.log("Sending payload:", JSON.stringify(payload));
 
-            if (data.success && data.users && data.users.length > 0) {
-                data.users.forEach(user => {
-                    const userDiv = document.createElement('div');
-                    userDiv.className = 'p-2 border-b border-gray-200 hover:bg-gray-50 flex justify-between items-center';
-                    userDiv.innerHTML = `
-                        <div>
-                            <p class="font-medium">${user.name}</p>
-                            <p class="text-sm text-gray-600">${user.playerLevel || 'Unknown level'}</p>
-                        </div>
-                        <form action="/Tournaments/InviteToLadder" method="post">
-                            <input type="hidden" name="ladderId" value="${'@Model.Id'}">
-                            <input type="hidden" name="inviteeId" value="${user.id}">
-                            <input type="hidden" name="redirectToDetails" value="true">
-                            <button type="submit" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                                Invite
-                            </button>
-                        </form>
-                    `;
-                    resultsContainer.appendChild(userDiv);
+            fetch('/Tournaments/ResolveLadderDispute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log("Response status:", response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log("Server response:", data);
+                if (data.success) {
+                    closeResolveDisputeModal();
+                    window.location.reload();
+                } else {
+                    alert('Error resolving dispute: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error resolving dispute:', error);
+                alert('An error occurred while resolving the dispute');
+            });
+        }
+        // Set up search input
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchButton = document.getElementById('openSearchModal');
+            if (searchButton) {
+                searchButton.addEventListener('click', openSearchModal);
+            }
+
+            const searchInput = document.getElementById('userSearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(function() {
+                    const query = this.value.trim();
+                    if (query.length >= 2) {
+                        searchUsers(query);
+                    } else {
+                        document.getElementById('searchResults').innerHTML = '';
+                    }
+                }, 500));
+            }
+
+            // Close modal when clicking outside
+            const modal = document.getElementById('searchModal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeSearchModal();
+                    }
                 });
-            } else {
-                resultsContainer.innerHTML = `<p class="p-2 text-gray-600">No users found matching "${query}"</p>`;
             }
-        })
-        .catch(error => {
-            console.error('Search error:', error);
-            document.getElementById('searchResults').innerHTML = `<p class="p-2 text-red-600">Error searching for users</p>`;
+
+            // Close dispute modal when clicking outside
+            const disputeModal = document.getElementById('resolve-dispute-modal');
+            if (disputeModal) {
+                disputeModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeResolveDisputeModal();
+                    }
+                });
+            }
         });
-}
+
+        // Debounce function to limit API calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func.apply(this, args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Search users function
+        function searchUsers(query) {
+            fetch(`/Tournaments/SearchAllUsers?query=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const resultsContainer = document.getElementById('searchResults');
+                    resultsContainer.innerHTML = '';
+
+                    if (data.success && data.users && data.users.length > 0) {
+                        data.users.forEach(user => {
+                            const userDiv = document.createElement('div');
+                            userDiv.className = 'p-2 border-b border-gray-200 hover:bg-gray-50 flex justify-between items-center';
+                            userDiv.innerHTML = `
+                                <div>
+                                    <p class="font-medium">${user.name}</p>
+                                    <p class="text-sm text-gray-600">${user.playerLevel || 'Unknown level'}</p>
+                                </div>
+                                <form action="/Tournaments/InviteToLadder" method="post">
+                                    <input type="hidden" name="ladderId" value="${'@Model.Id'}">
+                                    <input type="hidden" name="inviteeId" value="${user.id}">
+                                    <input type="hidden" name="redirectToDetails" value="true">
+                                    <button type="submit" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                        Invite
+                                    </button>
+                                </form>
+                            `;
+                            resultsContainer.appendChild(userDiv);
+                        });
+                    } else {
+                        resultsContainer.innerHTML = `<p class="p-2 text-gray-600">No users found matching "${query}"</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    document.getElementById('searchResults').innerHTML = `<p class="p-2 text-red-600">Error searching for users</p>`;
+                });
+        }
         // Match data store
         const matches = @Html.Raw(Json.Serialize(Model.Matches));
 
@@ -1135,6 +1123,54 @@ function searchUsers(query) {
                 closeSubmitResultModal();
             }
         });
+
+        // Expandable sections styles
+        document.head.insertAdjacentHTML('beforeend', `
+        <style>
+            /* Expandable sections styles */
+            .expandable-section .section-header {
+                position: relative;
+                cursor: pointer;
+            }
+
+            @@media (min-width: 768px) {
+                .expandable-section .section-header {
+                    cursor: default;
+                }
+            }
+
+            .expand-indicator {
+                transition: transform 0.2s ease-in-out;
+            }
+
+            .expand-indicator.rotate-180 {
+                transform: rotate(180deg);
+            }
+
+            .section-content {
+                transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+            }
+
+            .section-content.hidden {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+
+            .section-content:not(.hidden) {
+                max-height: 2000px;
+                opacity: 1;
+            }
+
+            @@media (max-width: 767px) {
+                .expandable-section .section-header:hover {
+                    background-color: rgba(0, 0, 0, 0.03);
+                }
+            }
+        </style>
+        `);
     </script>
 }
 

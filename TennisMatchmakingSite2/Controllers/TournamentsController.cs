@@ -167,7 +167,6 @@ namespace TennisMatchmakingSite2.Controllers
             return View(new CreateTournamentViewModel());
         }
 
-        // 15. CreateTournament - Add automatic notification to creator
         [HttpPost]
         public async Task<IActionResult> CreateTournament(CreateTournamentViewModel model)
         {
@@ -224,7 +223,7 @@ namespace TennisMatchmakingSite2.Controllers
                     // Create a confirmation notification for the creator
                     if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(tournamentId))
                     {
-                        await _notificationService.CreateNotificationAsync(
+                        var notificationSent = await _notificationService.CreateNotificationAsync(
                             userId,
                             "tournament_created",
                             $"You have successfully created the tournament \"{model.Name}\". Invite players to get started!",
@@ -232,6 +231,11 @@ namespace TennisMatchmakingSite2.Controllers
                             userId,
                             null
                         );
+
+                        if (!notificationSent)
+                        {
+                            _logger.LogWarning("Failed to send tournament creation confirmation notification to user {UserId}", userId);
+                        }
                     }
 
                     return RedirectToAction(nameof(Index), new { personal = true });
@@ -379,14 +383,17 @@ namespace TennisMatchmakingSite2.Controllers
                     // Notify tournament creator that someone joined
                     if (!string.IsNullOrEmpty(tournament.CreatorId) && tournament.CreatorId != userId)
                     {
-                        await _notificationService.CreateNotificationAsync(
-                             tournament.CreatorId,
-                             "tournament_player_joined",
-                             $"{userName} has joined your tournament \"{tournament.Name}\"",
-                             id,
-                             userId,
-                             null
-                         );
+                        var notificationSent = await _notificationService.SendTournamentPlayerJoinedNotification(
+                            tournament.CreatorId,
+                            userName,
+                            id,
+                            tournament.Name
+                        );
+
+                        if (!notificationSent)
+                        {
+                            _logger.LogWarning("Failed to send tournament player joined notification to creator {CreatorId}", tournament.CreatorId);
+                        }
                     }
 
                     TempData["SuccessMessage"] = "Successfully joined tournament";
@@ -401,6 +408,7 @@ namespace TennisMatchmakingSite2.Controllers
                 return RedirectToAction(nameof(TournamentDetails), new { id });
             }
         }
+
 
         // 10. JoinLadder - Add notification to ladder creator
         [HttpPost]
@@ -632,6 +640,9 @@ namespace TennisMatchmakingSite2.Controllers
                 var player1Name = player1Details?.Name ?? "Opponent";
                 var player2Name = player2Details?.Name ?? "Opponent";
 
+                // Determine if this is the first submission or a confirmation
+                bool isFirstSubmission = matchDetails.Status == "scheduled" || matchDetails.Status == "pending_result";
+
                 var request = new HttpRequestMessage(HttpMethod.Post, $"tournaments/{id}/matches/{matchId}/result");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -651,32 +662,137 @@ namespace TennisMatchmakingSite2.Controllers
                 }
                 else
                 {
-                    // Send notifications to both players
-                    if (player1Id != null && player1Id != submitterUserId)
+                    _logger.LogInformation("Successfully submitted match result. Player1: {Player1Id}, Player2: {Player2Id}, Winner: {WinnerId}",
+                        player1Id, player2Id, winner);
+
+                    bool notificationSuccess = true;
+
+                    // Check the response to determine if match is now finalized
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    bool isMatchFinalized = false;
+
+                    try
                     {
-                        await _notificationService.SendTournamentMatchResultNotification(
-                            player1Id,
-                            player2Name,
-                            winner == player1Id,
-                            id,
-                            tournament.Name,
-                            matchId
-                        );
+                        using (JsonDocument document = JsonDocument.Parse(responseContent))
+                        {
+                            // Check if the response indicates the match is finalized
+                            if (document.RootElement.TryGetProperty("status", out JsonElement statusElement) &&
+                                statusElement.GetString() == "completed")
+                            {
+                                isMatchFinalized = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error parsing match submission response");
                     }
 
-                    if (player2Id != null && player2Id != submitterUserId)
+                    // If this is the first submission and not yet finalized, notify the other player to confirm
+                    if (isFirstSubmission && !isMatchFinalized)
                     {
-                        await _notificationService.SendTournamentMatchResultNotification(
-                            player2Id,
-                            player1Name,
-                            winner == player2Id,
-                            id,
-                            tournament.Name,
-                            matchId
-                        );
+                        // Determine the other player to notify
+                        string otherPlayerId = submitterUserId == player1Id ? player2Id : player1Id;
+                        string otherPlayerName = submitterUserId == player1Id ? player2Name : player1Name;
+
+                        if (!string.IsNullOrEmpty(otherPlayerId))
+                        {
+                            var notificationSent = await _notificationService.CreateNotificationAsync(
+                                otherPlayerId,
+                                "tournament_match_submission",
+                                $"{submitterName} has submitted a result for your match in \"{tournament.Name}\". Please confirm or dispute the result.",
+                                matchId,
+                                submitterUserId,
+                                new Dictionary<string, string> { { "tournamentId", id } }
+                            );
+
+                            if (!notificationSent)
+                            {
+                                _logger.LogWarning("Failed to send match submission notification to player {PlayerId}", otherPlayerId);
+                                notificationSuccess = false;
+                            }
+                        }
                     }
 
-                    TempData["SuccessMessage"] = "Match result submitted successfully";
+                    // If match is now finalized, notify both players and tournament participants
+                    if (isMatchFinalized)
+                    {
+                        // Notify both players about their match result
+                        if (player1Id != null && player1Id != submitterUserId)
+                        {
+                            var notificationSent = await _notificationService.SendTournamentMatchResultNotification(
+                                player1Id,
+                                player2Name,
+                                winner == player1Id,
+                                id,
+                                tournament.Name,
+                                matchId
+                            );
+
+                            if (!notificationSent)
+                            {
+                                _logger.LogWarning("Failed to send match result notification to player1 {PlayerId}", player1Id);
+                                notificationSuccess = false;
+                            }
+                        }
+
+                        if (player2Id != null && player2Id != submitterUserId)
+                        {
+                            var notificationSent = await _notificationService.SendTournamentMatchResultNotification(
+                                player2Id,
+                                player1Name,
+                                winner == player2Id,
+                                id,
+                                tournament.Name,
+                                matchId
+                            );
+
+                            if (!notificationSent)
+                            {
+                                _logger.LogWarning("Failed to send match result notification to player2 {PlayerId}", player2Id);
+                                notificationSuccess = false;
+                            }
+                        }
+
+                        // Construct the score display for notification (e.g., "6-4, 7-5")
+                        string scoreDisplay = string.Join(", ", Scores.Select(s => $"{s.Player1}-{s.Player2}"));
+                        string winnerName = winner == player1Id ? player1Name : player2Name;
+                        string loserName = winner == player1Id ? player2Name : player1Name;
+
+                        // Notify all tournament participants except the players involved
+                        if (tournament.Players != null)
+                        {
+                            foreach (var playerId in tournament.Players)
+                            {
+                                // Skip the players who were in the match
+                                if (playerId == player1Id || playerId == player2Id)
+                                    continue;
+
+                                var notificationSent = await _notificationService.CreateNotificationAsync(
+                                    playerId,
+                                    "tournament_match_completed",
+                                    $"{winnerName} defeated {loserName} ({scoreDisplay}) in the tournament \"{tournament.Name}\"",
+                                    matchId,
+                                    null,
+                                    new Dictionary<string, string> { { "tournamentId", id } }
+                                );
+
+                                if (!notificationSent)
+                                {
+                                    _logger.LogWarning("Failed to send match completed notification to tournament participant {PlayerId}", playerId);
+                                }
+                            }
+                        }
+                    }
+
+                    TempData["SuccessMessage"] = isMatchFinalized
+                        ? "Match result finalized successfully"
+                        : "Match result submitted successfully. Waiting for opponent to confirm.";
+
+                    if (!notificationSuccess)
+                    {
+                        _logger.LogWarning("One or more match result notifications failed to send");
+                    }
                 }
 
                 return RedirectToAction(nameof(TournamentDetails), new { id });
@@ -731,12 +847,17 @@ namespace TennisMatchmakingSite2.Controllers
                             // Skip notifying the organizer
                             if (playerId != organizerId)
                             {
-                                await _notificationService.SendTournamentStartedNotification(
+                                var notificationSent = await _notificationService.SendTournamentStartedNotification(
                                     playerId,
                                     organizerName,
                                     id,
                                     tournament.Name
                                 );
+
+                                if (!notificationSent)
+                                {
+                                    _logger.LogWarning("Failed to send tournament started notification to player {PlayerId}", playerId);
+                                }
                             }
                         }
                     }
@@ -754,7 +875,6 @@ namespace TennisMatchmakingSite2.Controllers
             }
         }
 
-        // 6. IssueChallenge - Notifies a user when they receive a ladder challenge
         [HttpPost]
         public async Task<IActionResult> IssueChallenge(string id, string challengeeId)
         {
@@ -1214,12 +1334,17 @@ namespace TennisMatchmakingSite2.Controllers
                 if (response.IsSuccessStatusCode)
                 {
                     // Send notification to invitee
-                    await _notificationService.SendTournamentInviteNotification(
+                    var notificationSent = await _notificationService.SendTournamentInviteNotification(
                         inviteeId,
                         senderName,
                         tournamentId,
                         tournamentName
                     );
+
+                    if (!notificationSent)
+                    {
+                        _logger.LogWarning("Failed to send tournament invitation notification to user {InviteeId}", inviteeId);
+                    }
 
                     TempData["SuccessMessage"] = "Invitation sent successfully";
                 }
@@ -1329,7 +1454,6 @@ namespace TennisMatchmakingSite2.Controllers
             }
         }
 
-        // 7. RespondToTournamentInvitation - Notifies tournament creator when invitation is accepted/rejected
         [HttpPost]
         public async Task<IActionResult> RespondToTournamentInvitation(string invitationId, string response)
         {
@@ -1393,29 +1517,31 @@ namespace TennisMatchmakingSite2.Controllers
                 else
                 {
                     // Notify tournament creator if we have their ID
+                    bool notificationSent = false;
                     if (!string.IsNullOrEmpty(creatorId) && !string.IsNullOrEmpty(tournamentId))
                     {
                         if (response.ToLower() == "accept")
                         {
-                            await _notificationService.CreateNotificationAsync(
+                            notificationSent = await _notificationService.SendTournamentInvitationAcceptedNotification(
                                 creatorId,
-                                "tournament_invitation_accepted",
-                                $"{respondentName} has accepted your invitation to join \"{tournamentName}\"",
+                                respondentName,
                                 tournamentId,
-                                null,
-                                null
+                                tournamentName
                             );
                         }
                         else
                         {
-                            await _notificationService.CreateNotificationAsync(
+                            notificationSent = await _notificationService.SendTournamentInvitationDeclinedNotification(
                                 creatorId,
-                                "tournament_invitation_rejected",
-                                $"{respondentName} has declined your invitation to join \"{tournamentName}\"",
+                                respondentName,
                                 tournamentId,
-                                null,
-                                null
+                                tournamentName
                             );
+                        }
+
+                        if (!notificationSent)
+                        {
+                            _logger.LogWarning("Failed to send tournament invitation response notification to creator {CreatorId}", creatorId);
                         }
                     }
 
@@ -1534,7 +1660,6 @@ namespace TennisMatchmakingSite2.Controllers
             }
         }
 
-        // 11. CancelTournamentInvitation - Add notification to invitee
         [HttpPost]
         public async Task<IActionResult> CancelTournamentInvitation(string tournamentId, string invitationId)
         {
@@ -1584,14 +1709,17 @@ namespace TennisMatchmakingSite2.Controllers
                     // Notify the invitee if we have their ID
                     if (!string.IsNullOrEmpty(inviteeId))
                     {
-                        await _notificationService.CreateNotificationAsync(
+                        var notificationSent = await _notificationService.SendTournamentInvitationCancelledNotification(
                             inviteeId,
-                            "tournament_invitation_cancelled",
-                            $"{organizerName} has cancelled your invitation to \"{tournamentName}\"",
+                            organizerName,
                             tournamentId,
-                            null,
-                            null
+                            tournamentName
                         );
+
+                        if (!notificationSent)
+                        {
+                            _logger.LogWarning("Failed to send tournament invitation cancelled notification to user {InviteeId}", inviteeId);
+                        }
                     }
 
                     TempData["SuccessMessage"] = "Invitation cancelled successfully";
@@ -1758,25 +1886,65 @@ namespace TennisMatchmakingSite2.Controllers
 
 
         [HttpPost]
-        public async Task<IActionResult> ResolveLadderDispute(ResolveLadderDisputeViewModel model)
+        public async Task<IActionResult> ResolveLadderDispute([FromBody] JsonElement requestData)
         {
             try
             {
-                var token = HttpContext.Session.GetString("JWTToken");
-                var resolverName = HttpContext.Session.GetString("UserName");
+                // Log the entire received request data
+                _logger.LogInformation($"Raw dispute resolution data received: {JsonSerializer.Serialize(requestData)}");
 
+                var token = HttpContext.Session.GetString("JWTToken");
                 if (string.IsNullOrEmpty(token))
                 {
                     return Json(new { success = false, message = "Authorization required" });
                 }
 
-                if (string.IsNullOrEmpty(model.LadderId) || string.IsNullOrEmpty(model.MatchId) || string.IsNullOrEmpty(model.Resolution))
+                // Try to extract required parameters directly from JSON
+                string ladderId = null;
+                string matchId = null;
+                string resolution = null;
+                string winnerId = null;
+
+                // Check if properties exist and extract them
+                if (requestData.TryGetProperty("ladderId", out var ladderIdElement))
+                    ladderId = ladderIdElement.GetString();
+                else if (requestData.TryGetProperty("LadderId", out ladderIdElement))
+                    ladderId = ladderIdElement.GetString();
+
+                if (requestData.TryGetProperty("matchId", out var matchIdElement))
+                    matchId = matchIdElement.GetString();
+                else if (requestData.TryGetProperty("MatchId", out matchIdElement))
+                    matchId = matchIdElement.GetString();
+
+                if (requestData.TryGetProperty("resolution", out var resolutionElement))
+                    resolution = resolutionElement.GetString();
+                else if (requestData.TryGetProperty("Resolution", out resolutionElement))
+                    resolution = resolutionElement.GetString();
+
+                if (requestData.TryGetProperty("winnerId", out var winnerIdElement) &&
+                    winnerIdElement.ValueKind != JsonValueKind.Null)
+                    winnerId = winnerIdElement.GetString();
+                else if (requestData.TryGetProperty("WinnerId", out winnerIdElement) &&
+                         winnerIdElement.ValueKind != JsonValueKind.Null)
+                    winnerId = winnerIdElement.GetString();
+
+                // Log what we found
+                _logger.LogInformation($"Extracted parameters - ladderId: {ladderId}, matchId: {matchId}, resolution: {resolution}, winnerId: {winnerId}");
+
+                // Check for required parameters
+                if (string.IsNullOrEmpty(ladderId) || string.IsNullOrEmpty(matchId) || string.IsNullOrEmpty(resolution))
                 {
-                    return Json(new { success = false, message = "Required parameters missing" });
+                    string missing = "";
+                    if (string.IsNullOrEmpty(ladderId)) missing += "ladderId ";
+                    if (string.IsNullOrEmpty(matchId)) missing += "matchId ";
+                    if (string.IsNullOrEmpty(resolution)) missing += "resolution ";
+
+                    _logger.LogWarning($"Missing required parameters: {missing}");
+                    return Json(new { success = false, message = $"Required parameters missing: {missing}" });
                 }
 
                 // Get ladder details first to get match participants
-                var ladder = await FetchDataFromApi<LadderDetailData>($"ladders/{model.LadderId}", token);
+                var ladder = await FetchDataFromApi<LadderDetailData>($"ladders/{ladderId}", token);
 
                 if (ladder == null)
                 {
@@ -1784,7 +1952,7 @@ namespace TennisMatchmakingSite2.Controllers
                 }
 
                 // Find the match and get player info
-                var match = ladder.Matches?.FirstOrDefault(m => m.Id == model.MatchId);
+                var match = ladder.Matches?.FirstOrDefault(m => m.Id == matchId);
 
                 if (match == null)
                 {
@@ -1795,20 +1963,21 @@ namespace TennisMatchmakingSite2.Controllers
                 string challengeeId = match.ChallengeeId;
 
                 // For void_match, we'll pass "void" as the winnerId instead of null
-                string winnerId = model.WinnerId;
-                if (model.Resolution == "void_match")
+                if (resolution == "void_match")
                 {
                     winnerId = "void";
                 }
 
-                var request = new HttpRequestMessage(HttpMethod.Post, $"ladders/{model.LadderId}/matches/{model.MatchId}/resolve");
+                var request = new HttpRequestMessage(HttpMethod.Post, $"ladders/{ladderId}/matches/{matchId}/resolve");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var requestBody = new
                 {
-                    resolution = model.Resolution,
+                    resolution = resolution,
                     winnerId = winnerId
                 };
+
+                _logger.LogInformation($"Sending to Lambda: {JsonSerializer.Serialize(requestBody)}");
 
                 request.Content = JsonContent.Create(requestBody);
                 var response = await _httpClient.SendAsync(request);
@@ -1818,31 +1987,37 @@ namespace TennisMatchmakingSite2.Controllers
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Notify both challenger and challengee
-                    if (!string.IsNullOrEmpty(challengerId))
-                    {
-                        await _notificationService.SendMatchDisputeResolvedNotification(
-                            challengerId,
-                            resolverName,
-                            model.Resolution,
-                            "ladder",
-                            ladder.Name,
-                            model.MatchId,
-                            model.LadderId
-                        );
-                    }
+                    // Get username for notifications
+                    var resolverName = HttpContext.Session.GetString("UserName");
 
-                    if (!string.IsNullOrEmpty(challengeeId))
+                    // Notify both challenger and challengee (if notification service is available)
+                    if (_notificationService != null)
                     {
-                        await _notificationService.SendMatchDisputeResolvedNotification(
-                            challengeeId,
-                            resolverName,
-                            model.Resolution,
-                            "ladder",
-                            ladder.Name,
-                            model.MatchId,
-                            model.LadderId
-                        );
+                        if (!string.IsNullOrEmpty(challengerId))
+                        {
+                            await _notificationService.SendMatchDisputeResolvedNotification(
+                                challengerId,
+                                resolverName,
+                                resolution,
+                                "ladder",
+                                ladder.Name,
+                                matchId,
+                                ladderId
+                            );
+                        }
+
+                        if (!string.IsNullOrEmpty(challengeeId))
+                        {
+                            await _notificationService.SendMatchDisputeResolvedNotification(
+                                challengeeId,
+                                resolverName,
+                                resolution,
+                                "ladder",
+                                ladder.Name,
+                                matchId,
+                                ladderId
+                            );
+                        }
                     }
 
                     // Set a success message that will be shown after redirect

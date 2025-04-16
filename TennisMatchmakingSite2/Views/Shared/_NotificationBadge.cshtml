@@ -1,0 +1,7 @@
+@{
+    var unreadCount = ViewBag.UnreadNotificationCount ?? 0;
+}
+
+<div id="notification-badge" class="@(unreadCount > 0 ? "" : "hidden")">
+    <span class="notification-count">@unreadCount</span>
+</div>

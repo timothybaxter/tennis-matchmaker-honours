@@ -1,0 +1,46 @@
+/* expandable-sections.css */
+
+/* General styles for expandable sections */
+.expandable-section .section-header {
+    position: relative;
+    cursor: pointer;
+}
+
+/* Show cursor only on mobile */
+@media (min-width: 768px) {
+    .expandable-section .section-header {
+        cursor: default;
+    }
+}
+
+/* Expand/collapse indicator */
+.expand-indicator {
+    transition: transform 0.2s ease-in-out;
+}
+
+    .expand-indicator.rotate-180 {
+        transform: rotate(180deg);
+    }
+
+/* Smooth transition for expanding/collapsing */
+.section-content {
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+}
+
+    .section-content.hidden {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+    }
+
+    .section-content:not(.hidden) {
+        max-height: 2000px; /* Large enough to contain content */
+        opacity: 1;
+    }
+
+/* Add a subtle hover effect on mobile */
+@media (max-width: 767px) {
+    .expandable-section .section-header:hover {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+}

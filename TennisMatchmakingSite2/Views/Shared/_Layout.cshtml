@@ -3,6 +3,7 @@
     var currentTheme = Context.Session.GetString("Theme") ?? "Wimbledon";
     var userId = Context.Session.GetString("UserId");
     var userName = Context.Session.GetString("UserName");
+    var unreadNotifications = ViewBag.UnreadNotificationCount ?? 0;
 
     // Define theme colors based on the current theme
     string navbarColor, backgroundImage, bottomNavColor, bottomNavLinkColor, bottomNavLinkHoverColor, bottomNavLinkActiveColor, iconColor;
@@ -68,33 +69,32 @@
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
 
-    <!-- Add this at the top of your _Layout.cshtml file -->
     <style>
-    /* Global fix for match card content */
-    [id^="content-"] {
-        max-height: none !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
-
-    /* Make sure button containers wrap properly */
-    .button-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    @@media (max-width: 640px) {
-        /* Smaller buttons on mobile */
-        button.inline-flex {
-            padding: 0.5rem !important;
-            font-size: 0.75rem !important;
+        /* Global fix for match card content */
+        [id^="content-"] {
+            max-height: none !important;
+            height: auto !important;
+            overflow: visible !important;
         }
 
-        button.inline-flex i {
-            margin-right: 0.25rem !important;
+        /* Make sure button containers wrap properly */
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
-    }
+
+        @@media (max-width: 640px) {
+            /* Smaller buttons on mobile */
+            button.inline-flex {
+                padding: 0.5rem !important;
+                font-size: 0.75rem !important;
+            }
+
+                button.inline-flex i {
+                    margin-right: 0.25rem !important;
+                }
+        }
     </style>
 
     <style>
@@ -180,6 +180,11 @@
         /* Toast container */
         #toast-container {
             z-index: 9999;
+            pointer-events: none;
+        }
+
+        #toast-container > * {
+            pointer-events: auto;
         }
 
         /* Toast animation */
@@ -235,20 +240,71 @@
             margin-top: 2px;
         }
 
-        /* Notification badge */
-        .notification-badge {
+        /* Notification Badge Styles - UPDATED */
+        #notification-badge {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background-color: #FF3B30;
+            top: -8px;
+            right: -8px;
+            background-color: #ef4444; /* Red-500 */
             color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            min-width: 18px;
+            height: 18px;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            padding: 0 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 20;
+        }
+
+        #notification-badge.hidden {
+            display: none;
+        }
+
+        /* Pulse animation for badge updates */
+        @@keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .pulse-animation {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        /* "New" badge styling for notifications list */
+        .new-badge {
+            display: inline-block;
+            background-color: #10b981; /* Green-500 */
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+            transition: opacity 0.3s ease;
+        }
+
+        .new-badge.fading {
+            animation: fade-out 0.5s forwards;
+        }
+
+        .new-badge.hidden {
+            display: none;
+        }
+
+        @@keyframes fade-out {
+            from { opacity: 1; }
+            to { opacity: 0; }
         }
 
         @@keyframes fadeIn {
@@ -279,8 +335,18 @@
         </div>
     </div>
 
-    <!-- Toast container for notifications -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs"></div>
+    <!-- Updated Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 max-w-xs pointer-events-none">
+        <!-- Toasts will be inserted here by JS -->
+        <!-- The container itself should be pointer-events-none, but each toast will have pointer-events-auto -->
+    </div>
+
+    <!-- Store the toast container reference globally so all scripts can access it -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            window.toastContainer = document.getElementById('toast-container');
+        });
+    </script>
 
     <div class="container">
         <main role="main" class="pb-20 mt-28">
@@ -297,10 +363,14 @@
                 <span class="text-xs mt-1">Home</span>
             </a>
             <a asp-controller="Social" asp-action="Index" class="social-icon-container flex flex-col items-center justify-center w-full h-full relative @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Social" ? "active" : "")">
-                <i data-lucide="users" class="w-6 h-6" color="@iconColor"></i>
+                <div class="relative">
+                    <i data-lucide="users" class="w-6 h-6" color="@iconColor"></i>
+                    <!-- Notification Badge - Updated position -->
+                    <div id="notification-badge" class="@(unreadNotifications > 0 ? "" : "hidden")">
+                        <span id="notification-count">@unreadNotifications</span>
+                    </div>
+                </div>
                 <span class="text-xs mt-1">Social</span>
-                <!-- Notification badge -->
-                <span id="notification-badge" class="notification-badge hidden">0</span>
             </a>
             <a asp-controller="Map" asp-action="Index" class="flex flex-col items-center justify-center w-full h-full @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Map" ? "active" : "")">
                 <i data-lucide="map" class="w-6 h-6" color="@iconColor"></i>
@@ -318,11 +388,6 @@
     </nav>
     }
 
-    <!-- Connection status indicator (can be hidden in production) -->
-    <div id="connection-status-indicator" class="fixed bottom-20 right-4 text-sm bg-white shadow rounded-full px-3 py-1 border z-50">
-        Status: <span id="connection-status" class="text-gray-500">Connecting...</span>
-    </div>
-
     <!-- Hidden audio element for notification sounds -->
     <audio id="notification-sound" preload="auto" src="/sounds/notification.mp3"></audio>
 
@@ -334,21 +399,74 @@
         document.addEventListener('DOMContentLoaded', function() {
             const currentTheme = '@currentTheme';
             window.applyTheme(currentTheme);
-
-            // Hide connection status after 5 seconds
-            setTimeout(() => {
-                document.getElementById('connection-status-indicator').classList.add('hidden');
-            }, 5000);
         });
     </script>
 
     <script>
     // Store session values globally for SignalR and other scripts
     window.currentUserId = '@Context.Session.GetString("UserId")';
-    console.log("Current user ID set from session:", window.currentUserId);
     </script>
 
-    <script src="~/js/match-functions.js"></script>
+    <!-- Notification scripts -->
     <script src="~/js/signalr-connection.js"></script>
+    <script src="~/js/notification-manager.js" asp-append-version="true"></script>
+    <script src="~/js/match-functions.js"></script>
+
+    <!-- Auto-check notification count on page load if not on Social page -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const isOnSocialPage = window.location.pathname.includes('/Social');
+
+            // If not on Social page and coming from Social page, refresh badge count after a delay
+            if (!isOnSocialPage && sessionStorage.getItem('refreshNotificationCount') === 'true') {
+                sessionStorage.removeItem('refreshNotificationCount');
+
+                setTimeout(() => {
+                    fetch('/Social/GetUnreadCount')
+                        .then(response => response.json())
+                        .then(data => {
+                            updateNotificationBadge(data.count);
+                        })
+                        .catch(error => console.error('Error fetching notification count:', error));
+                }, 1000);
+            }
+
+            // Set flag when leaving Social page
+            if (isOnSocialPage) {
+                window.addEventListener('beforeunload', function () {
+                    sessionStorage.setItem('refreshNotificationCount', 'true');
+                });
+            }
+        });
+
+        // Improved notification count handling
+        document.addEventListener('DOMContentLoaded', function () {
+            // Check if we're on the Social page
+            const isOnSocialPage = window.location.pathname.includes('/Social');
+
+            // For other pages, we rely on the notification-labels.js to fetch the count
+            // But let's make sure badge visibility is set correctly based on current count
+            if (!isOnSocialPage) {
+                const notificationBadge = document.getElementById('notification-badge');
+                const notificationCount = document.getElementById('notification-count');
+
+                if (notificationBadge && notificationCount) {
+                    const count = parseInt(notificationCount.textContent || '0');
+                    if (count > 0) {
+                        notificationBadge.classList.remove('hidden');
+                    } else {
+                        notificationBadge.classList.add('hidden');
+                    }
+                }
+            }
+
+            // We should only set the flag when actually leaving the Social page
+            if (isOnSocialPage) {
+                window.addEventListener('beforeunload', function () {
+                    sessionStorage.setItem('refreshNotificationCount', 'true');
+                });
+            }
+        });
+    </script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+wwwroot\css\expandable-sections.css
 wwwroot\css\site.css
 wwwroot\favicon.ico
 wwwroot\images\court_background_blue.png
@@ -9,6 +10,9 @@ wwwroot\images\logo2.png
 wwwroot\js\court-autocomplete.js
 wwwroot\js\match.js
 wwwroot\js\match-functions.js
+wwwroot\js\mobile-expandable-sections.js
+wwwroot\js\notification-labels.js
+wwwroot\js\notification-manager.js
 wwwroot\js\signalr-connection.js
 wwwroot\js\site.js
 wwwroot\js\theme-handler.js

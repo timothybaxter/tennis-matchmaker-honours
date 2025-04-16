@@ -13,7 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services
 builder.Services.AddControllersWithViews();
 builder.Services.AddSession();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options => {
+    options.EnableDetailedErrors = true;
+    options.MaximumReceiveMessageSize = 32768;
+
+    // Add fallback options for when WebSockets aren't available
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+}); 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<NotificationService>();
 
@@ -83,7 +90,6 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = ""
 });
 
-// app.UseCors("CorsPolicy");
 
 app.UseSession();
 app.UseRouting();
