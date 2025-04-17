@@ -426,9 +426,9 @@ export async function joinTournament(event) {
         console.error('Join tournament error:', error);
         return createResponse(500, { message: 'Error joining tournament', error: error.message });
     }
-}
 
-// Start tournament
+}
+// Start tournament function with deadline scaling
 export async function startTournament(event) {
     try {
         // Extract and verify token
@@ -485,6 +485,7 @@ export async function startTournament(event) {
             // Only create matches where both players are defined (not byes)
             if (matchInfo.player1 && matchInfo.player2) {
                 const matchDeadline = new Date();
+                // First round deadline stays the same
                 matchDeadline.setHours(matchDeadline.getHours() + tournament.challengeWindow);
 
                 const match = {
@@ -617,6 +618,270 @@ export async function startTournament(event) {
     }
 }
 
+// Advance winner function with progressive deadlines and bye-match fix
+async function advanceWinner(tournamentId, match, winnerId, tournaments, matches) {
+    try {
+        console.log(`Advancing winner ${winnerId} from match ${match.matchNumber} in round ${match.round}`);
+
+        // Get tournament
+        const tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        if (!tournament || tournament.status !== 'active') {
+            console.log(`Tournament ${tournamentId} not found or not active`);
+            return;
+        }
+
+        const currentRound = match.round;
+        const nextRound = currentRound + 1;
+
+        // If this is the final round, update tournament as completed
+        if (nextRound > tournament.bracket.numRounds) {
+            console.log(`Tournament ${tournamentId} completed with winner ${winnerId}`);
+            await tournaments.updateOne(
+                { _id: new ObjectId(tournamentId) },
+                { $set: { status: 'completed', completedAt: new Date(), winner: winnerId } }
+            );
+            return;
+        }
+
+        // Find the proper next match using fromMatch fields in the bracket
+        const nextRoundData = tournament.bracket.rounds.find(r => r.roundNumber === nextRound);
+        if (!nextRoundData) {
+            console.error(`Could not find round ${nextRound} in tournament structure`);
+            return;
+        }
+
+        // Find the next match by checking fromMatch1 and fromMatch2 fields
+        let nextMatch = null;
+        let playerPosition = null;
+
+        for (const matchData of nextRoundData.matches) {
+            if (matchData.fromMatch1 === match.matchNumber) {
+                nextMatch = matchData;
+                playerPosition = 'player1';
+                break;
+            }
+            if (matchData.fromMatch2 === match.matchNumber) {
+                nextMatch = matchData;
+                playerPosition = 'player2';
+                break;
+            }
+        }
+
+        // Fallback to numerical calculation if fromMatch fields aren't found
+        if (!nextMatch) {
+            // Calculate next match number based on current match number
+            const nextMatchNumber = Math.ceil(match.matchNumber / 2) +
+                (Math.pow(2, tournament.bracket.numRounds - 1) - Math.pow(2, tournament.bracket.numRounds - currentRound));
+
+            playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
+
+            nextMatch = nextRoundData.matches.find(m => m.matchNumber === nextMatchNumber);
+
+            if (!nextMatch) {
+                console.error(`Could not find next match for match ${match.matchNumber}`);
+                return;
+            }
+        }
+
+        console.log(`Winner ${winnerId} will advance to ${playerPosition} in match ${nextMatch.matchNumber}`);
+
+        // Find indices in the bracket structure
+        let currentRoundIndex = -1;
+        let nextRoundIndex = -1;
+        let currentMatchIndex = -1;
+        let nextMatchIndex = -1;
+
+        // Find round indices
+        for (let i = 0; i < tournament.bracket.rounds.length; i++) {
+            if (tournament.bracket.rounds[i].roundNumber === currentRound) {
+                currentRoundIndex = i;
+            }
+            if (tournament.bracket.rounds[i].roundNumber === nextRound) {
+                nextRoundIndex = i;
+            }
+        }
+
+        if (currentRoundIndex === -1 || nextRoundIndex === -1) {
+            console.error(`Could not find round indices`);
+            return;
+        }
+
+        // Find match indices
+        for (let i = 0; i < tournament.bracket.rounds[currentRoundIndex].matches.length; i++) {
+            if (tournament.bracket.rounds[currentRoundIndex].matches[i].matchNumber === match.matchNumber) {
+                currentMatchIndex = i;
+                break;
+            }
+        }
+
+        for (let i = 0; i < tournament.bracket.rounds[nextRoundIndex].matches.length; i++) {
+            if (tournament.bracket.rounds[nextRoundIndex].matches[i].matchNumber === nextMatch.matchNumber) {
+                nextMatchIndex = i;
+                break;
+            }
+        }
+
+        if (currentMatchIndex === -1 || nextMatchIndex === -1) {
+            console.error(`Could not find match indices`);
+            return;
+        }
+
+        // IMPORTANT: Update winner in current match in bracket
+        await tournaments.updateOne(
+            { _id: new ObjectId(tournamentId) },
+            {
+                $set: {
+                    [`bracket.rounds.${currentRoundIndex}.matches.${currentMatchIndex}.winner`]: { id: winnerId }
+                }
+            }
+        );
+
+        // IMPORTANT: Update player in next match in bracket
+        await tournaments.updateOne(
+            { _id: new ObjectId(tournamentId) },
+            {
+                $set: {
+                    [`bracket.rounds.${nextRoundIndex}.matches.${nextMatchIndex}.${playerPosition}`]: { id: winnerId }
+                }
+            }
+        );
+
+        // Now check if we need to create a match record in the matches collection
+        const existingMatch = await matches.findOne({
+            tournamentId: tournamentId,
+            round: nextRound,
+            matchNumber: nextMatch.matchNumber
+        });
+
+        // Get updated bracket data
+        const updatedTournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
+        const updatedNextMatch = updatedTournament.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
+
+        // Extract player IDs
+        const player1 = updatedNextMatch.player1 ? updatedNextMatch.player1.id : null;
+        const player2 = updatedNextMatch.player2 ? updatedNextMatch.player2.id : null;
+
+        // If match exists, update it with the new player
+        if (existingMatch) {
+            const updateData = {};
+
+            if (playerPosition === 'player1' && player1) {
+                updateData.player1 = player1;
+            } else if (playerPosition === 'player2' && player2) {
+                updateData.player2 = player2;
+            }
+
+            // Only update if we have data to update
+            if (Object.keys(updateData).length > 0) {
+                await matches.updateOne(
+                    { _id: existingMatch._id },
+                    { $set: updateData }
+                );
+                console.log(`Updated existing match ${existingMatch.matchNumber} with ${playerPosition}=${playerPosition === 'player1' ? player1 : player2}`);
+            }
+
+            // Check if this is now the final match with all players assigned
+            if (player1 && player2 && !existingMatch.winner) {
+                // Don't auto-complete the final match even if it's the same player on both sides
+                // The match should be played out normally
+                console.log(`Final match has both players assigned and ready to play`);
+            }
+        } else {
+            // Create new match if at least one player is assigned
+            if (player1 || player2) {
+                console.log(`Creating match ${nextMatch.matchNumber} in round ${nextRound} with players: ${player1 || 'TBD'} vs ${player2 || 'TBD'}`);
+
+                const matchDeadline = new Date();
+                // CHANGE: Scale deadline based on round number
+                // Each round gets progressively more time
+                matchDeadline.setHours(matchDeadline.getHours() + (tournament.challengeWindow * nextRound));
+
+                // FIXED CONDITION: Only treat as bye match if it's not the final round 
+                // and there's only one player AND it's not a match between two bye players
+                const isByeMatch = nextRound < tournament.bracket.numRounds && (
+                    (player1 && player2 && player1 === player2) || // Same player in both positions (shouldn't happen)
+                    ((player1 && !player2) || (!player1 && player2)) && // Only one player assigned
+                    // Additional check to ensure we're not in the middle of processing multiple byes
+                    !isNextRoundMatchBetweenByePlayers(tournament, nextRound, nextMatch.matchNumber)
+                );
+
+                let status = 'scheduled';
+                let winner = null;
+                let player1Submitted = false;
+                let player2Submitted = false;
+                let completedAt = null;
+
+                if (isByeMatch) {
+                    // Auto-complete bye matches but NOT the final match
+                    status = 'completed';
+                    winner = player1 || player2;
+                    player1Submitted = true;
+                    player2Submitted = true;
+                    completedAt = new Date();
+                    console.log(`Auto-completing match for player ${winner} (bye match)`);
+                }
+
+                const newMatch = {
+                    tournamentId: tournamentId,
+                    matchNumber: nextMatch.matchNumber,
+                    round: nextRound,
+                    player1: player1,
+                    player2: player2,
+                    winner: winner,
+                    scores: [],
+                    status: status,
+                    createdAt: new Date(),
+                    deadline: matchDeadline,
+                    player1Submitted: player1Submitted,
+                    player2Submitted: player2Submitted,
+                    completedAt: completedAt,
+                    isByeMatch: isByeMatch,
+                    fromMatch1: nextMatch.fromMatch1,
+                    fromMatch2: nextMatch.fromMatch2
+                };
+
+                const result = await matches.insertOne(newMatch);
+                console.log(`Created match: ${result.insertedId}`);
+
+                // If this is a bye match, advance the winner to the next round
+                // But ONLY if it's not the final round
+                if (isByeMatch && winner && nextRound < tournament.bracket.numRounds) {
+                    console.log(`Auto-advancing player ${winner} from bye match to next round`);
+                    const newMatchObj = { ...newMatch, _id: result.insertedId };
+                    await advanceWinner(tournamentId, newMatchObj, winner, tournaments, matches);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error in advanceWinner:', error);
+        console.error(error.stack);
+    }
+}
+
+// Helper function to check if a match in the next round will have two players who both received byes
+function isNextRoundMatchBetweenByePlayers(tournament, roundNumber, matchNumber) {
+    // Get the current round's matches that feed into this next round match
+    const previousRound = roundNumber - 1;
+    if (previousRound < 1) return false;
+
+    const previousRoundData = tournament.bracket.rounds.find(r => r.roundNumber === previousRound);
+    if (!previousRoundData) return false;
+
+    // Find the two matches that feed into this next round match
+    const feederMatches = previousRoundData.matches.filter(m => {
+        const nextMatchNum = Math.ceil(m.matchNumber / 2);
+        return nextMatchNum === matchNumber;
+    });
+
+    // Check if both feeder matches are bye matches
+    if (feederMatches.length === 2 &&
+        feederMatches[0].isByeMatch &&
+        feederMatches[1].isByeMatch) {
+        return true;
+    }
+
+    return false;
+}
 // Submit match result
 export async function submitMatchResult(event) {
     try {
@@ -1313,263 +1578,6 @@ function compareSubmissions(scores1, scores2, winner1, winner2) {
     return true;
 }
 
-// Full advanceWinner function with fix
-async function advanceWinner(tournamentId, match, winnerId, tournaments, matches) {
-    try {
-        console.log(`Advancing winner ${winnerId} from match ${match.matchNumber} in round ${match.round}`);
-
-        // Get tournament
-        const tournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
-        if (!tournament || tournament.status !== 'active') {
-            console.log(`Tournament ${tournamentId} not found or not active`);
-            return;
-        }
-
-        const currentRound = match.round;
-        const nextRound = currentRound + 1;
-
-        // If this is the final round, update tournament as completed
-        if (nextRound > tournament.bracket.numRounds) {
-            console.log(`Tournament ${tournamentId} completed with winner ${winnerId}`);
-            await tournaments.updateOne(
-                { _id: new ObjectId(tournamentId) },
-                { $set: { status: 'completed', completedAt: new Date(), winner: winnerId } }
-            );
-            return;
-        }
-
-        // Find the proper next match using fromMatch fields in the bracket
-        const nextRoundData = tournament.bracket.rounds.find(r => r.roundNumber === nextRound);
-        if (!nextRoundData) {
-            console.error(`Could not find round ${nextRound} in tournament structure`);
-            return;
-        }
-
-        // Find the next match by checking fromMatch1 and fromMatch2 fields
-        let nextMatch = null;
-        let playerPosition = null;
-
-        for (const matchData of nextRoundData.matches) {
-            if (matchData.fromMatch1 === match.matchNumber) {
-                nextMatch = matchData;
-                playerPosition = 'player1';
-                break;
-            }
-            if (matchData.fromMatch2 === match.matchNumber) {
-                nextMatch = matchData;
-                playerPosition = 'player2';
-                break;
-            }
-        }
-
-        // Fallback to numerical calculation if fromMatch fields aren't found
-        if (!nextMatch) {
-            // Calculate next match number based on current match number
-            const nextMatchNumber = Math.ceil(match.matchNumber / 2) +
-                (Math.pow(2, tournament.bracket.numRounds - 1) - Math.pow(2, tournament.bracket.numRounds - currentRound));
-
-            playerPosition = match.matchNumber % 2 === 1 ? 'player1' : 'player2';
-
-            nextMatch = nextRoundData.matches.find(m => m.matchNumber === nextMatchNumber);
-
-            if (!nextMatch) {
-                console.error(`Could not find next match for match ${match.matchNumber}`);
-                return;
-            }
-        }
-
-        console.log(`Winner ${winnerId} will advance to ${playerPosition} in match ${nextMatch.matchNumber}`);
-
-        // Find indices in the bracket structure
-        let currentRoundIndex = -1;
-        let nextRoundIndex = -1;
-        let currentMatchIndex = -1;
-        let nextMatchIndex = -1;
-
-        // Find round indices
-        for (let i = 0; i < tournament.bracket.rounds.length; i++) {
-            if (tournament.bracket.rounds[i].roundNumber === currentRound) {
-                currentRoundIndex = i;
-            }
-            if (tournament.bracket.rounds[i].roundNumber === nextRound) {
-                nextRoundIndex = i;
-            }
-        }
-
-        if (currentRoundIndex === -1 || nextRoundIndex === -1) {
-            console.error(`Could not find round indices`);
-            return;
-        }
-
-        // Find match indices
-        for (let i = 0; i < tournament.bracket.rounds[currentRoundIndex].matches.length; i++) {
-            if (tournament.bracket.rounds[currentRoundIndex].matches[i].matchNumber === match.matchNumber) {
-                currentMatchIndex = i;
-                break;
-            }
-        }
-
-        for (let i = 0; i < tournament.bracket.rounds[nextRoundIndex].matches.length; i++) {
-            if (tournament.bracket.rounds[nextRoundIndex].matches[i].matchNumber === nextMatch.matchNumber) {
-                nextMatchIndex = i;
-                break;
-            }
-        }
-
-        if (currentMatchIndex === -1 || nextMatchIndex === -1) {
-            console.error(`Could not find match indices`);
-            return;
-        }
-
-        // IMPORTANT: Update winner in current match in bracket
-        await tournaments.updateOne(
-            { _id: new ObjectId(tournamentId) },
-            {
-                $set: {
-                    [`bracket.rounds.${currentRoundIndex}.matches.${currentMatchIndex}.winner`]: { id: winnerId }
-                }
-            }
-        );
-
-        // IMPORTANT: Update player in next match in bracket
-        await tournaments.updateOne(
-            { _id: new ObjectId(tournamentId) },
-            {
-                $set: {
-                    [`bracket.rounds.${nextRoundIndex}.matches.${nextMatchIndex}.${playerPosition}`]: { id: winnerId }
-                }
-            }
-        );
-
-        // Now check if we need to create a match record in the matches collection
-        const existingMatch = await matches.findOne({
-            tournamentId: tournamentId,
-            round: nextRound,
-            matchNumber: nextMatch.matchNumber
-        });
-
-        // Get updated bracket data
-        const updatedTournament = await tournaments.findOne({ _id: new ObjectId(tournamentId) });
-        const updatedNextMatch = updatedTournament.bracket.rounds[nextRoundIndex].matches[nextMatchIndex];
-
-        // Extract player IDs
-        const player1 = updatedNextMatch.player1 ? updatedNextMatch.player1.id : null;
-        const player2 = updatedNextMatch.player2 ? updatedNextMatch.player2.id : null;
-
-        // If match exists, update it with the new player
-        if (existingMatch) {
-            const updateData = {};
-
-            if (playerPosition === 'player1' && player1) {
-                updateData.player1 = player1;
-            } else if (playerPosition === 'player2' && player2) {
-                updateData.player2 = player2;
-            }
-
-            // Only update if we have data to update
-            if (Object.keys(updateData).length > 0) {
-                await matches.updateOne(
-                    { _id: existingMatch._id },
-                    { $set: updateData }
-                );
-                console.log(`Updated existing match ${existingMatch.matchNumber} with ${playerPosition}=${playerPosition === 'player1' ? player1 : player2}`);
-            }
-
-            if (player1 && player2 && !existingMatch.winner) {
-                
-                console.log(`Final match has both players assigned and ready to play`);
-            }
-        } else {
-            // Create new match if at least one player is assigned
-            if (player1 || player2) {
-                console.log(`Creating match ${nextMatch.matchNumber} in round ${nextRound} with players: ${player1 || 'TBD'} vs ${player2 || 'TBD'}`);
-
-                const matchDeadline = new Date();
-                matchDeadline.setHours(matchDeadline.getHours() + tournament.challengeWindow);
-
-                const isByeMatch = nextRound < tournament.bracket.numRounds && (
-                    (player1 && player2 && player1 === player2) || 
-                    ((player1 && !player2) || (!player1 && player2)) && 
-              
-                    !isNextRoundMatchBetweenByePlayers(tournament, nextRound, nextMatch.matchNumber)
-                );
-
-                let status = 'scheduled';
-                let winner = null;
-                let player1Submitted = false;
-                let player2Submitted = false;
-                let completedAt = null;
-
-                if (isByeMatch) {
-                    // Auto-complete bye matches but NOT the final match
-                    status = 'completed';
-                    winner = player1 || player2;
-                    player1Submitted = true;
-                    player2Submitted = true;
-                    completedAt = new Date();
-                    console.log(`Auto-completing match for player ${winner} (bye match)`);
-                }
-
-                const newMatch = {
-                    tournamentId: tournamentId,
-                    matchNumber: nextMatch.matchNumber,
-                    round: nextRound,
-                    player1: player1,
-                    player2: player2,
-                    winner: winner,
-                    scores: [],
-                    status: status,
-                    createdAt: new Date(),
-                    deadline: matchDeadline,
-                    player1Submitted: player1Submitted,
-                    player2Submitted: player2Submitted,
-                    completedAt: completedAt,
-                    isByeMatch: isByeMatch,
-                    fromMatch1: nextMatch.fromMatch1,
-                    fromMatch2: nextMatch.fromMatch2
-                };
-
-                const result = await matches.insertOne(newMatch);
-                console.log(`Created match: ${result.insertedId}`);
-
-                // If this is a bye match, advance the winner to the next round
-                // But ONLY if it's not the final round
-                if (isByeMatch && winner && nextRound < tournament.bracket.numRounds) {
-                    console.log(`Auto-advancing player ${winner} from bye match to next round`);
-                    const newMatchObj = { ...newMatch, _id: result.insertedId };
-                    await advanceWinner(tournamentId, newMatchObj, winner, tournaments, matches);
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error in advanceWinner:', error);
-        console.error(error.stack);
-    }
-}
-
-function isNextRoundMatchBetweenByePlayers(tournament, roundNumber, matchNumber) {
-    // Get the current round's matches that feed into this next round match
-    const previousRound = roundNumber - 1;
-    if (previousRound < 1) return false;
-
-    const previousRoundData = tournament.bracket.rounds.find(r => r.roundNumber === previousRound);
-    if (!previousRoundData) return false;
-
-    // Find the two matches that feed into this next round match
-    const feederMatches = previousRoundData.matches.filter(m => {
-        const nextMatchNum = Math.ceil(m.matchNumber / 2);
-        return nextMatchNum === matchNumber;
-    });
-
-    // Check if both feeder matches are bye matches
-    if (feederMatches.length === 2 &&
-        feederMatches[0].isByeMatch &&
-        feederMatches[1].isByeMatch) {
-        return true;
-    }
-
-    return false;
-}
 // This function explicitly creates the final match for a tournament if needed
 async function ensureFinalMatchExists(tournamentId) {
     try {
